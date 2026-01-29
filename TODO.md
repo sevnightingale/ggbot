@@ -258,23 +258,6 @@ Both spot trading endpoints return 404 (not deployed yet):
 
 All test scripts and documentation ready. See [DOCS/symphony_spot_integration.md](DOCS/symphony_spot_integration.md).
 
-### Market Maker - Kuru Integration
-
-**Status**: WAITING - Module complete, needs Kuru API launch
-
-**What's Ready**:
-- [x] Core Avellaneda-Stoikov engine (~900 lines)
-- [x] Simulation tested (+0.20% P&L, inventory management working)
-- [x] Exchange adapter interface
-- [x] Kuru adapter template (needs real API docs)
-
-**Next Steps (When Kuru Launches)**:
-- [ ] Register on Kuru platform, get API credentials
-- [ ] Update KuruAdapter with actual endpoints/auth
-- [ ] Test with small capital ($100-200 orders, $2k capital)
-- [ ] Production deployment if successful
-
----
 
 ## 🧠 **Market Intelligence - Future Phases**
 

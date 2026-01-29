@@ -6,6 +6,59 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-28 - Rei Scheduled Bot Engine (Experimental)
+
+**Purpose**: Alternative decision engine using Rei Core (reilabs.org) instead of OpenRouter LLMs. Replaces agent-based Rei integration that failed due to Claude overriding Rei signals.
+
+**New Files**:
+- `decision/rei_engine.py` - ReiDecisionEngine + report_trade_outcome_to_rei() feedback function
+- `DOCS/REI_DOCS.md` - Rei platform documentation (from reilabs.org)
+
+**Schema Changes** (`core/config/schemas.py`, `core/services/config_service.py`):
+- Added `rei_enabled: bool = False` to ScheduledTradingConfigData
+- Added `rei_enabled` attribute to BotConfigV2 class + from_dict() loader
+
+**Orchestrator Routing** (`ggbot.py:_run_decision_v2()`):
+- Checks `config.rei_enabled` flag
+- Routes to ReiDecisionEngine instead of DecisionEngineV2
+- Fetches open positions + account balance for Rei context
+
+**Feedback Loop** (`trading/paper/supabase_service.py`):
+- On trade close, checks if bot is rei_enabled
+- Reports outcome to Rei: symbol, side, P&L, duration, close reason
+- Enables inference-time learning (Rei improves from outcomes)
+
+**Activity Logging** (`decision/rei_engine.py`):
+- Logs as `llm_thought` (not `rei_decision`) for frontend compatibility
+- Formats Rei's key_signals/warnings/reasoning into KEY_SIGNAL/SUMMARY/RISK sections
+- Sets `provider='rei'`, `model='rei-core'`, zero cost (external billing)
+
+**Test Bot**: "The Nightingale" (config_id: `4060437e-b39e-4c51-a2a9-b35cf698ed64`) - BTC/USDT paper
+
+**Doc Updates**: `ACTIVE.md` (Rei section under Trading Modes), `decision/README.md` (full Rei section)
+
+---
+
+## 2026-01-28 - Kimi K2.5 Model Update + LLM Update Workflow
+
+**Kimi Model Upgrade** (`decision/llm_providers/openrouter_provider.py`):
+- Standard tier: `kimi-k2-0905` → `kimi-k2.5` (multimodal SOTA, agent swarm)
+- Premium tier: `kimi-k2-thinking` → `kimi-k2.5` (same model, high reasoning effort)
+- Economy tier: unchanged (`kimi-k2`)
+- Updated `REASONING_SUPPORTED`, `TEMPERATURE_SUPPORTED`, `MODEL_MAP`, `MODEL_TIER_MAP`
+- DB `llm_models` table: pricing $0.60/$3.00, context 262K, description updated
+
+**LLM Model Update Workflow** (`decision/llm_providers/MODEL_UPDATE.md` - NEW):
+- Systematic process: Research → Code → DB → Restart → Verify
+- Current 21-combination roster table (7 models × 3 tiers)
+- Checklist for all touch points (code + DB)
+- Update history with this Kimi change as first entry
+
+**Documentation** (`CLAUDE.md`):
+- Added "Updating LLM models/tiers" → `decision/llm_providers/MODEL_UPDATE.md` to quick reference table
+
+---
+
 ## 2026-01-27 - Forge React Query + Arena Podium Fixes
 
 **Forge Page React Query** (`frontend/lib/queries.ts`, `frontend/app/forge/page.tsx`):

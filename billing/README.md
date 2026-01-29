@@ -62,7 +62,7 @@ scripts/
 | Tier | DB Value | Description | Billing | Bot Stops When |
 |------|----------|-------------|---------|----------------|
 | `FREE` | `free` | Trial users | None | N/A (can't run bots) |
-| `PREPAID` | `ggbase` | Credit pack users | None (prepaid) | Credits exhausted |
+| `PREPAID` | `prepaid` | Credit pack users | None (prepaid) | Credits exhausted |
 | `USAGE_BASED` | `usage_based` | Pay-as-you-go | Stripe metered (weekly) | Never (just billed) |
 | `PRO` | `pro` | Premium subscription | $29/mo + metered | Never |
 
@@ -78,7 +78,7 @@ scripts/
 | Hard-block on depletion | YES (before LLM call) | NO (soft pause after) |
 | Invoice at end of period | NO | YES |
 
-**PREPAID flow**: User buys credits → tier set to `ggbase` → pre-LLM credit check → bot pauses when $0 → no invoice ever.
+**PREPAID flow**: User buys credits → tier set to `prepaid` → pre-LLM credit check → bot pauses when $0 → no invoice ever.
 
 **USAGE_BASED flow**: User subscribes → metered billing → credits apply as discounts → invoice for net usage.
 
@@ -113,7 +113,7 @@ STRIPE_WEBHOOK_SECRET=whsec_xxx       # Webhook signature verification
 `billing/stripe_meter_reporter.py` runs daily at midnight UTC via APScheduler:
 
 1. Query `activities` table for unreported usage (`stripe_reported = FALSE`)
-2. **Exclude prepaid users** (JOIN filter: `subscription_tier != 'ggbase'`)
+2. **Exclude prepaid users** (JOIN filter: `subscription_tier != 'prepaid'`)
 3. Aggregate by user
 4. Send meter events to Stripe (with idempotency key)
 5. Mark activities as reported
@@ -125,7 +125,7 @@ identifier = f"{user_id}:{report_date}:{hash(value)}"
 
 **Note**: Prepaid users are excluded at two levels:
 1. Activity logged with `stripe_reported=TRUE` (never enters queue)
-2. Meter reporter query JOINs user_profiles to exclude `ggbase` tier
+2. Meter reporter query JOINs user_profiles to exclude `prepaid` tier
 
 ### Credit Grants
 
@@ -341,7 +341,7 @@ python -m billing.stripe_meter_reporter
 |--------|------|-------------|
 | `stripe_customer_id` | TEXT | Stripe customer ID |
 | `stripe_subscription_id` | TEXT | Stripe subscription ID (NULL for prepaid) |
-| `subscription_tier` | TEXT | `free`, `ggbase`, `usage_based`, `pro` |
+| `subscription_tier` | TEXT | `free`, `prepaid`, `usage_based`, `pro` |
 | `subscription_status` | TEXT | `active`, `canceled`, etc. |
 
 ---

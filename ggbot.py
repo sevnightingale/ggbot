@@ -4987,7 +4987,7 @@ async def create_crypto_checkout(
                 json={
                     "price_amount": amount_usd,
                     "price_currency": "usd",
-                    "order_id": f"credits_{current_user.user_id}_{amount_cents}",
+                    "order_id": f"credits_{current_user.user_id}_{amount_cents}_{int(datetime.now().timestamp())}",
                     "order_description": f"${amount_usd:.0f} Credit Pack for ggbots",
                     "ipn_callback_url": "https://ggbots-api.nightingale.business/api/v2/webhooks/nowpayments",
                     "success_url": f"{os.environ['FRONTEND_URL']}/credits/success",

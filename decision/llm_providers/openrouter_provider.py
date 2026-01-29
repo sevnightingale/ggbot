@@ -139,14 +139,17 @@ class OpenRouterProvider(LLMProvider):
         """
         super().__init__(api_key, model, **kwargs)
 
-        # Initialize OpenAI client with OpenRouter base URL
-        self.client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key
-        )
-
         self.timeout = kwargs.get('timeout', 200)
         self.max_retries = kwargs.get('max_retries', 3)
+
+        # Initialize OpenAI client with OpenRouter base URL
+        # Configure proper timeout and retry settings at client level
+        self.client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            timeout=self.timeout,
+            max_retries=2,  # Client-level retries before our manual retry loop
+        )
 
         # Get reasoning tier (economy, standard, premium)
         # Support both new reasoning_tier and legacy thinking_mode
@@ -188,6 +191,19 @@ class OpenRouterProvider(LLMProvider):
         Returns:
             Tuple[str, Dict[str, Any]]: Response text and standardized metadata
         """
+        # Validate prompt is not empty (prevents "Input must have at least 1 token" API errors)
+        if not prompt or not prompt.strip():
+            logger.bind(module="decision.openrouter").error(
+                f"Empty prompt received! custom_mode={custom_mode}, "
+                f"conversation_history_len={len(conversation_history) if conversation_history else 0}"
+            )
+            raise ValueError("Cannot send empty prompt to LLM API")
+
+        # Log prompt info for debugging (truncated for brevity)
+        logger.bind(module="decision.openrouter").debug(
+            f"Prompt received: {len(prompt)} chars, first 100: {prompt[:100]!r}..."
+        )
+
         messages = []
 
         # Add system prompt if custom mode is specified
@@ -237,6 +253,13 @@ class OpenRouterProvider(LLMProvider):
 
                 # Call OpenRouter via OpenAI SDK
                 response = await self.client.chat.completions.create(**request_params)
+
+                # Validate response structure before accessing
+                if not response.choices:
+                    raise ValueError(
+                        f"OpenRouter returned empty choices array - "
+                        f"model: {self.openrouter_model}, response: {response}"
+                    )
 
                 # Extract response content
                 message = response.choices[0].message

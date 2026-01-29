@@ -162,7 +162,7 @@ created_at        timestamp
 ```
 user_id           uuid         PRIMARY KEY
 email             varchar      User email
-subscription_tier varchar      'free' | 'ggbase' | etc
+subscription_tier varchar      'free' | 'prepaid' | 'usage_based' | 'pro'
 subscription_expires_at timestamp Nullable
 created_at        timestamp
 ```

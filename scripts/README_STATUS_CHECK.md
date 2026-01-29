@@ -55,7 +55,7 @@ Useful for:
 
 ### User Metrics
 - Total registered users
-- Pro users (ggbase subscription tier)
+- Prepaid users (credit pack tier)
 - Free users
 - Active subscribers (paid and not expired)
 - Users with at least one bot
@@ -102,7 +102,7 @@ Generated: 2025-10-22 15:58:06 UTC
 📊 USER STATISTICS
 --------------------------------------------------------------------------------
 Total Users: 256
-  Pro Users (ggbase): 5 (2 active subscriptions)
+  Prepaid Users: 5 (2 active subscriptions)
   Free Users: 251
 Users with Bots: 250 (97.7%)
 

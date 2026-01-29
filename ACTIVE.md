@@ -1,63 +1,66 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-27 18:36:00 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-29 17:10:24 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 307
-- **Prepaid Users**: 13 (13 active subscriptions)
-- **Free Users**: 284
-- **Users with Bots**: 298 (97.1%)
+- **Total Users**: 310
+- **Prepaid Users**: 16 (16 active subscriptions)
+- **Free Users**: 286
+- **Users with Bots**: 301 (97.1%)
 
 ### Bot Statistics
-- **Total Bots**: 467
-- **Active Bots**: 30 (6.4%)
-  - Paper: 29
+- **Total Bots**: 477
+- **Active Bots**: 35 (7.3%)
+  - Paper: 34
   - Symphony (Live): 1
   - Aster (DEX): 0
-- **Inactive Bots**: 437
+- **Inactive Bots**: 442
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,581
-  - Wins: 1,684
-  - Losses: 3,897
-  - Platform Win Rate: 30.17%
-  - Total P&L: $-18,614.83
+- **Total Trades (All Time)**: 5,650
+  - Wins: 1,706
+  - Losses: 3,944
+  - Platform Win Rate: 30.19%
+  - Total P&L: $-20,974.32
 - **Recent Activity**:
-  - Last 24 hours: 29 trades
-  - Last 7 days: 178 trades
-  - Last 30 days: 361 trades
+  - Last 24 hours: 66 trades
+  - Last 7 days: 214 trades
+  - Last 30 days: 440 trades
 
 ### Open Positions
-- **Open Positions**: 17
-- **Unique Symbols**: 4
-- **Total Exposure**: $187,800.74
-- **Unrealized P&L**: $719.69
+- **Open Positions**: 19
+- **Unique Symbols**: 5
+- **Total Exposure**: $1,098,555.24
+- **Unrealized P&L**: $7,960.86
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,935.38
+- **Average Balance**: $9,931.78
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $10,472.05
+- **Highest Balance**: $11,470.59
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 19 bots
-- **SOL/USDT**: 5 bots
-- **ETH/USDT**: 4 bots
+- **BTC/USDT**: 20 bots
+- **SOL/USDT**: 8 bots
+- **ETH/USDT**: 3 bots
+- **SOL/USDC**: 2 bots
 - **LINK/USDT**: 1 bots
-- **RENDER/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 865 decisions (avg confidence: 39.4%)
-- **enter**: 29 decisions (avg confidence: 65.9%)
-- **exit**: 19 decisions (avg confidence: 70.9%)
+- **wait**: 883 decisions (avg confidence: 47.0%)
+- **enter**: 68 decisions (avg confidence: 72.3%)
+- **exit**: 25 decisions (avg confidence: 70.4%)
+- **long**: 3 decisions (avg confidence: 65.0%)
+- **close**: 2 decisions (avg confidence: 62.0%)
+- **enter_long**: 1 decisions (avg confidence: 65.0%)
 
 ### System Health
-- **Decisions (last hour)**: 31
+- **Decisions (last hour)**: 59
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -66,21 +69,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 19MB | 20h 38m | 8 |
-| market-data-ws | 🟢 online | 1.3% | 13MB | 20h 38m | 7 |
-| ggbot | 🟢 online | 1.1% | 470MB | 51m | 50 |
-| account-monitor | 🟢 online | 1.6% | 217MB | 20h 38m | 25 |
-| telegram-bot | 🟢 online | 0% | 35MB | 20h 38m | 3 |
+| error-alerts | 🟢 online | 0% | 34MB | 37m | 11 |
+| market-data-ws | 🟢 online | 2.4% | 133MB | 37m | 10 |
+| ggbot | 🟢 online | 1% | 440MB | 37m | 65 |
+| account-monitor | 🟢 online | 0.6% | 153MB | 37m | 30 |
+| telegram-bot | 🟢 online | 0% | 34MB | 37m | 6 |
 
 ### VM Resources
 
-- **Disk**: 45G / 78G (58%)
-- **Memory**: 1.9Gi / 3.8Gi
-- **CPU Load**: 0.56 / 0.25 / 0.16 (1m/5m/15m)
+- **Disk**: 46G / 78G (59%)
+- **Memory**: 2.3Gi / 3.8Gi
+- **CPU Load**: 0.69 / 0.29 / 0.21 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 21.03M)
+- **Redis**: 🟢 connected (Memory: 16.47M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -446,7 +449,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-27 18:36:01 UTC
+**Last Updated**: 2026-01-29 17:10:26 UTC
 
 ---
 
@@ -1332,7 +1335,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-27 18:36:01 UTC
+**Last Updated**: 2026-01-29 17:10:26 UTC
 
 ---
 

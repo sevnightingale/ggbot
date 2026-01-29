@@ -131,7 +131,19 @@ class HybridPriceService:
         return self.redis_client
 
     async def _get_binance_client(self) -> AsyncClient:
-        """Get or create Binance client."""
+        """Get or create Binance client with connection health check."""
+        if self.binance_client:
+            try:
+                # Test connection health - ping is lightweight (1 weight)
+                await self.binance_client.ping()
+            except Exception as e:
+                self._log.warning(f"Binance connection stale, recreating: {type(e).__name__}: {e}")
+                try:
+                    await self.binance_client.close_connection()
+                except Exception:
+                    pass  # Ignore close errors on dead connection
+                self.binance_client = None
+
         if not self.binance_client:
             self.binance_client = await AsyncClient.create()
         return self.binance_client
@@ -290,8 +302,8 @@ class HybridPriceService:
             return market_price
 
         except Exception as e:
-            self._log.error(f"Binance REST API error for {symbol}: {e}")
-            raise Exception(f"Failed to fetch price from Binance API: {e}")
+            self._log.error(f"Binance REST API error for {symbol}: {type(e).__name__}: {e!r}")
+            raise Exception(f"Failed to fetch price from Binance API: {type(e).__name__}: {e}")
 
     async def get_rate_limit_status(self) -> Dict:
         """

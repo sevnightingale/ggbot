@@ -8,12 +8,16 @@ Restricted to ADMIN_USER_ID only.
 import os
 import json
 import subprocess
+import stripe
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2
+
+# Initialize Stripe
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 from core.common.db import get_db_connection
 from core.common.logger import logger
 
@@ -649,6 +653,86 @@ async def get_user_detail(
                     "open_positions": row[9] or 0
                 })
             user["paper_accounts"] = accounts
+
+            # Get unbilled usage from activities
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(platform_cost_usd), 0) as unbilled_cost,
+                    COUNT(*) as unbilled_count
+                FROM activities
+                WHERE user_id = %s
+                  AND platform_cost_usd > 0
+                  AND stripe_reported = false
+            """, (user_id,))
+            unbilled = cur.fetchone()
+            unbilled_cost = float(unbilled[0] or 0)
+            unbilled_count = unbilled[1] or 0
+
+            # Get total usage from activities
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(platform_cost_usd), 0) as total_cost,
+                    COUNT(*) as total_count
+                FROM activities
+                WHERE user_id = %s
+                  AND platform_cost_usd > 0
+            """, (user_id,))
+            total_usage = cur.fetchone()
+            total_usage_cost = float(total_usage[0] or 0)
+            total_usage_count = total_usage[1] or 0
+
+    # Fetch credit info from Stripe if customer exists
+    credit_info = {
+        "total_purchased": 0,
+        "available_balance": 0,
+        "used_balance": 0,
+        "unbilled_usage": round(unbilled_cost, 4),
+        "unbilled_count": unbilled_count,
+        "total_usage_cost": round(total_usage_cost, 4),
+        "total_usage_count": total_usage_count,
+        "credit_grants": []
+    }
+
+    stripe_customer_id = user.get("stripe_customer_id")
+    if stripe_customer_id:
+        try:
+            # Get credit grants
+            grants = stripe.billing.CreditGrant.list(customer=stripe_customer_id, limit=20)
+            total_purchased = 0
+            for g in grants.data:
+                amount = g.amount.monetary.value / 100
+                total_purchased += amount
+                credit_info["credit_grants"].append({
+                    "id": g.id,
+                    "name": g.name,
+                    "amount": amount,
+                    "category": g.category,
+                    "created_at": datetime.fromtimestamp(g.created).isoformat()
+                })
+            credit_info["total_purchased"] = round(total_purchased, 2)
+
+            # Get current balance
+            try:
+                balance_summary = stripe.billing.CreditBalanceSummary.retrieve(
+                    customer=stripe_customer_id,
+                    filter={
+                        'type': 'applicability_scope',
+                        'applicability_scope': {'price_type': 'metered'}
+                    }
+                )
+                if balance_summary.balances and len(balance_summary.balances) > 0:
+                    balance = balance_summary.balances[0]
+                    available = balance.available_balance.monetary.value / 100 if balance.available_balance else 0
+                    ledger = balance.ledger_balance.monetary.value / 100 if balance.ledger_balance else 0
+                    credit_info["available_balance"] = round(available, 2)
+                    credit_info["used_balance"] = round(total_purchased - available, 2)
+            except stripe.error.StripeError as e:
+                logger.warning(f"Could not fetch credit balance for {stripe_customer_id}: {e}")
+
+        except stripe.error.StripeError as e:
+            logger.warning(f"Could not fetch credit grants for {stripe_customer_id}: {e}")
+
+    user["credit_info"] = credit_info
 
     return {"success": True, "user": user}
 

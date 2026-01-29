@@ -314,7 +314,7 @@ with get_db_connection() as conn:
             SELECT
                 COALESCE(subscription_tier, 'unknown') as tier,
                 COUNT(*) as user_count,
-                COUNT(CASE WHEN subscription_expires_at > NOW() OR subscription_tier = 'ggbase' THEN 1 END) as active_subscribers,
+                COUNT(CASE WHEN subscription_expires_at > NOW() OR subscription_tier = 'prepaid' THEN 1 END) as active_subscribers,
                 SUM((
                     SELECT COUNT(*)
                     FROM configurations c

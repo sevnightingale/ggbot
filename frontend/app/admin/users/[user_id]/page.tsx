@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { ArrowLeft, Save, RefreshCw, Play, Square, RotateCcw, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Save, RefreshCw, Play, Square, RotateCcw, ChevronDown, ChevronRight, AlertCircle, CreditCard, Coins } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 
@@ -40,6 +40,25 @@ interface PaperAccount {
   open_positions: number
 }
 
+interface CreditGrant {
+  id: string
+  name: string
+  amount: number
+  category: string
+  created_at: string
+}
+
+interface CreditInfo {
+  total_purchased: number
+  available_balance: number
+  used_balance: number
+  unbilled_usage: number
+  unbilled_count: number
+  total_usage_cost: number
+  total_usage_count: number
+  credit_grants: CreditGrant[]
+}
+
 interface UserDetail {
   user_id: string
   email: string
@@ -57,6 +76,7 @@ interface UserDetail {
   profile_updated: string | null
   configurations: Config[]
   paper_accounts: PaperAccount[]
+  credit_info?: CreditInfo
 }
 
 export default function UserDetailPage() {
@@ -388,6 +408,78 @@ export default function UserDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Credits & Billing Section */}
+      {user.credit_info && (
+        <div className="bg-charcoal-900 rounded-lg border border-charcoal-700 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-amber-400" />
+            Credits & Billing
+          </h2>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-charcoal-800/50 rounded-lg p-4">
+              <div className="text-sm text-gray-500 mb-1">Total Purchased</div>
+              <div className="text-2xl font-bold text-white">
+                {formatCurrency(user.credit_info.total_purchased)}
+              </div>
+            </div>
+            <div className="bg-charcoal-800/50 rounded-lg p-4">
+              <div className="text-sm text-gray-500 mb-1">Available Balance</div>
+              <div className={`text-2xl font-bold ${user.credit_info.available_balance > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                {formatCurrency(user.credit_info.available_balance)}
+              </div>
+            </div>
+            <div className="bg-charcoal-800/50 rounded-lg p-4">
+              <div className="text-sm text-gray-500 mb-1">Total Used</div>
+              <div className="text-2xl font-bold text-amber-400">
+                {formatCurrency(user.credit_info.total_usage_cost)}
+              </div>
+              <div className="text-xs text-gray-500">{user.credit_info.total_usage_count} LLM calls</div>
+            </div>
+            <div className="bg-charcoal-800/50 rounded-lg p-4">
+              <div className="text-sm text-gray-500 mb-1">Unbilled Usage</div>
+              <div className={`text-2xl font-bold ${user.credit_info.unbilled_usage > 0 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                {formatCurrency(user.credit_info.unbilled_usage)}
+              </div>
+              <div className="text-xs text-gray-500">{user.credit_info.unbilled_count} pending</div>
+            </div>
+          </div>
+
+          {/* Credit Grants History */}
+          {user.credit_info.credit_grants.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                <Coins className="h-4 w-4" />
+                Credit Grants ({user.credit_info.credit_grants.length})
+              </h3>
+              <div className="space-y-2">
+                {user.credit_info.credit_grants.map(grant => (
+                  <div
+                    key={grant.id}
+                    className="flex items-center justify-between p-3 bg-charcoal-800/30 rounded-lg border border-charcoal-700"
+                  >
+                    <div>
+                      <div className="text-white font-medium">{grant.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {formatDate(grant.created_at)} · {grant.category}
+                      </div>
+                    </div>
+                    <div className="text-green-400 font-semibold">
+                      +{formatCurrency(grant.amount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {user.credit_info.credit_grants.length === 0 && (
+            <div className="text-gray-500 text-sm">No credit purchases yet</div>
+          )}
+        </div>
+      )}
 
       {/* Bots Section */}
       <div className="bg-charcoal-900 rounded-lg border border-charcoal-700 p-6 mb-6">
