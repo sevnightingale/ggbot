@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 1200px;
+      height: 630px;
+      background: linear-gradient(135deg, #0b0b0c 0%, #141416 50%, #0b0b0c 100%);
+      font-family: 'Space Grotesk', sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle grid pattern overlay */
+    .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image:
+        linear-gradient(rgba(193, 168, 125, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(193, 168, 125, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* Brass accent line */
+    .accent-line {
+      position: absolute;
+      top: 40px;
+      left: 80px;
+      right: 80px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #c1a87d, transparent);
+    }
+
+    .accent-line-bottom {
+      top: auto;
+      bottom: 40px;
+    }
+
+    .content {
+      text-align: center;
+      z-index: 1;
+      padding: 0 80px;
+    }
+
+    .logo-container {
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      height: 80px;
+      width: auto;
+    }
+
+    .tagline {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 72px;
+      font-weight: 400;
+      color: #edebe7;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+
+    .tagline .highlight {
+      color: #c1a87d;
+      font-style: italic;
+    }
+
+    .subtitle {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: #8a8781;
+      letter-spacing: 0.5px;
+    }
+
+    /* Decorative corner elements */
+    .corner {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: 2px solid #c1a87d;
+      opacity: 0.4;
+    }
+
+    .corner-tl {
+      top: 60px;
+      left: 60px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .corner-tr {
+      top: 60px;
+      right: 60px;
+      border-left: none;
+      border-bottom: none;
+    }
+
+    .corner-bl {
+      bottom: 60px;
+      left: 60px;
+      border-right: none;
+      border-top: none;
+    }
+
+    .corner-br {
+      bottom: 60px;
+      right: 60px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .url {
+      position: absolute;
+      bottom: 70px;
+      font-size: 18px;
+      color: #c1a87d;
+      letter-spacing: 2px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-overlay"></div>
+  <div class="accent-line"></div>
+  <div class="accent-line accent-line-bottom"></div>
+
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="content">
+    <div class="logo-container">
+      <img src="../public/ggbots_logo.png" alt="ggbots" class="logo" />
+    </div>
+    <h1 class="tagline">Your Edge, <span class="highlight">Amplified</span></h1>
+    <p class="subtitle">AI trading agents that think, adapt, and execute 24/7</p>
+  </div>
+
+  <span class="url">GGBOTS.AI</span>
+</body>
+</html>

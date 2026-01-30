@@ -1,6 +1,15 @@
 import React from 'react'
 import Link from 'next/link'
 import { Settings, Key, User, Bell } from 'lucide-react'
+import { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Settings',
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 interface SettingsLayoutProps {
   children: React.ReactNode

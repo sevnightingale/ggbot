@@ -24,8 +24,48 @@ const ibmPlexMono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "ggbots - your edge, amplified",
-  description: "build autonomous AI trading agents that trade like you",
+  metadataBase: new URL('https://ggbots.ai'),
+  title: {
+    default: "ggbots - Your Edge, Amplified",
+    template: "%s | ggbots",
+  },
+  description: "Build autonomous AI trading agents that think, adapt, and execute your strategies 24/7. Created by traders, for traders.",
+  keywords: ["AI trading", "autonomous trading bots", "cryptocurrency trading", "algorithmic trading", "adaptive AI", "trading agents", "crypto bots"],
+  authors: [{ name: "ggbots" }],
+  creator: "ggbots",
+  publisher: "ggbots",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://ggbots.ai",
+    siteName: "ggbots",
+    title: "ggbots - Your Edge, Amplified",
+    description: "Build autonomous AI trading agents that think, adapt, and execute your strategies 24/7.",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "ggbots - AI Trading Agents",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ggbots - Your Edge, Amplified",
+    description: "Build autonomous AI trading agents that think, adapt, and execute your strategies 24/7.",
+    images: ["/twitter-image.png"],
+    creator: "@ggbots_ai",
+  },
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
+  manifest: "/manifest.json",
 }
 
 export default function RootLayout({
