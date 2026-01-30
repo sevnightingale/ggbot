@@ -242,6 +242,7 @@ case 'live_trading':
 | Updating LLM models/tiers | `decision/llm_providers/MODEL_UPDATE.md` |
 | Agent behavior, MCP tools, strategy | `agent/README.md` |
 | Frontend components, SSE, bot rail | `frontend/README.md` |
+| SEO, blog, OG images, content strategy | `frontend/SEO.md` |
 | Database schema questions | `ACTIVE.md` (Database Schema section) |
 | API endpoint behavior | `ACTIVE.md` (Core API Endpoints section) |
 

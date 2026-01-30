@@ -294,7 +294,7 @@ The ggbot repository is organized into the following top-level directories:
 
 ## 📚 Module Documentation
 
-The ggbot repository includes 9 comprehensive module READMEs with detailed technical documentation:
+The ggbot repository includes comprehensive module documentation:
 
 | Module | Lines | Contents |
 |--------|-------|----------|
@@ -305,6 +305,7 @@ The ggbot repository includes 9 comprehensive module READMEs with detailed techn
 | **[trading/README.md](trading/README.md)** | 723 | Paper & live trading, Symphony integration |
 | **[billing/README.md](billing/README.md)** | 400+ | Metered billing, Stripe + crypto payments, credit grants, usage tracking |
 | **[frontend/README.md](frontend/README.md)** | 488 | Forge architecture, subscription system |
+| **[frontend/SEO.md](frontend/SEO.md)** | 350+ | SEO infrastructure, blog system, OG images, content strategy |
 
 
 ---
