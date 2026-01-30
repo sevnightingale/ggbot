@@ -37,10 +37,11 @@ export function BotManagementMenu({
     setNewName(bot.config_name)
   }, [bot.config_name])
 
-  // Close menu when clicking outside
+  // Close menu when clicking outside (supports both mouse and touch)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setIsOpen(false)
         setShowDeleteConfirm(false)
         setShowResetConfirm(false)
@@ -50,8 +51,9 @@ export function BotManagementMenu({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    // Use pointerdown for unified mouse/touch handling
+    document.addEventListener('pointerdown', handleClickOutside)
+    return () => document.removeEventListener('pointerdown', handleClickOutside)
   }, [isRenamingLocal, handleRenameCancel])
 
   // Focus input when entering rename mode
@@ -138,7 +140,7 @@ export function BotManagementMenu({
 
   if (showDeleteConfirm) {
     return (
-      <div ref={menuRef} className="absolute right-0 top-8 z-50 min-w-48 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+      <div ref={menuRef} data-bot-menu className="absolute right-0 top-8 z-50 min-w-48 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
         <div className="p-3">
           <div className="text-xs text-[var(--text-primary)] mb-2">
             Delete &ldquo;{bot.config_name}&rdquo;?
@@ -168,7 +170,7 @@ export function BotManagementMenu({
 
   if (showResetConfirm) {
     return (
-      <div ref={menuRef} className="absolute right-0 top-8 z-50 min-w-56 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+      <div ref={menuRef} data-bot-menu className="absolute right-0 top-8 z-50 min-w-56 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
         <div className="p-3">
           <div className="text-xs text-[var(--text-primary)] mb-2">
             Reset Trading Account?
@@ -219,7 +221,7 @@ export function BotManagementMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-6 z-50 min-w-44 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+        <div data-bot-menu className="absolute right-0 top-6 z-50 min-w-44 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
           <div className="py-1">
             <button
               onClick={handleRename}

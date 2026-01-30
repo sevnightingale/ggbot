@@ -165,8 +165,9 @@ function BotRow({
     >
       <div
         onClick={(e) => {
-          // Don't select bot if clicking menu button
-          if ((e.target as HTMLElement).closest('[data-menu-trigger]')) return
+          // Don't select bot if clicking menu button or inside menu dropdown
+          const target = e.target as HTMLElement
+          if (target.closest('[data-menu-trigger]') || target.closest('[data-bot-menu]')) return
           onClick()
         }}
         className="cursor-pointer mb-2"
