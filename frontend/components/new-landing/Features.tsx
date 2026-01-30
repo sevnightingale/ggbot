@@ -42,7 +42,7 @@ export default function Features() {
             return (
               <div
                 key={index}
-                className="relative border-2 border-brass/40 bg-carbon p-8 rounded-sm shadow-[0_0_25px_rgba(193,168,125,0.2)]"
+                className="relative border-2 border-brass/40 bg-carbon p-8 rounded-sm"
               >
                 {/* Icon */}
                 <div className="mb-6">
@@ -65,6 +65,22 @@ export default function Features() {
               </div>
             )
           })}
+        </div>
+
+        {/* CTA */}
+        <div className="text-center mt-16">
+          <p className="text-ivory/70 mb-6">
+            Ready to see these features in action?
+          </p>
+          <a
+            href="https://app.ggbots.ai/arena"
+            className="inline-flex items-center gap-2 border-2 border-brass text-brass hover:bg-brass hover:text-obsidian px-8 py-4 rounded-sm font-medium transition-colors"
+          >
+            Watch live bots compete in ggArena
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </a>
         </div>
 
       </div>

@@ -50,7 +50,7 @@ export default function Pricing() {
 
         {/* Main Pricing Card */}
         <div className="max-w-4xl mx-auto mb-16">
-          <div className="relative bg-obsidian border-2 border-brass rounded-sm p-8 md:p-12 shadow-[0_0_25px_rgba(193,168,125,0.3)]">
+          <div className="relative bg-obsidian border-2 border-brass rounded-sm p-8 md:p-12 ">
             {/* Badge */}
             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
               <div className="bg-brass text-obsidian px-4 py-1 rounded-full text-sm font-medium">
@@ -108,7 +108,7 @@ export default function Pricing() {
             {/* CTA Button */}
             <a
               href="https://app.ggbots.ai/signup"
-              className="block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 bg-brass hover:bg-brass-light text-obsidian shadow-[0_0_15px_rgba(193,168,125,0.3)]"
+              className="block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 bg-brass hover:bg-brass-light text-obsidian "
             >
               Start Building for Free
             </a>
@@ -174,7 +174,7 @@ export default function Pricing() {
           </p>
           <a
             href="https://app.ggbots.ai"
-            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-all duration-200 text-lg shadow-[0_0_25px_rgba(193,168,125,0.3)] hover:shadow-[0_0_35px_rgba(193,168,125,0.4)]"
+            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-colors text-lg"
           >
             Start for free
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

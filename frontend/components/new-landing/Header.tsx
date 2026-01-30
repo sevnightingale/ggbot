@@ -70,9 +70,16 @@ export default function Header() {
             </div>
           </nav>
 
-          {/* CTA Button & Mobile Menu */}
-          <div className="flex items-center space-x-4">
-            {/* Launch App CTA */}
+          {/* CTA Buttons & Mobile Menu */}
+          <div className="flex items-center space-x-3">
+            {/* Sign Up - secondary */}
+            <a
+              href="https://app.ggbots.ai/signup"
+              className="hidden sm:inline-flex text-ivory/80 hover:text-ivory px-4 py-2 rounded-sm font-medium transition-colors text-sm"
+            >
+              Sign Up
+            </a>
+            {/* Launch App CTA - primary */}
             <a
               href="https://app.ggbots.ai"
               className="bg-brass hover:bg-brass-light text-obsidian px-6 py-2 rounded-sm font-medium transition-colors text-sm"

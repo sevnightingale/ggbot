@@ -65,6 +65,19 @@ export default function Process() {
           </div>
         </div>
 
+        {/* CTA */}
+        <div className="text-center mt-16">
+          <a
+            href="https://app.ggbots.ai"
+            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-colors"
+          >
+            Build your first bot in 2 minutes
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </a>
+        </div>
+
       </div>
     </section>
   )

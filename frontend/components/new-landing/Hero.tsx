@@ -43,7 +43,7 @@ export default function Hero() {
           <div className="flex justify-center">
             <a
               href="https://app.ggbots.ai"
-              className="bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-all duration-200 text-lg shadow-[0_0_25px_rgba(193,168,125,0.3)] hover:shadow-[0_0_35px_rgba(193,168,125,0.4)]"
+              className="bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-colors text-lg"
             >
               Create a ggbot now
             </a>

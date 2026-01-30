@@ -271,6 +271,126 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ---
 
+## 🚀 **Landing Page Quick Wins**
+
+**Status**: 🟡 IN PROGRESS
+**Priority**: High - Product solid, time to optimize funnel
+**Estimated Effort**: ~4-6 hours
+
+**Goal**: Improve conversion on existing landing page before larger redesign.
+
+### **Phase 1: Remove & Replace** (~1 hour)
+- [ ] Remove Arcade demo embed (outdated, confusing "Get Started" CTA)
+- [ ] Replace with static hero image or simple animation
+
+### **Phase 2: Add Social Proof** (~2 hours)
+- [ ] Add live stats section: "X bots running", "Y trades executed", "Z users"
+- [ ] ggArena Season 1 banner: "$2,500 prize pool • 33 bots competing"
+- [ ] Consider: testimonial or tweet embed (if available)
+
+### **Phase 3: CTA Optimization** (~1 hour)
+- [ ] Add CTA after Process section (currently dead end)
+- [ ] Add CTA after Features section (currently dead end)
+- [ ] Vary CTA copy per section (not all "Start for free")
+
+### **Phase 4: Design Cleanup** (~1 hour)
+- [ ] Remove shadows from Hero/Features (violates design system)
+- [ ] Update FAQ contact CTA → Telegram community link
+- [ ] Add "Sign Up" to header (currently only "Launch App")
+
+---
+
+## 📈 **SEO & Content Strategy**
+
+**Status**: 🔴 NOT STARTED
+**Priority**: High - Compounds over time, start now
+**Estimated Effort**: ~8-12 hours initial setup
+
+**Goal**: Establish SEO foundation and content pipeline for organic growth.
+
+### **Phase 1: Technical SEO Audit** (~2 hours)
+- [ ] Audit meta titles/descriptions on all pages
+- [ ] Generate and submit sitemap.xml
+- [ ] Add schema markup to FAQ section (FAQ schema)
+- [ ] Add schema markup to pricing (Product schema)
+- [ ] Verify robots.txt allows crawling
+- [ ] Check page load speed (Core Web Vitals)
+
+### **Phase 2: Keyword Research** (~2 hours)
+- [ ] Identify target keywords: "AI trading bot", "crypto trading automation", etc.
+- [ ] Map keywords to pages (landing, blog posts, docs)
+- [ ] Analyze competitor keywords (3commas, Pionex, etc.)
+
+### **Phase 3: Blog Setup** (~3 hours)
+- [ ] Create `/blog` route with proper structure
+- [ ] Set up blog post template with SEO fields
+- [ ] Publish first blog post (already written)
+- [ ] Create 2-3 cornerstone content pieces:
+  - [ ] "How AI Trading Bots Work (And Why Most Fail)"
+  - [ ] "ggbots vs Traditional Bots: What's Different"
+  - [ ] "Getting Started with AI Trading in 2026"
+
+### **Phase 4: Content Calendar** (~1 hour)
+- [ ] Plan 4-8 blog posts for next 2 months
+- [ ] Topics: tutorials, comparisons, case studies, ggArena updates
+- [ ] Consider: newsletter signup for content distribution
+
+### **Future Considerations**
+- [ ] Mintlify docs setup (when user questions increase)
+- [ ] Lead magnet: "5 AI Trading Strategies" PDF
+- [ ] Email capture on landing page
+
+---
+
+## 🎭 **Landing Page Scrollytelling Redesign** (Future)
+
+**Status**: ⏸️ PLANNED - After quick wins + SEO foundation
+**Priority**: Medium - Larger investment, do after validating current changes
+**Estimated Effort**: ~16-24 hours
+
+**Goal**: Transform landing page into app-like onboarding journey.
+
+### **Design Principles**
+- Scroll = Progress (each section unlocks next piece)
+- Show, Don't Tell (interactive elements woven into narrative)
+- Emotional Arc: Problem → Solution → Proof → Action
+- Single CTA per viewport
+- Scroll-triggered animations (Framer Motion)
+
+### **Proposed Section Flow**
+```
+Hero (problem statement)
+    ↓ scroll
+"The Old Way" (pain points, visual)
+    ↓ scroll
+"The ggbots Way" (solution reveal)
+    ↓ scroll
+Live Demo (interactive, inline)
+    ↓ scroll
+Social Proof (stats, testimonials)
+    ↓ scroll
+How It Works (3 steps, animated)
+    ↓ scroll
+Pricing (transparent, simple)
+    ↓ scroll
+Founder Story (trust building)
+    ↓ scroll
+Final CTA (urgency, ggArena)
+```
+
+### **Technical Requirements**
+- [ ] Framer Motion scroll animations
+- [ ] Intersection Observer for section triggers
+- [ ] Performance optimization (lazy load below-fold)
+- [ ] Mobile-optimized experience
+
+### **Inspiration**
+- Linear.app (product reveals on scroll)
+- Vercel.com (journey through capabilities)
+- Arc browser (emotional, personal narrative)
+
+---
+
 ## ⏸️ **BLOCKED - External Dependencies**
 
 ### Symphony Live Trading Integration

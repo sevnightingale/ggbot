@@ -120,7 +120,7 @@ export default function PersonalStory() {
           </p>
           <a
             href="https://app.ggbots.ai"
-            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-all duration-200 shadow-[0_0_25px_rgba(193,168,125,0.3)] hover:shadow-[0_0_35px_rgba(193,168,125,0.4)]"
+            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-colors"
           >
             Start building your ggbot
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

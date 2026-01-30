@@ -1,6 +1,6 @@
 import Header from '@/components/new-landing/Header'
 import Hero from '@/components/new-landing/Hero'
-import Demo from '@/components/new-landing/Demo'
+import SocialProof from '@/components/new-landing/SocialProof'
 import Process from '@/components/new-landing/Process'
 import PersonalStory from '@/components/new-landing/PersonalStory'
 import Features from '@/components/new-landing/Features'
@@ -13,7 +13,7 @@ export default function NewLandingPage() {
     <main className="min-h-screen bg-obsidian">
       <Header />
       <Hero />
-      <Demo />
+      <SocialProof />
       <Process />
       <PersonalStory />
       <Features />
