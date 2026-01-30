@@ -320,6 +320,64 @@ The Decision Engine adds **only significant additional context** when present:
 - ✅ **Production-ready** - Proven 98% token reduction with maintained quality
 - ✅ **Flexible** - Easy to adjust which fields are included via decision engine config
 
+### **Rei Compact Format (2026-01-29)**
+
+For Rei Core integration, preprocessors also implement `to_compact()` - a universal compact schema optimized for Rei's numerical precision and ~30KB API payload limit.
+
+**Compact Schema** (~400 bytes vs ~2KB full output):
+```python
+def to_compact(self, full_output: dict, timeframe: str) -> dict:
+    return {
+        "indicator": "rsi",
+        "timeframe": timeframe,
+        "timestamp": full_output["current"]["timestamp"],
+
+        "value": 65.4,           # Primary reading
+        "value_secondary": None, # Signal line, %D, +DI (where applicable)
+        "value_tertiary": None,  # Histogram, -DI (where applicable)
+
+        "velocity": 2.5,         # Rate of change
+        "rank": 0.73,            # Position in historical range (0-1)
+
+        "zone": "neutral_high",  # State classification
+        "zone_periods": 5,       # Consecutive periods in zone
+        "trend": "rising",       # rising/falling/sideways
+
+        "crossover_type": "bullish_50",
+        "crossover_periods_ago": 2,
+
+        "patterns": ["momentum_rising"],  # Human-readable pattern codes
+        "analysis": "RSI at 65.4..."      # Summary text
+    }
+```
+
+**Timeframe Filtering** (`compact_config.py`):
+```python
+REI_INDICATOR_TIMEFRAMES = {
+    "rsi": ["15m", "1h", "4h", "1d"],      # Momentum: more granular
+    "macd": ["1h", "4h", "1d"],            # Trend: longer TFs
+    "adx": ["4h", "1d"],                   # Trend strength
+    "atr": ["1h", "4h", "1d"],             # Volatility
+    "obv": ["1h", "4h"],                   # Volume
+    # ... all 21 indicators configured
+}
+```
+
+**Usage** (in `decision/rei_engine.py`):
+```python
+from extraction.v2.preprocessors import get_preprocessor
+from extraction.v2.preprocessors.compact_config import get_timeframes_for_indicator
+
+for indicator_name, tf_data in extraction_result.indicators.items():
+    for tf_key, output in tf_data.items():
+        if tf_key in get_timeframes_for_indicator(indicator_name):
+            preprocessor = get_preprocessor(indicator_name)
+            compact = preprocessor.to_compact(output, tf_key)
+            # ~400 bytes instead of ~2KB
+```
+
+**Results**: Payload reduced from ~22KB → ~7KB. See `DOCS/REI_COMPACT_PROGRESS.md` for implementation status.
+
 ---
 
 ## 🗄️ Data Storage

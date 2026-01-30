@@ -443,19 +443,54 @@ class TRIXPreprocessor(BasePreprocessor):
         return patterns
 
     def _generate_trix_summary(self, current_trix: float, current_signal: Optional[float],
-                              momentum_analysis: Dict, zero_line_analysis: Dict) -> str:
-        """Generate human-readable TRIX summary."""
+                              momentum_analysis: Dict, zero_line_analysis: Dict,
+                              crossover_analysis: Dict = None, divergence: Dict = None,
+                              pattern_analysis: Dict = None) -> str:
+        """Generate human-readable TRIX summary with enriched signals."""
         momentum_direction = momentum_analysis.get("direction", "neutral")
         strength_level = momentum_analysis.get("strength_level", "weak")
         position = zero_line_analysis.get("position", "at_zero")
 
-        summary = f"TRIX {current_trix:.6f} - {strength_level} {momentum_direction} momentum"
+        summary = f"TRIX={current_trix:.6f} ({strength_level} {momentum_direction})"
 
-        if current_signal is not None:
-            histogram = current_trix - current_signal
-            summary += f", histogram {histogram:+.6f}"
+        # Zero line position
+        if position == "above_zero":
+            summary += " bullish"
+        elif position == "below_zero":
+            summary += " bearish"
 
-        summary += f" ({position.replace('_', ' ')})"
+        # Signal line crossover
+        if current_signal is not None and crossover_analysis:
+            latest = crossover_analysis.get("latest_crossover")
+            if latest and latest.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "bullish" in latest.get("type", "") else "bearish"
+                summary += f". ✓ {cross_type.capitalize()} signal crossover {latest['periods_ago']}p ago"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "bullish" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "bearish" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Histogram momentum
+        if pattern_analysis and "histogram_momentum" in pattern_analysis:
+            hm = pattern_analysis["histogram_momentum"]
+            if "expanding" in hm.get("type", ""):
+                summary += ". Momentum expanding"
+            elif "contracting" in hm.get("type", ""):
+                summary += ". Momentum contracting"
+
+        # Zero line crossover
+        if zero_line_analysis:
+            recent_cross = zero_line_analysis.get("recent_crosses", [])
+            if recent_cross and recent_cross[0].get("periods_ago", 99) <= 5:
+                cross = recent_cross[0]
+                if "bullish" in cross.get("type", ""):
+                    summary += ". ✓ Bullish zero cross"
+                else:
+                    summary += ". ⚠️ Bearish zero cross"
 
         return summary
 

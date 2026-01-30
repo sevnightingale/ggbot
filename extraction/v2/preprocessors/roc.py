@@ -107,7 +107,8 @@ class ROCPreprocessor(BasePreprocessor):
                 },
                 "calculation_notes": f"ROC analysis based on {len(roc)} periods with length={length}"
             },
-            "summary": self._generate_roc_summary(current_roc, momentum_analysis, overbought_oversold)
+            "summary": self._generate_roc_summary(current_roc, momentum_analysis, overbought_oversold,
+                                               divergence, pattern_analysis)
         }
     
     def _analyze_roc_momentum(self, roc: pd.Series, length: int = 10) -> Dict[str, Any]:
@@ -632,21 +633,54 @@ class ROCPreprocessor(BasePreprocessor):
         
         return round(np.mean(confidence_factors), 3)
     
-    def _generate_roc_summary(self, current_roc: float, momentum_analysis: Dict, overbought_oversold: Dict) -> str:
-        """Generate human-readable ROC summary."""
+    def _generate_roc_summary(self, current_roc: float, momentum_analysis: Dict, overbought_oversold: Dict,
+                             divergence: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable ROC summary with enriched signals."""
         direction = momentum_analysis.get("direction", "neutral")
         strength_level = momentum_analysis.get("strength_level", "weak")
         condition = overbought_oversold.get("condition", "neutral")
-        
-        summary = f"ROC {current_roc:+.2f}% - {strength_level} {direction} momentum"
-        
+
+        summary = f"ROC={current_roc:+.2f}% ({strength_level} {direction})"
+
+        # Zone status
         if condition != "neutral":
             streak = overbought_oversold.get("current_streak", 0)
-            if streak > 0:
+            if "extreme" in condition:
+                summary += f". ⚠️ {condition.replace('_', ' ').upper()} ({streak}p)"
+            elif streak > 0:
                 summary += f", {condition} ({streak}p)"
-            else:
-                summary += f", {condition}"
-        
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "bullish" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE (momentum recovering)"
+            elif "bearish" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE (momentum weakening)"
+
+        # Pattern analysis (exhaustion, double patterns)
+        if pattern_analysis:
+            if "exhaustion" in pattern_analysis:
+                exh = pattern_analysis["exhaustion"]
+                if "positive_momentum_exhaustion" in exh.get("type", ""):
+                    summary += ". ⚠️ Upward momentum exhausting"
+                elif "negative_momentum_exhaustion" in exh.get("type", ""):
+                    summary += ". ✓ Downward momentum exhausting"
+
+            if "double_pattern" in pattern_analysis:
+                dp = pattern_analysis["double_pattern"]
+                if "double_peak" in dp.get("type", ""):
+                    summary += ". ⚠️ Double peak"
+                elif "double_trough" in dp.get("type", ""):
+                    summary += ". ✓ Double trough"
+
+        # Momentum evolution
+        evolution = momentum_analysis.get("evolution", "")
+        if evolution == "accelerating":
+            summary += ". Momentum accelerating"
+        elif evolution == "decelerating":
+            summary += ". Momentum decelerating"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

@@ -135,7 +135,8 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
                 "calculation_notes": f"Donchian analysis based on {len(aligned_data)} aligned data points with period {length}"
             },
             "summary": self._generate_donchian_summary(current_price, current_upper, current_middle,
-                                                     current_lower, breakout_analysis, consolidation_analysis)
+                                                     current_lower, breakout_analysis, consolidation_analysis,
+                                                     trend_analysis, turtle_analysis)
         }
     
     def _analyze_price_position_donchian(self, prices: pd.Series, upper: pd.Series, 
@@ -464,25 +465,54 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
     # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
     
     def _generate_donchian_summary(self, price: float, upper: float, middle: float, lower: float,
-                                 breakout_analysis: Dict, consolidation_analysis: Dict) -> str:
-        """Generate human-readable Donchian Channels summary."""
+                                 breakout_analysis: Dict, consolidation_analysis: Dict,
+                                 trend_analysis: Dict = None, turtle_analysis: Dict = None) -> str:
+        """Generate human-readable Donchian Channels summary with enriched signals."""
         position_pct = ((price - lower) / (upper - lower)) * 100 if upper != lower else 50
-        width = upper - lower
-        
-        summary = f"Donchian: Price {price:.4f} ({position_pct:.1f}%), Width {width:.4f}"
-        
-        # Add breakout information
+
+        summary = f"Donchian %pos={position_pct:.0f}%"
+
+        # Recent breakout - critical signal
         latest_breakout = breakout_analysis.get("latest_breakout")
-        if latest_breakout and latest_breakout["periods_ago"] <= 3:
-            breakout_type = latest_breakout["type"].replace("_", " ")
-            periods_ago = latest_breakout["periods_ago"]
-            summary += f" - {breakout_type} {periods_ago}p ago"
-        
-        # Add consolidation information
+        if latest_breakout and latest_breakout.get("periods_ago", 99) <= 5:
+            breakout_type = "bullish" if "upper" in latest_breakout.get("type", "") else "bearish"
+            strength = latest_breakout.get("strength", 0)
+            if strength > 0.01:
+                summary += f". ⚠️ Strong {breakout_type} breakout {latest_breakout['periods_ago']}p ago"
+            else:
+                summary += f". {breakout_type.capitalize()} breakout {latest_breakout['periods_ago']}p ago"
+
+        # Consolidation - potential breakout setup
         if consolidation_analysis.get("is_consolidation", False):
-            consolidation_periods = consolidation_analysis.get("consolidation_periods", 0)
-            summary += f" - CONSOLIDATION ({consolidation_periods}p)"
-        
+            periods = consolidation_analysis.get("consolidation_periods", 0)
+            potential = consolidation_analysis.get("breakout_potential", "")
+            if potential == "high":
+                summary += f". ⚠️ CONSOLIDATION ({periods}p) - high breakout potential"
+            else:
+                summary += f". Consolidation ({periods}p)"
+
+        # Trend strength from position
+        if trend_analysis:
+            strength = trend_analysis.get("strength", "")
+            if "strong_upward" in strength:
+                summary += ". ✓ Strong uptrend (near highs)"
+            elif "strong_downward" in strength:
+                summary += ". ⚠️ Strong downtrend (near lows)"
+
+        # Turtle trading signals
+        if turtle_analysis:
+            primary = turtle_analysis.get("primary_period", {})
+            if primary.get("at_upper_channel"):
+                summary += ". ✓ New N-period high"
+            elif primary.get("at_lower_channel"):
+                summary += ". ⚠️ New N-period low"
+
+        # Extreme positions
+        if position_pct >= 100:
+            summary += ". ⚠️ At upper channel"
+        elif position_pct <= 0:
+            summary += ". ⚠️ At lower channel"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

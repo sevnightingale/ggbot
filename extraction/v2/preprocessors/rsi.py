@@ -72,7 +72,8 @@ class RSIPreprocessor(BasePreprocessor):
         
         # Generate sophisticated summary
         summary = self._generate_rsi_summary(
-            current, trend_analysis, extremes, zone_analysis, patterns
+            current, trend_analysis, extremes, zone_analysis, patterns,
+            acceleration, level_analysis
         )
         
         return {
@@ -266,30 +267,65 @@ class RSIPreprocessor(BasePreprocessor):
         return None
     
     
-    def _generate_rsi_summary(self, current: float, trend: Dict, extremes: Dict, 
-                             zones: Dict, patterns: Dict) -> str:
-        """Generate human-readable RSI summary."""
+    def _generate_rsi_summary(self, current: float, trend: Dict, extremes: Dict,
+                             zones: Dict, patterns: Dict, acceleration: float = 0.0,
+                             level_analysis: Dict = None) -> str:
+        """Generate human-readable RSI summary with enriched signals."""
         summary = f"RSI at {current:.1f}"
-        
-        # Add trend info
-        if trend["direction"] != "sideways":
-            strength = "strongly" if trend["strength"] > 0.7 else ""
-            summary += f", {trend['direction']} {strength}".strip()
-        
-        # Add recent extreme context
-        if extremes["high_periods_ago"] <= 10:
-            summary += f" (recent high: {extremes['high_value']:.1f} {extremes['high_periods_ago']}p ago)"
-        
-        # Add zone info
+
+        # Add zone info (most important context)
         if zones["current_zone"] != "neutral":
             if zones["periods_overbought"] > 0:
-                summary += f". Overbought for {zones['periods_overbought']} periods"
+                summary += f", overbought ({zones['periods_overbought']}p)"
             elif zones["periods_oversold"] > 0:
-                summary += f". Oversold for {zones['periods_oversold']} periods"
-        
-        # Add pattern info
-        if "momentum" in patterns:
-            summary += f". {patterns['momentum']['description']}"
+                summary += f", oversold ({zones['periods_oversold']}p)"
+
+        # Add trend info
+        if trend["direction"] != "sideways":
+            strength = "strongly " if trend["strength"] > 0.7 else ""
+            summary += f". {strength.capitalize() if strength else ''}{trend['direction'].capitalize()}"
+
+        # ⚠️ DIVERGENCE - critical signal when detected
+        if "divergence" in patterns:
+            div = patterns["divergence"]
+            div_type = div.get("type", "")
+            if "positive" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "negative" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Acceleration/deceleration
+        if abs(acceleration) > 0.5:
+            if acceleration > 0:
+                summary += ". Momentum accelerating"
+            else:
+                summary += ". Momentum decelerating"
+
+        # Recent crossovers (key levels: 30, 50, 70)
+        if level_analysis:
+            crossovers = level_analysis.get("recent_crossovers", [])
+            for cross in crossovers[:1]:  # Only most recent
+                if cross.get("periods_ago", 99) <= 5:
+                    level = cross.get("level")
+                    direction = cross.get("direction")
+                    periods = cross.get("periods_ago")
+                    if level == 50:
+                        signal = "crossed above 50" if direction == "up" else "crossed below 50"
+                    elif level == 70:
+                        signal = "entered overbought" if direction == "up" else "exited overbought"
+                    elif level == 30:
+                        signal = "exited oversold" if direction == "up" else "entered oversold"
+                    else:
+                        signal = f"crossed {level}"
+                    summary += f". {signal.capitalize()} {periods}p ago"
+
+        # Reversal patterns
+        if "reversal" in patterns:
+            rev = patterns["reversal"]
+            if "double_top" in rev.get("type", ""):
+                summary += ". ⚠️ Double top pattern"
+            elif "double_bottom" in rev.get("type", ""):
+                summary += ". ✓ Double bottom pattern"
 
         return summary
 

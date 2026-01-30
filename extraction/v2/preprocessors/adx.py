@@ -100,8 +100,9 @@ class ADXPreprocessor(BasePreprocessor):
                 "percentile": round(position_rank, 1),
                 "interpretation": self._interpret_position_rank(position_rank)
             },
-            "summary": self._generate_adx_summary(current_adx, current_plus_di, current_minus_di, 
-                                                 trend_strength_analysis, directional_analysis)
+            "summary": self._generate_adx_summary(current_adx, current_plus_di, current_minus_di,
+                                                 trend_strength_analysis, directional_analysis,
+                                                 momentum_analysis, pattern_analysis)
         }
     
     def _analyze_trend_strength(self, adx: pd.Series) -> Dict[str, Any]:
@@ -496,20 +497,57 @@ class ADXPreprocessor(BasePreprocessor):
     
     
     def _generate_adx_summary(self, adx_value: float, plus_di: float, minus_di: float,
-                             trend_strength: Dict, directional_analysis: Dict) -> str:
-        """Generate human-readable ADX summary."""
-        summary = f"ADX {adx_value:.1f} - {trend_strength['description']}"
+                             trend_strength: Dict, directional_analysis: Dict,
+                             momentum_analysis: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable ADX summary with enriched signals."""
+        # Strength classification with ADX value
+        summary = f"ADX={adx_value:.1f} ({trend_strength['current_strength']})"
 
-        # Add directional information if available
+        # Directional bias if available
         if plus_di is not None and minus_di is not None:
             bias = directional_analysis.get("current_bias", "neutral")
             strength = directional_analysis.get("directional_strength", 0)
-            summary += f" with {bias} bias ({strength:.1f})"
+            summary += f", {bias} +DI/-DI spread={strength:.1f}"
 
-        # Add trend evolution
+        # Trend evolution
         evolution = trend_strength.get("trend_evolution", "stable")
-        if evolution != "stable":
-            summary += f", trend {evolution}"
+        if evolution == "strengthening":
+            summary += ". Trend strengthening"
+        elif evolution == "weakening":
+            summary += ". Trend weakening"
+
+        # DI Crossover - important signal
+        if directional_analysis:
+            crossovers = directional_analysis.get("crossovers", {})
+            latest_cross = crossovers.get("latest_crossover")
+            if latest_cross and latest_cross.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "bullish" in latest_cross.get("type", "") else "bearish"
+                summary += f". ✓ {cross_type.capitalize()} DI crossover {latest_cross['periods_ago']}p ago"
+
+        # ADX turning points
+        if pattern_analysis:
+            if "turning_points" in pattern_analysis:
+                tp = pattern_analysis["turning_points"]
+                if tp.get("type") == "peak" and tp.get("periods_ago", 99) <= 3:
+                    summary += ". ⚠️ ADX peaked, trend may weaken"
+                elif tp.get("type") == "trough" and tp.get("periods_ago", 99) <= 3:
+                    summary += ". ✓ ADX bottomed, trend may strengthen"
+
+            # Extreme levels
+            if "extreme_levels" in pattern_analysis:
+                el = pattern_analysis["extreme_levels"]
+                if el.get("type") == "extreme_high":
+                    summary += ". ⚠️ Extreme ADX - trend exhaustion possible"
+                elif el.get("type") == "extreme_low":
+                    summary += ". ⚠️ Very low ADX - ranging/consolidation"
+
+            # DI convergence/divergence
+            if "di_patterns" in pattern_analysis:
+                di = pattern_analysis["di_patterns"]
+                if di.get("type") == "convergence":
+                    summary += ". DI lines converging"
+                elif di.get("type") == "divergence":
+                    summary += ". DI lines diverging"
 
         return summary
 

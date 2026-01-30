@@ -78,7 +78,7 @@ class ATRPreprocessor(BasePreprocessor):
                 "stop_loss": stop_loss_analysis
             },
             "evidence": evidence,
-            "summary": self._generate_atr_summary(current_atr, volatility_analysis, atr_trend_analysis)
+            "summary": self._generate_atr_summary(current_atr, volatility_analysis, atr_trend_analysis, breakout_analysis)
         }
     
     def _analyze_volatility_levels(self, atr: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
@@ -325,17 +325,43 @@ class ATRPreprocessor(BasePreprocessor):
                 "breakout_setup": squeeze and squeeze_periods >= 3}
     
     
-    def _generate_atr_summary(self, current_atr: float, volatility_analysis: Dict, trend_analysis: Dict) -> str:
-        """Generate human-readable ATR summary."""
+    def _generate_atr_summary(self, current_atr: float, volatility_analysis: Dict, trend_analysis: Dict,
+                             breakout_analysis: Dict = None) -> str:
+        """Generate human-readable ATR summary with enriched signals."""
         volatility_level = volatility_analysis["current_level"]
         percentile = volatility_analysis["percentile_rank"]
 
-        summary = f"ATR {current_atr:.6f} - {volatility_level.replace('_', ' ')} volatility ({percentile:.0f}th percentile)"
+        summary = f"ATR={current_atr:.6f} ({volatility_level.replace('_', ' ')}, {percentile:.0f}%ile)"
 
+        # Volatility trend
         if trend_analysis:
             interpretation = trend_analysis.get("interpretation", "")
-            if interpretation != "volatility_stable":
-                summary += f", {interpretation.replace('_', ' ')}"
+            if "expanding_strongly" in interpretation:
+                summary += ". ⚠️ Volatility expanding strongly"
+            elif "expanding" in interpretation:
+                summary += ". Volatility expanding"
+            elif "contracting_strongly" in interpretation:
+                summary += ". Volatility contracting strongly"
+            elif "contracting" in interpretation:
+                summary += ". Volatility contracting"
+
+        # Squeeze detection - important for breakout setups
+        if breakout_analysis:
+            if breakout_analysis.get("squeeze_detected"):
+                periods = breakout_analysis.get("squeeze_periods", 0)
+                potential = breakout_analysis.get("expansion_potential", 0)
+                if breakout_analysis.get("breakout_setup"):
+                    summary += f". ⚠️ SQUEEZE ({periods}p) - breakout setup"
+                else:
+                    summary += f". Squeeze ({periods}p)"
+
+            # Recent volatility change
+            recent_change = breakout_analysis.get("recent_volatility_change_pct", 0)
+            if abs(recent_change) > 20:
+                if recent_change > 0:
+                    summary += f". Volatility spiked +{recent_change:.0f}%"
+                else:
+                    summary += f". Volatility dropped {recent_change:.0f}%"
 
         return summary
 

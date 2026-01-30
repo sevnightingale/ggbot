@@ -380,6 +380,102 @@ def test_new_preprocessor():
 - ✅ Standardized schema structure
 - ✅ Scale-independent thresholds
 - ✅ BasePreprocessor inheritance
+- ✅ `to_compact()` method for Rei integration (2026-01-29)
+
+## Dual Output Formats
+
+Preprocessors support two output formats optimized for different decision engines:
+
+### Summary Format (DecisionEngineV2 / Traditional LLMs)
+
+```python
+# What LLMs receive (~15 tokens per indicator)
+"RSI 65.4 - Neutral high, rising momentum"
+"MACD 0.0023 - Bullish, histogram positive"
+"ADX 28.5 - Developing trend, bullish bias"
+```
+
+**Token impact**: ~2,200 tokens for 21 indicators × 7 timeframes
+
+**Why summary for LLMs?**
+- LLMs tokenize numbers poorly (0.0847 becomes [0][.][08][47] - loses numerical meaning)
+- Natural language summaries are optimized for LLM reasoning
+- Token cost matters (OpenRouter billing per token)
+
+### Compact Format (ReiDecisionEngine / Rei Core)
+
+```python
+# What Rei receives (~400 bytes / ~85 tokens per indicator)
+{
+    "indicator": "rsi",
+    "timeframe": "1h",
+    "value": 65.4,
+    "value_secondary": None,
+    "velocity": 2.3,
+    "rank": 0.73,
+    "zone": "neutral_high",
+    "zone_periods": 5,
+    "trend": "rising",
+    "crossover_type": "bullish_50",
+    "crossover_periods_ago": 8,
+    "patterns": ["momentum_rising"],
+    "analysis": "RSI at 65.4, rising with moderate momentum"
+}
+```
+
+**Token impact**: ~5,700 tokens for ~67 filtered indicator-timeframes (~7KB payload)
+
+**Why compact for Rei?**
+- Rei preserves Float64 precision (not tokenized like LLMs)
+- Structured data enables pattern learning across trades
+- Timeframe filtering reduces payload (30KB API limit)
+- Different pricing model (per-unit, not per-token)
+
+### Format Selection
+
+| Decision Engine | Method | Format | Tokens | Bytes |
+|-----------------|--------|--------|--------|-------|
+| DecisionEngineV2 | `preprocess()` → `summary` | Natural language | ~2,200 | ~9KB |
+| ReiDecisionEngine | `to_compact()` | Structured JSON | ~5,700 | ~7KB |
+
+**Implementation** (`extraction/v2/preprocessors/base.py`):
+```python
+class BasePreprocessor:
+    def preprocess(self, values, **kwargs) -> dict:
+        """Full analysis output with summary field for LLMs."""
+        ...
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Compact output for Rei Core numerical processing."""
+        ...
+```
+
+### Timeframe Filtering (Rei Only)
+
+Compact format includes timeframe filtering to reduce payload size:
+
+```python
+# extraction/v2/preprocessors/compact_config.py
+REI_INDICATOR_TIMEFRAMES = {
+    # Momentum oscillators: more granular for timing
+    "rsi": ["15m", "1h", "4h", "1d"],
+    "stochastic": ["15m", "1h", "4h", "1d"],
+
+    # Trend indicators: longer timeframes
+    "macd": ["1h", "4h", "1d"],
+    "adx": ["4h", "1d"],
+
+    # Volatility: regime detection
+    "atr": ["1h", "4h", "1d"],
+    "bbands": ["1h", "4h", "1d"],
+
+    # Volume: institutional flow
+    "obv": ["1h", "4h"],
+    "vwap": ["1h", "4h"],
+}
+```
+
+**Result**: 147 combinations → ~67 after filtering (54% reduction)
 
 ## Future Enhancements
 

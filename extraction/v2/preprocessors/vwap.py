@@ -560,18 +560,43 @@ class VWAPPreprocessor(BasePreprocessor):
         return patterns
 
     def _generate_vwap_summary(self, vwap_value: float, price: float,
-                              price_relationship: Dict, fair_value_analysis: Dict) -> str:
-        """Generate human-readable VWAP summary."""
+                              price_relationship: Dict, fair_value_analysis: Dict,
+                              crossover_analysis: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable VWAP summary with enriched signals."""
         position = price_relationship.get("position", "at_level")
         distance_pct = price_relationship.get("distance_pct", 0)
         fair_value = fair_value_analysis.get("current_assessment", "fairly_valued")
 
-        summary = f"VWAP {vwap_value:.4f}, price {position}"
+        summary = f"VWAP={vwap_value:.4f}, price {position}"
 
         if abs(distance_pct) > 0.5:
-            summary += f" ({distance_pct:+.1f}%)"
+            summary += f" by {abs(distance_pct):.1f}%"
 
-        summary += f" - {fair_value.replace('_', ' ')}"
+        # Fair value assessment
+        if "overvalued" in fair_value:
+            summary += ". ⚠️ Price overvalued"
+        elif "undervalued" in fair_value:
+            summary += ". ✓ Price undervalued"
+
+        # Recent crossover
+        if crossover_analysis:
+            latest = crossover_analysis.get("latest_crossover")
+            if latest and latest.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "bullish" in latest.get("type", "") else "bearish"
+                summary += f". {cross_type.capitalize()} VWAP cross {latest['periods_ago']}p ago"
+
+        # Extreme deviation pattern
+        if pattern_analysis and "extreme_deviation" in pattern_analysis:
+            ed = pattern_analysis["extreme_deviation"]
+            direction = ed.get("direction", "")
+            if direction == "above":
+                summary += ". ⚠️ Extreme above VWAP - mean reversion likely"
+            elif direction == "below":
+                summary += ". ⚠️ Extreme below VWAP - bounce likely"
+
+        # Institutional support/resistance
+        if abs(distance_pct) < 0.3:
+            summary += ". Price at VWAP (key institutional level)"
 
         return summary
 

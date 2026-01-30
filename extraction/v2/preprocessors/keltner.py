@@ -115,7 +115,8 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
                 "calculation_notes": f"Keltner analysis based on {len(df_aligned)} aligned data points with period {length}"
             },
             "summary": self._generate_keltner_summary(current_price, current_upper, current_middle,
-                                                    current_lower, position_analysis, squeeze_analysis)
+                                                    current_lower, position_analysis, squeeze_analysis,
+                                                    breakout_analysis, trend_analysis)
         }
     
     def _clean_and_align_series(self, prices: pd.Series, upper: pd.Series, middle: pd.Series, lower: pd.Series) -> pd.DataFrame:
@@ -454,19 +455,45 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
     # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
     
     def _generate_keltner_summary(self, price: float, upper: float, middle: float, lower: float,
-                                position_analysis: Dict, squeeze_analysis: Dict) -> str:
-        """Generate human-readable Keltner Channels summary."""
+                                position_analysis: Dict, squeeze_analysis: Dict,
+                                breakout_analysis: Dict = None, trend_analysis: Dict = None) -> str:
+        """Generate human-readable Keltner Channels summary with enriched signals."""
         position = position_analysis.get("position", "middle").replace("_", " ")
         position_pct = position_analysis.get("position_pct", 50)
-        width = (upper - lower) / self._safe_denom(middle) * 100
-        
-        summary = f"Keltner: Price {price:.4f} ({position}, {position_pct:.1f}%)"
-        summary += f", Width {width:.2f}%"
-        
+
+        summary = f"Keltner %pos={position_pct:.0f}% ({position})"
+
+        # Squeeze detection - critical volatility signal
         if squeeze_analysis.get("is_squeeze", False):
             squeeze_periods = squeeze_analysis.get("squeeze_periods", 0)
-            summary += f" - SQUEEZE ({squeeze_periods}p)"
-        
+            intensity = squeeze_analysis.get("squeeze_intensity", 0)
+            if intensity > 50:
+                summary += f". ⚠️ TIGHT SQUEEZE ({squeeze_periods}p)"
+            else:
+                summary += f". Squeeze ({squeeze_periods}p)"
+
+        # Recent breakout - important trend signal
+        if breakout_analysis:
+            latest = breakout_analysis.get("latest_breakout")
+            if latest and latest.get("periods_ago", 99) <= 5:
+                breakout_type = "bullish" if "upward" in latest.get("type", "") else "bearish"
+                summary += f". ✓ {breakout_type.capitalize()} breakout {latest['periods_ago']}p ago"
+
+        # Trend direction
+        if trend_analysis:
+            trend = trend_analysis.get("middle_trend", "")
+            trend_strength = trend_analysis.get("trend_strength", 0)
+            if trend == "rising" and trend_strength > 0.5:
+                summary += ". ✓ Strong uptrend"
+            elif trend == "falling" and trend_strength > 0.5:
+                summary += ". ⚠️ Strong downtrend"
+
+        # Extreme position warnings
+        if position_pct > 100:
+            summary += ". ⚠️ Above upper channel"
+        elif position_pct < 0:
+            summary += ". ⚠️ Below lower channel"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

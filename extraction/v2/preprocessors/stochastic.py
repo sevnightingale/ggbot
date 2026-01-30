@@ -90,7 +90,8 @@ class StochasticPreprocessor(BasePreprocessor):
 
         # Generate summary
         summary = self._generate_stoch_summary(
-            current_k, current_d, cross_analysis, zone_analysis, position_rank
+            current_k, current_d, cross_analysis, zone_analysis, position_rank,
+            patterns, momentum_analysis
         )
         
         return {
@@ -403,23 +404,50 @@ class StochasticPreprocessor(BasePreprocessor):
         return patterns
     
     def _generate_stoch_summary(self, k_value: float, d_value: float, cross_analysis: Dict,
-                               zone_analysis: Dict, position_rank: float) -> str:
-        """Generate human-readable Stochastic summary."""
-        summary = f"Stochastic %K: {k_value:.1f}, %D: {d_value:.1f}"
+                               zone_analysis: Dict, position_rank: float,
+                               patterns: Dict = None, momentum_analysis: Dict = None) -> str:
+        """Generate human-readable Stochastic summary with enriched signals."""
+        summary = f"Stochastic %K={k_value:.1f}, %D={d_value:.1f}"
 
         # Add zone information
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
             streak = zone_analysis[zone]["streak_length"]
             if streak > 0:
-                summary += f" ({zone} for {streak} periods)"
+                summary += f" ({zone}, {streak}p)"
             else:
                 summary += f" ({zone})"
 
-        # Add crossover information
+        # Recent crossover
         latest_cross = cross_analysis.get("latest_crossover")
         if latest_cross and latest_cross["periods_ago"] <= 5:
-            summary += f". {latest_cross['type'].replace('_', ' ').title()} {latest_cross['periods_ago']}p ago"
+            cross_type = "bullish" if "bullish" in latest_cross.get("type", "") else "bearish"
+            location = latest_cross.get("location", "neutral")
+            if location in ["overbought", "oversold"]:
+                summary += f". {cross_type.capitalize()} crossover in {location} {latest_cross['periods_ago']}p ago"
+            else:
+                summary += f". {cross_type.capitalize()} crossover {latest_cross['periods_ago']}p ago"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if patterns and "divergence" in patterns:
+            div = patterns["divergence"]
+            if "bullish" in div.get("type", ""):
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "bearish" in div.get("type", ""):
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Acceleration/deceleration
+        if momentum_analysis:
+            accel = momentum_analysis.get("k_acceleration", 0)
+            if abs(accel) > 2:
+                if accel > 0:
+                    summary += ". Momentum accelerating"
+                else:
+                    summary += ". Momentum decelerating"
+
+        # Squeeze pattern (low volatility)
+        if patterns and "squeeze" in patterns:
+            summary += ". ⚠️ Volatility squeeze"
 
         return summary
 

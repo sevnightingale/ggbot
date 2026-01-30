@@ -112,8 +112,9 @@ class BollingerBandsPreprocessor(BasePreprocessor):
             "volatility": volatility_analysis,
             "trend": trend_analysis,
             "patterns": pattern_analysis,
-            "summary": self._generate_bollinger_summary(current_price, current_upper, current_middle, 
-                                                       current_lower, position_analysis, squeeze_analysis)
+            "summary": self._generate_bollinger_summary(current_price, current_upper, current_middle,
+                                                       current_lower, position_analysis, squeeze_analysis,
+                                                       pattern_analysis, volatility_analysis)
         }
     
     def _analyze_price_position(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -515,8 +516,9 @@ class BollingerBandsPreprocessor(BasePreprocessor):
     
     
     def _generate_bollinger_summary(self, price: float, upper: float, middle: float, lower: float,
-                                   position_analysis: Dict, squeeze_analysis: Dict) -> str:
-        """Generate human-readable Bollinger Bands summary."""
+                                   position_analysis: Dict, squeeze_analysis: Dict,
+                                   pattern_analysis: Dict = None, volatility_analysis: Dict = None) -> str:
+        """Generate human-readable Bollinger Bands summary with enriched signals."""
         percent_b = position_analysis["percent_b"]
         position = position_analysis["position"]
 
@@ -524,12 +526,42 @@ class BollingerBandsPreprocessor(BasePreprocessor):
         denom = middle if abs(middle) > 1e-12 else 1e-12
         bandwidth = (upper - lower) / denom * 100
 
-        summary = f"BB: Price {price:.4f}, %B {percent_b:.2f} ({position.replace('_', ' ')})"
-        summary += f", BW {bandwidth:.2f}%"
+        summary = f"BB %B={percent_b:.2f} ({position.replace('_', ' ')})"
 
-        if squeeze_analysis["is_squeeze"]:
-            squeeze_periods = squeeze_analysis["squeeze_periods"]
-            summary += f" - SQUEEZE ({squeeze_periods}p)"
+        # Squeeze detection - critical volatility signal
+        if squeeze_analysis.get("is_squeeze"):
+            quality = squeeze_analysis.get("squeeze_quality", "")
+            periods = squeeze_analysis.get("squeeze_periods", 0)
+            if quality in ["excellent", "good"]:
+                summary += f". ⚠️ SQUEEZE ({periods}p, {quality})"
+            else:
+                summary += f". Squeeze ({periods}p)"
+
+        # Walking bands pattern - strong trend confirmation
+        if pattern_analysis:
+            if "walking_bands" in pattern_analysis:
+                wb = pattern_analysis["walking_bands"]
+                if "upper" in wb.get("type", ""):
+                    summary += f". ✓ Walking upper band ({wb.get('periods', 0)}p)"
+                elif "lower" in wb.get("type", ""):
+                    summary += f". ⚠️ Walking lower band ({wb.get('periods', 0)}p)"
+            if "double_touch" in pattern_analysis:
+                dt = pattern_analysis["double_touch"]
+                summary += f". {dt.get('type', '').replace('_', ' ').capitalize()}"
+
+        # Volatility regime
+        if volatility_analysis:
+            regime = volatility_analysis.get("regime", "")
+            if regime == "high_volatility":
+                summary += ". Volatility expanding"
+            elif regime == "low_volatility":
+                summary += ". Volatility contracting"
+
+        # Band break signals
+        if percent_b > 1.0:
+            summary += ". ⚠️ Price above upper band"
+        elif percent_b < 0.0:
+            summary += ". ⚠️ Price below lower band"
 
         return summary
 

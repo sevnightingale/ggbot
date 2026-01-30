@@ -1,228 +1,140 @@
-# SQL Migration Commands - RLS Security Fix
+# SQL Migration - Index Optimization
 
-**Date**: 2025-11-13
-**Purpose**: Fix RLS security issues + add public bot performance features
+**Date**: 2026-01-29
+**Purpose**: Fix duplicate/unused indexes, add missing FK index
 
 Run these commands in Supabase SQL Editor.
 
 ---
 
-## Step 1: Add Public Performance Flag to Configurations
+## Phase 1: RENAME (Safe - Reversible)
+
+Rename indexes instead of dropping. If anything breaks, rename back instantly.
 
 ```sql
--- Add is_public_performance column (default private)
-ALTER TABLE configurations
-ADD COLUMN IF NOT EXISTS is_public_performance BOOLEAN DEFAULT FALSE;
+-- ============================================================
+-- STEP 1: Rename duplicate index (instead of dropping)
+-- idx_snapshots_config_time is identical to idx_snapshots_latest
+-- ============================================================
 
--- Add index for filtering public bots
-CREATE INDEX IF NOT EXISTS idx_configurations_public
-ON configurations(is_public_performance)
-WHERE is_public_performance = TRUE;
+ALTER INDEX IF EXISTS idx_snapshots_config_time
+RENAME TO _deprecated_idx_snapshots_config_time;
 
--- Add comment
-COMMENT ON COLUMN configurations.is_public_performance IS
-'When true, bot performance data (activities, trades, metrics) is publicly viewable without auth';
+
+-- ============================================================
+-- STEP 2: Rename unused heartbeat index (instead of dropping)
+-- idx_snapshots_heartbeat has 0 scans
+-- ============================================================
+
+ALTER INDEX IF EXISTS idx_snapshots_heartbeat
+RENAME TO _deprecated_idx_snapshots_heartbeat;
+
+
+-- ============================================================
+-- STEP 3: Add missing FK index for paper_trades.decision_id
+-- Supabase flagged this as unindexed foreign key
+-- NOTE: Removed CONCURRENTLY to avoid Supabase timeout
+-- Table is small (~6k rows) so brief lock is fine
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_paper_trades_decision
+ON paper_trades(decision_id);
+
+
+-- ============================================================
+-- STEP 4: Verify changes
+-- ============================================================
+
+SELECT indexname, pg_size_pretty(pg_relation_size(indexrelid)) as size
+FROM pg_stat_user_indexes
+WHERE relname IN ('account_snapshots', 'paper_trades')
+ORDER BY relname, indexname;
 ```
 
 ---
 
-## Step 2: Fix Activities Table RLS
+## Phase 2: MONITOR (Wait 3-7 days)
 
-**Issue**: Policy exists but RLS is disabled. Anyone can query any bot's activities.
+Watch for any errors or slow queries. Check logs for:
+- "index not found" errors
+- Slow query warnings
+- Any degraded performance
+
+---
+
+## Phase 3: DROP (After confirming no issues)
+
+Only run this AFTER Phase 1 has been stable for a few days:
 
 ```sql
--- Enable Row Level Security on activities table
-ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
+-- ============================================================
+-- FINAL: Drop deprecated indexes (only after monitoring period)
+-- ============================================================
 
--- Drop existing policy if it exists (clean slate)
-DROP POLICY IF EXISTS activities_user_isolation ON activities;
+DROP INDEX IF EXISTS _deprecated_idx_snapshots_config_time;
+DROP INDEX IF EXISTS _deprecated_idx_snapshots_heartbeat;
 
--- Policy 1: Users can see their own activities
-CREATE POLICY activities_user_access ON activities
-FOR SELECT
-USING (user_id = auth.uid());
-
--- Policy 2: Public can see activities for public bots (no auth required)
-CREATE POLICY activities_public_access ON activities
-FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM configurations c
-    WHERE c.config_id = activities.config_id
-    AND c.is_public_performance = TRUE
-  )
-);
-
--- Service role (backend) bypasses RLS automatically - no policy needed
--- Backend writes use service_role key, which has BYPASSRLS privilege
+-- Verify cleanup
+SELECT indexname FROM pg_indexes
+WHERE indexname LIKE '_deprecated%';
 ```
 
 ---
 
-## Step 3: Fix Agent Sessions Table RLS
+## ROLLBACK (If something breaks)
 
-**Issue**: No RLS at all. Potential exposure of Claude SDK session IDs.
+If you see errors after Phase 1, rename back immediately:
 
 ```sql
--- Enable Row Level Security on agent_sessions table
-ALTER TABLE agent_sessions ENABLE ROW LEVEL SECURITY;
+-- Restore original index names
+ALTER INDEX IF EXISTS _deprecated_idx_snapshots_config_time
+RENAME TO idx_snapshots_config_time;
 
--- Policy: Users can only see their own agent sessions
-CREATE POLICY agent_sessions_user_isolation ON agent_sessions
-FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM configurations c
-    WHERE c.config_id = agent_sessions.config_id
-    AND c.user_id = auth.uid()
-  )
-);
-
--- Backend writes bypass RLS (service_role key has BYPASSRLS)
+ALTER INDEX IF EXISTS _deprecated_idx_snapshots_heartbeat
+RENAME TO idx_snapshots_heartbeat;
 ```
 
 ---
 
-## Step 4: LLM Models Table - Public Read-Only
+## Expected Results
 
-**Issue**: No RLS. Reference data that should be publicly readable.
-
-```sql
--- Enable Row Level Security on llm_models table
-ALTER TABLE llm_models ENABLE ROW LEVEL SECURITY;
-
--- Policy: Allow public read access (all users can read model pricing/specs)
-CREATE POLICY llm_models_public_read ON llm_models
-FOR SELECT
-USING (true);
-
--- No write policies - only backend (service_role) can write
-```
+After Phase 1:
+- `idx_snapshots_config_time` → renamed to `_deprecated_idx_snapshots_config_time`
+- `idx_snapshots_heartbeat` → renamed to `_deprecated_idx_snapshots_heartbeat`
+- `idx_paper_trades_decision` → CREATED (FK optimization)
 
 ---
 
-## Step 5: Verify Policies Are Active
+## Optional: Additional Unused Indexes to Consider
+
+These indexes have 0 scans but review before dropping:
 
 ```sql
--- Check RLS status for all 3 tables
-SELECT
-  schemaname,
-  tablename,
-  rowsecurity AS rls_enabled
-FROM pg_tables
-WHERE schemaname = 'public'
-AND tablename IN ('activities', 'agent_sessions', 'llm_models')
-ORDER BY tablename;
+-- Review these - may be needed for future features or admin queries
+-- Only drop if you're sure they're not needed
 
--- Should show TRUE for all 3 tables
-```
+-- idx_decisions_confidence (5 MB) - confidence score filtering
+-- DROP INDEX IF EXISTS idx_decisions_confidence;
 
----
+-- idx_activities_symbol (5.5 MB) - symbol filtering in activities
+-- DROP INDEX IF EXISTS idx_activities_symbol;
 
-## Step 6: Check Existing Policies
+-- Various llm_models indexes (small, ~16 KB each)
+-- DROP INDEX IF EXISTS idx_llm_models_enabled;
+-- DROP INDEX IF EXISTS idx_llm_models_provider;
 
-```sql
--- View all policies on these tables
-SELECT
-  schemaname,
-  tablename,
-  policyname,
-  permissive,
-  roles,
-  cmd,
-  qual,
-  with_check
-FROM pg_policies
-WHERE schemaname = 'public'
-AND tablename IN ('activities', 'agent_sessions', 'llm_models')
-ORDER BY tablename, policyname;
-```
-
----
-
-## Expected Results After Migration
-
-### Activities Table:
--  RLS enabled
--  Policy: `activities_user_access` - Users see own activities
--  Policy: `activities_public_access` - Public sees activities for public bots
--  Backend writes still work (service role bypasses RLS)
-
-### Agent Sessions Table:
--  RLS enabled
--  Policy: `agent_sessions_user_isolation` - Users see only their sessions
--  Backend reads/writes still work (service role bypasses RLS)
-
-### LLM Models Table:
--  RLS enabled
--  Policy: `llm_models_public_read` - All users can read
--  Backend writes still work (service role bypasses RLS)
-
----
-
-## Testing Queries
-
-### Test 1: Verify you can see your own activities
-```sql
--- Run this as authenticated user in Supabase dashboard
--- Should return your activities
-SELECT COUNT(*) FROM activities WHERE user_id = auth.uid();
-```
-
-### Test 2: Verify public bot activities are visible
-```sql
--- First, mark a test bot as public
-UPDATE configurations
-SET is_public_performance = TRUE
-WHERE config_id = 'YOUR_TEST_CONFIG_ID';
-
--- Then verify activities are visible without auth
--- (This would be tested via API endpoint, not SQL editor)
-```
-
-### Test 3: Verify isolation works
-```sql
--- Try to query another user's private bot activities
--- Should return 0 rows (unless bot is public)
-SELECT COUNT(*) FROM activities WHERE user_id != auth.uid();
-```
-
----
-
-## Rollback (if needed)
-
-```sql
--- Disable RLS on all tables (back to current unsafe state)
-ALTER TABLE activities DISABLE ROW LEVEL SECURITY;
-ALTER TABLE agent_sessions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE llm_models DISABLE ROW LEVEL SECURITY;
-
--- Drop policies
-DROP POLICY IF EXISTS activities_user_access ON activities;
-DROP POLICY IF EXISTS activities_public_access ON activities;
-DROP POLICY IF EXISTS agent_sessions_user_isolation ON agent_sessions;
-DROP POLICY IF EXISTS llm_models_public_read ON llm_models;
-
--- Remove public performance flag
-ALTER TABLE configurations DROP COLUMN IF EXISTS is_public_performance;
+-- trade_observations indexes (small, ~16 KB each)
+-- DROP INDEX IF EXISTS idx_trade_observations_config;
+-- DROP INDEX IF EXISTS idx_trade_observations_user;
+-- DROP INDEX IF EXISTS idx_trade_observations_type;
+-- DROP INDEX IF EXISTS idx_trade_observations_importance;
 ```
 
 ---
 
 ## Notes
 
-1. **Service Role Bypass**: All backend writes use `get_db_connection()` with service role key, which has `BYPASSRLS` privilege. Policies don't affect backend operations.
-
-2. **Existing Policy**: The `activities_user_isolation` policy mentioned in Supabase warnings will be dropped and replaced with two separate policies (user access + public access).
-
-3. **No Breaking Changes**: Existing functionality preserved:
-   - Backend writes work identically
-   - Users can still access their own data
-   - Public viewing enabled for opted-in bots
-
-4. **Frontend Changes Required**: After running SQL, you'll need to:
-   - Add privacy toggle in bot settings UI
-   - Create `/api/v2/arena` endpoint for public leaderboard
-   - Update activities API to respect public access
-
-5. **Backward Compatible**: All bots default to `is_public_performance = FALSE` (private). No bots become public without explicit opt-in.
+1. **CONCURRENTLY**: The FK index uses CONCURRENTLY to avoid locking the table during creation
+2. **IF EXISTS/IF NOT EXISTS**: Safe to run multiple times
+3. **No data loss**: Index drops only affect query performance, not data
+4. **Disk space**: Regular VACUUM will reclaim space after drops

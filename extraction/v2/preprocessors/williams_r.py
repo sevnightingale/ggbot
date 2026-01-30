@@ -94,7 +94,7 @@ class WilliamsRPreprocessor(BasePreprocessor):
         extremes = self._find_recent_extremes(wr_core, max(20, length))
 
         # Generate summary
-        summary = self._generate_wr_summary(current_wr, zone_analysis, momentum_analysis)
+        summary = self._generate_wr_summary(current_wr, zone_analysis, momentum_analysis, pattern_analysis)
 
         return {
             "indicator": "Williams_R",
@@ -400,22 +400,43 @@ class WilliamsRPreprocessor(BasePreprocessor):
 
         return None
 
-    def _generate_wr_summary(self, wr_value: float, zone_analysis: Dict, momentum_analysis: Dict) -> str:
-        """Generate human-readable Williams %R summary."""
-        summary = f"Williams %R at {wr_value:.1f}"
+    def _generate_wr_summary(self, wr_value: float, zone_analysis: Dict, momentum_analysis: Dict,
+                            pattern_analysis: Dict = None) -> str:
+        """Generate human-readable Williams %R summary with enriched signals."""
+        summary = f"Williams %R={wr_value:.1f}"
 
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
             streak = zone_analysis[zone]["streak_length"]
             if streak > 0:
-                summary += f" ({zone} for {streak} periods)"
+                summary += f" ({zone}, {streak}p)"
             else:
                 summary += f" ({zone})"
 
-        if "momentum_interpretation" in momentum_analysis:
-            momentum = momentum_analysis["momentum_interpretation"]
-            if "strong" in momentum:
-                summary += f", {momentum.replace('_', ' ')}"
+        # ⚠️ DIVERGENCE - critical signal
+        if pattern_analysis and "divergence" in pattern_analysis:
+            div = pattern_analysis["divergence"]
+            if "bullish" in div.get("type", ""):
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "bearish" in div.get("type", ""):
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Acceleration/deceleration
+        if momentum_analysis:
+            accel = momentum_analysis.get("acceleration", 0)
+            if abs(accel) > 2:
+                if accel > 0:
+                    summary += ". Momentum accelerating"
+                else:
+                    summary += ". Momentum decelerating"
+
+        # Failure swing pattern
+        if pattern_analysis and "failure_swing" in pattern_analysis:
+            fs = pattern_analysis["failure_swing"]
+            if "bullish" in fs.get("type", ""):
+                summary += ". ✓ Bullish failure swing"
+            elif "bearish" in fs.get("type", ""):
+                summary += ". ⚠️ Bearish failure swing"
 
         return summary
 

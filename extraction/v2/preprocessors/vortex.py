@@ -604,20 +604,44 @@ class VortexPreprocessor(BasePreprocessor):
         return None
 
     def _generate_vortex_summary(self, vi_plus: float, vi_minus: float,
-                               crossover_analysis: Dict, dominance_analysis: Dict) -> str:
-        """Generate human-readable Vortex summary."""
+                               crossover_analysis: Dict, dominance_analysis: Dict,
+                               divergence: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable Vortex summary with enriched signals."""
         dominant = dominance_analysis.get("current_dominant", "").replace("_", " ")
         dominance_strength = dominance_analysis.get("dominance_strength", 0)
 
-        summary = f"Vortex VI+ {vi_plus:.3f}, VI- {vi_minus:.3f}"
-        summary += f" - {dominant} dominant ({dominance_strength:+.3f})"
+        summary = f"Vortex VI+={vi_plus:.3f}, VI-={vi_minus:.3f} ({dominant})"
 
-        # Add recent crossover info
+        # Recent crossover - important trend change signal
         latest_crossover = crossover_analysis.get("latest_crossover")
-        if latest_crossover and latest_crossover["periods_ago"] <= 5:
-            crossover_type = latest_crossover["type"]
-            periods_ago = latest_crossover["periods_ago"]
-            summary += f", {crossover_type.replace('_', ' ')} {periods_ago}p ago"
+        if latest_crossover and latest_crossover.get("periods_ago", 99) <= 5:
+            crossover_type = "bullish" if "bullish" in latest_crossover.get("type", "") else "bearish"
+            strength = latest_crossover.get("strength", 0)
+            if strength > 0.5:
+                summary += f". ✓ Strong {crossover_type} crossover {latest_crossover['periods_ago']}p ago"
+            else:
+                summary += f". {crossover_type.capitalize()} crossover {latest_crossover['periods_ago']}p ago"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "bullish" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "bearish" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Dominance strength
+        if abs(dominance_strength) > 0.2:
+            if dominance_strength > 0:
+                summary += ". ✓ Strong bullish trend"
+            else:
+                summary += ". ⚠️ Strong bearish trend"
+
+        # Pattern analysis
+        if pattern_analysis and "parallel_movement" in pattern_analysis:
+            pm = pattern_analysis["parallel_movement"]
+            if pm.get("direction") == "opposite":
+                summary += ". VI lines diverging"
 
         return summary
 

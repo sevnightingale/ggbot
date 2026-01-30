@@ -6,6 +6,67 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-30 - Enriched Preprocessor Summaries (Option A)
+
+**Purpose**: Surface rich indicator signals (divergence, crossovers, squeeze, acceleration) in LLM-readable summaries. Token-neutral approach - signals appear only when detected.
+
+**Updated All 21 Preprocessors** (`extraction/v2/preprocessors/`):
+- Momentum: RSI, Stochastic, CCI, MFI, Williams %R, ROC - Added divergence, crossovers, acceleration, failure swings
+- Trend: MACD, ADX, EMA, SMA, PSAR, Aroon, Vortex, Trix - Added crossovers, DI signals, reversals, zero-line crosses
+- Volatility: ATR, BBands, BBWidth, Keltner, Donchian - Added squeeze detection, breakouts, consolidation patterns
+- Volume: OBV, VWAP - Added accumulation/distribution, divergence, mean reversion signals
+
+**Enriched Summary Format**:
+```
+Before: "RSI at 73.2, overbought for 7 periods"
+After:  "RSI=73.2, overbought (7p). ⚠️ BEARISH DIVERGENCE. Momentum decelerating"
+```
+
+**Design Principles**:
+- Conditional signals: Only appear when actually detected (keeps summaries lean)
+- Consistent emoji markers: `✓` bullish/confirmation, `⚠️` warning/bearish
+- Token-neutral: ~same token count when no special signals present
+
+**Background**: Audit found ALL 21 preprocessors compute rich data (divergence in 12, crossover in 8, squeeze in 5) but summaries only showed basic values. Option A chosen over Option B (compact format for LLMs) due to 5x token cost difference.
+
+---
+
+## 2026-01-29 - Rei Compact Format + Behavior Prompt
+
+**Purpose**: Reduce Rei payload size (~22KB → ~7KB) via compact indicator format + timeframe filtering. Align behavior prompt with Rei Core learning principles.
+
+**Compact Format Implementation** (`extraction/v2/preprocessors/`):
+- `base.py` - Added `to_compact()` method to BasePreprocessor with universal schema
+- `compact_config.py` (NEW) - `REI_INDICATOR_TIMEFRAMES` dict + `get_timeframes_for_indicator()`
+- All 21 preprocessors - Indicator-specific `to_compact()` implementations
+
+**Universal Compact Schema** (~400 bytes vs ~2KB full output):
+```python
+{value, value_secondary, value_tertiary, velocity, rank, zone, zone_periods, trend,
+ crossover_type, crossover_periods_ago, patterns[], analysis, indicator, timeframe, timestamp}
+```
+
+**Timeframe Filtering** (per indicator type):
+- Momentum oscillators: 15m, 1h, 4h, 1d
+- Trend indicators: 1h, 4h, 1d
+- Volatility indicators: 1h, 4h, 1d
+- Volume indicators: 1h, 4h
+
+**Rei Engine Updates** (`decision/rei_engine.py`):
+- `_convert_to_compact_indicators()` - Filters by configured timeframes, calls `to_compact()`
+- Payload log: "Consulting Rei for BTC/USDT decision (payload ~7014 bytes)"
+
+**Strategy File** (`trading/strategies/rei_core.md` - NEW):
+- Separate Description + Behavior Prompt sections for Rei Factory copy/paste
+- Follows Rei doc principles: teach relationships not rules, no prescriptive thresholds
+- Documents all 33 data points (21 technical + 12 market intelligence)
+
+**Working Doc**: `DOCS/REI_COMPACT_PROGRESS.md` - Implementation tracker (21/21 complete)
+
+**Test Results**: "The Nightingale" - 7KB payload, Rei responded "wait @ 65% confidence"
+
+---
+
 ## 2026-01-28 - Rei Scheduled Bot Engine (Experimental)
 
 **Purpose**: Alternative decision engine using Rei Core (reilabs.org) instead of OpenRouter LLMs. Replaces agent-based Rei integration that failed due to Claude overriding Rei signals.

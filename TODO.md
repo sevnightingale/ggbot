@@ -41,6 +41,43 @@ See planning doc for complete provider-specific instructions and verification st
 
 ---
 
+## 🗄️ **Supabase Database Optimizations**
+
+**Status**: 🟡 PARTIAL - Disk IO fixes done, policy fixes pending
+**Reference**: `NOTE.md` (Supabase advisor output), `SQL.md` (migration scripts)
+
+### **Completed (2026-01-29)**
+- [x] VACUUM FULL on decisions (1160 MB → 402 MB)
+- [x] Added `idx_paper_trades_config_status` composite index
+- [x] Added `idx_paper_trades_decision` FK index
+- [x] Renamed duplicate/unused indexes to `_deprecated_*`
+- [x] Code change: stop storing prompts in decisions table
+
+### **Pending: Drop Deprecated Indexes** (after 3-7 day monitoring)
+- [ ] Drop `_deprecated_idx_snapshots_config_time` (10 MB)
+- [ ] Drop `_deprecated_idx_snapshots_heartbeat` (12 MB)
+
+### **Pending: RLS Policy Performance**
+6 tables have RLS policies that re-evaluate `auth.uid()` per row instead of once:
+- [ ] `data_sources` - change `auth.uid()` → `(select auth.uid())`
+- [ ] `data_points` - change `auth.uid()` → `(select auth.uid())`
+- [ ] `live_trades` - change `auth.uid()` → `(select auth.uid())`
+- [ ] `trade_observations` - change `auth.uid()` → `(select auth.uid())`
+- [ ] `activities` - change `auth.uid()` → `(select auth.uid())`
+- [ ] `agent_sessions` - change `auth.uid()` → `(select auth.uid())`
+
+### **Pending: RLS Disabled Tables**
+- [ ] Enable RLS on `account_snapshots` (or confirm backend-only access)
+- [ ] Enable RLS on `arena_pledges` (or confirm backend-only access)
+
+### **Pending: Multiple Permissive Policies**
+Tables with conflicting RLS policies that OR together (review and consolidate):
+- [ ] `activities` - has `activities_public_access` + `activities_user_access`
+- [ ] `data_points` - has `reference_data_points_read` + `service_manages_data_points`
+- [ ] `data_sources` - has `reference_data_sources_read` + `service_manages_data_sources`
+
+---
+
 ## 🔧 **API Extraction Refactor - Scheduler Process Separation**
 
 **Status**: 🔴 CRITICAL - Production 502s during bot execution

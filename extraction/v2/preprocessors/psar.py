@@ -112,7 +112,8 @@ class ParabolicSARPreprocessor(BasePreprocessor):
                 "stop_loss": stop_loss_analysis,
                 "calculation_notes": f"Parabolic SAR analysis based on {len(psar)} aligned periods"
             },
-            "summary": self._generate_psar_summary(current_psar, current_price, trend_analysis, signal_analysis)
+            "summary": self._generate_psar_summary(current_psar, current_price, trend_analysis, signal_analysis,
+                                               distance_analysis, pattern_analysis)
         }
     
     def _analyze_psar_trend(self, psar: pd.Series, prices: pd.Series) -> Dict[str, Any]:
@@ -536,21 +537,47 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         
         return round(np.mean(confidence_factors), 3)
     
-    def _generate_psar_summary(self, psar_value: float, price: float, 
-                              trend_analysis: Dict, signal_analysis: Dict) -> str:
-        """Generate human-readable Parabolic SAR summary."""
-        current_trend = trend_analysis["current_direction"]
-        trend_periods = trend_analysis["trend_periods"]
+    def _generate_psar_summary(self, psar_value: float, price: float,
+                              trend_analysis: Dict, signal_analysis: Dict,
+                              distance_analysis: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable Parabolic SAR summary with enriched signals."""
+        current_trend = trend_analysis.get("current_direction", "unknown")
+        trend_periods = trend_analysis.get("trend_periods", 0)
         distance_pct = abs((price - psar_value) / max(1e-12, abs(price))) * 100
-        
-        summary = f"PSAR {psar_value:.4f} - {current_trend} trend for {trend_periods} periods"
-        summary += f", {distance_pct:.2f}% from price"
-        
-        # Add reversal information
+
+        summary = f"PSAR={psar_value:.4f} ({current_trend}, {trend_periods}p)"
+
+        # Recent reversal - critical trend change signal
         latest_reversal = signal_analysis.get("latest_reversal")
-        if latest_reversal and latest_reversal["periods_ago"] <= 3:
-            summary += f". Recent reversal {latest_reversal['periods_ago']}p ago"
-        
+        if latest_reversal and latest_reversal.get("periods_ago", 99) <= 3:
+            reversal_type = "bullish" if "bullish" in latest_reversal.get("type", "") else "bearish"
+            strength = latest_reversal.get("strength", 0)
+            if strength > 0.6:
+                summary += f". ⚠️ Strong {reversal_type} reversal {latest_reversal['periods_ago']}p ago"
+            else:
+                summary += f". {reversal_type.capitalize()} reversal {latest_reversal['periods_ago']}p ago"
+
+        # Distance warning (price approaching stop)
+        if distance_pct < 0.5:
+            summary += ". ⚠️ Price very close to stop level"
+        elif distance_pct < 1.0:
+            summary += ". Price near stop level"
+
+        # Extended trend pattern
+        if pattern_analysis and "extended_trend" in pattern_analysis:
+            ext = pattern_analysis["extended_trend"]
+            if ext.get("duration", 0) >= 20:
+                summary += f". ✓ Extended {current_trend} trend ({ext['duration']}p)"
+
+        # Clustering pattern (potential breakout)
+        if pattern_analysis and "clustering" in pattern_analysis:
+            summary += ". ⚠️ PSAR clustering - breakout setup"
+
+        # Trend strength
+        trend_strength = trend_analysis.get("trend_strength", 0)
+        if trend_strength > 0.7:
+            summary += ". Strong trend"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

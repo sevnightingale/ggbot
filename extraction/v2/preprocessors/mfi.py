@@ -99,7 +99,8 @@ class MFIPreprocessor(BasePreprocessor):
                 },
                 "calculation_notes": f"MFI analysis based on {len(mfi_core)} core periods, divergence on {len(mfi_div) if mfi_div is not None else 'N/A'} aligned periods"
             },
-            "summary": self._generate_mfi_summary(current_mfi, zone_analysis, momentum_analysis, money_flow_analysis)
+            "summary": self._generate_mfi_summary(current_mfi, zone_analysis, momentum_analysis, money_flow_analysis,
+                                               divergence, pattern_analysis)
         }
     
     def _analyze_mfi_zones(self, mfi: pd.Series, length: int) -> Dict[str, Any]:
@@ -469,37 +470,67 @@ class MFIPreprocessor(BasePreprocessor):
         return None
     
     def _generate_mfi_summary(self, mfi_value: float, zone_analysis: Dict,
-                             momentum_analysis: Dict, money_flow_analysis: Dict) -> str:
-        """Generate human-readable MFI summary."""
-        summary = f"MFI at {mfi_value:.1f}"
-        
+                             momentum_analysis: Dict, money_flow_analysis: Dict,
+                             divergence: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable MFI summary with enriched signals."""
+        summary = f"MFI={mfi_value:.1f}"
+
         # Add zone information
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
             streak = zone_analysis[zone]["streak_length"]
             if streak > 0:
-                summary += f" ({zone} for {streak} periods)"
+                summary += f" ({zone}, {streak}p)"
             else:
                 summary += f" ({zone})"
-        else:
-            # For neutral zone, add momentum info if significant
-            momentum_strength = momentum_analysis.get("momentum_strength", 0)
-            if momentum_strength > 0.5:
-                momentum_interp = momentum_analysis.get("momentum_interpretation", "")
-                if "money_inflow" in momentum_interp:
-                    summary += " (neutral, rising money flow)"
-                elif "money_outflow" in momentum_interp:
-                    summary += " (neutral, falling money flow)"
-        
-        # Add money flow pressure
+
+        # Extreme readings
+        if zone_analysis.get("overbought", {}).get("extreme_reading"):
+            summary += ". ⚠️ Extreme overbought (>90)"
+        elif zone_analysis.get("oversold", {}).get("extreme_reading"):
+            summary += ". ⚠️ Extreme oversold (<10)"
+
+        # Money flow pressure
         pressure = money_flow_analysis.get("pressure", "balanced")
-        if pressure != "balanced":
-            summary += f", {pressure} pressure"
-        
-        # Add flow quality
         flow_quality = money_flow_analysis.get("flow_quality", "")
         if "high_quality" in flow_quality:
-            summary += " - HIGH QUALITY FLOW"
+            if pressure == "buying":
+                summary += ". ✓ Strong buying pressure"
+            elif pressure == "selling":
+                summary += ". ⚠️ Strong selling pressure"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "positive" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE (money flow strengthening)"
+            elif "negative" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE (money flow weakening)"
+
+        # Acceleration/deceleration
+        if momentum_analysis:
+            accel = momentum_analysis.get("acceleration", 0)
+            if abs(accel) > 2:
+                if accel > 0:
+                    summary += ". Money flow accelerating"
+                else:
+                    summary += ". Money flow decelerating"
+
+        # Pattern analysis (exhaustion, double patterns)
+        if pattern_analysis:
+            if "exhaustion" in pattern_analysis:
+                exh = pattern_analysis["exhaustion"]
+                if "bullish" in exh.get("type", ""):
+                    summary += ". ⚠️ Buying exhaustion"
+                elif "bearish" in exh.get("type", ""):
+                    summary += ". ✓ Selling exhaustion"
+
+            if "double_pattern" in pattern_analysis:
+                dp = pattern_analysis["double_pattern"]
+                if "top" in dp.get("type", ""):
+                    summary += ". ⚠️ Double top pattern"
+                elif "bottom" in dp.get("type", ""):
+                    summary += ". ✓ Double bottom pattern"
 
         return summary
 

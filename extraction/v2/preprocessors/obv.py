@@ -99,7 +99,8 @@ class OBVPreprocessor(BasePreprocessor):
                 },
                 "calculation_notes": f"OBV analysis based on {len(obv)} periods with length {length}"
             },
-            "summary": self._generate_obv_summary(current_obv, trend_analysis, accumulation_analysis)
+            "summary": self._generate_obv_summary(current_obv, trend_analysis, accumulation_analysis,
+                                                divergence, pattern_analysis)
         }
     
     def _analyze_obv_trend(self, obv: pd.Series, length: int) -> Dict[str, Any]:
@@ -490,61 +491,6 @@ class OBVPreprocessor(BasePreprocessor):
     
     # Signal generation and confidence methods removed to comply with analysis-only philosophy
 
-    def _generate_obv_summary(self, current_obv: float, trend_analysis: Dict, accumulation_analysis: Dict) -> str:
-        """Generate human-readable OBV summary."""
-        signals = []
-        
-        # Trend-based signals
-        consensus = trend_analysis.get("consensus", "mixed")
-        trend_strength = trend_analysis.get("strength", 0)
-        
-        if consensus == "bullish" and trend_strength > 0.6:
-            signals.append({
-                "type": "volume_accumulation",
-                "strength": "medium",
-                "reason": f"Strong bullish OBV trend with {trend_strength:.2f} strength",
-                "strength_score": 0.7
-            })
-        elif consensus == "bearish" and trend_strength > 0.6:
-            signals.append({
-                "type": "volume_distribution",
-                "strength": "medium",
-                "reason": f"Strong bearish OBV trend with {trend_strength:.2f} strength",
-                "strength_score": 0.7
-            })
-        
-        # Accumulation/Distribution signals
-        if accumulation_analysis:
-            overall_phase = accumulation_analysis.get("overall_phase", "neutral_phase")
-            phase_strength = accumulation_analysis.get("phase_strength", "weak")
-            
-            if overall_phase == "accumulation_phase" and phase_strength == "strong":
-                signals.append({
-                    "type": "strong_accumulation_signal",
-                    "strength": "strong",
-                    "reason": "Strong accumulation detected across multiple timeframes",
-                    "strength_score": 0.8
-                })
-            elif overall_phase == "distribution_phase" and phase_strength == "strong":
-                signals.append({
-                    "type": "strong_distribution_signal",
-                    "strength": "strong",
-                    "reason": "Strong distribution detected across multiple timeframes",
-                    "strength_score": 0.8
-                })
-        
-        # Divergence signals
-        if divergence:
-            div_type = divergence["type"]
-            signals.append({
-                "type": f"obv_{div_type}",
-                "strength": "strong",
-                "reason": divergence["description"],
-                "strength_score": divergence.get("strength_score", 0.7)
-            })
-        
-        return signals
-    
     def _calculate_obv_confidence(self, obv: pd.Series, trend_analysis: Dict, flow_analysis: Dict) -> float:
         """Calculate OBV analysis confidence."""
         confidence_factors = []
@@ -569,22 +515,56 @@ class OBVPreprocessor(BasePreprocessor):
         
         return round(np.mean(confidence_factors), 3)
     
-    def _generate_obv_summary(self, current_obv: float, trend_analysis: Dict, accumulation_analysis: Dict) -> str:
-        """Generate human-readable OBV summary."""
+    def _generate_obv_summary(self, current_obv: float, trend_analysis: Dict, accumulation_analysis: Dict,
+                             divergence: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable OBV summary with enriched signals."""
         consensus = trend_analysis.get("consensus", "mixed")
         trend_strength = trend_analysis.get("strength", 0)
-        
-        summary = f"OBV {current_obv:.0f} - {consensus} trend"
-        
+
+        summary = f"OBV={current_obv:.0f} ({consensus})"
+
         if trend_strength > 0.6:
-            summary += f" (strong, {trend_strength:.2f})"
-        
+            summary += f" strong trend"
+
+        # Accumulation/distribution phase
         if accumulation_analysis:
             overall_phase = accumulation_analysis.get("overall_phase", "neutral_phase")
-            if overall_phase != "neutral_phase":
-                phase = overall_phase.replace("_phase", "")
-                summary += f", {phase} detected"
-        
+            phase_strength = accumulation_analysis.get("phase_strength", "weak")
+            if overall_phase == "accumulation_phase":
+                if phase_strength == "strong":
+                    summary += ". ✓ Strong accumulation"
+                else:
+                    summary += ". Accumulation"
+            elif overall_phase == "distribution_phase":
+                if phase_strength == "strong":
+                    summary += ". ⚠️ Strong distribution"
+                else:
+                    summary += ". Distribution"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "positive" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE (accumulation)"
+            elif "negative" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE (distribution)"
+
+        # Breakout patterns
+        if pattern_analysis:
+            if "breakout" in pattern_analysis:
+                breakout = pattern_analysis["breakout"]
+                if breakout.get("type") == "upward_breakout":
+                    summary += ". ✓ OBV breakout above resistance"
+                elif breakout.get("type") == "downward_breakout":
+                    summary += ". ⚠️ OBV breakdown below support"
+
+            if "confirmation" in pattern_analysis:
+                conf = pattern_analysis["confirmation"]
+                if conf.get("type") == "new_high_confirmation":
+                    summary += ". OBV at new highs"
+                elif conf.get("type") == "new_low_confirmation":
+                    summary += ". OBV at new lows"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

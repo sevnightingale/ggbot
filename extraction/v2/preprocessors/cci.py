@@ -99,7 +99,8 @@ class CCIPreprocessor(BasePreprocessor):
                 },
                 "calculation_notes": f"CCI analysis based on {len(cci_clean)} valid data points with period {length}"
             },
-            "summary": self._generate_cci_summary(current_cci, zone_analysis, momentum_analysis)
+            "summary": self._generate_cci_summary(current_cci, zone_analysis, momentum_analysis,
+                                               divergence, pattern_analysis)
         }
     
     def _analyze_cci_zones(self, cci: pd.Series, length: int) -> Dict[str, Any]:
@@ -401,27 +402,57 @@ class CCIPreprocessor(BasePreprocessor):
     
     # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
 
-    def _generate_cci_summary(self, cci_value: float, zone_analysis: Dict, momentum_analysis: Dict) -> str:
-        """Generate human-readable CCI summary."""
-        summary = f"CCI at {cci_value:.1f}"
+    def _generate_cci_summary(self, cci_value: float, zone_analysis: Dict, momentum_analysis: Dict,
+                             divergence: Dict = None, pattern_analysis: Dict = None) -> str:
+        """Generate human-readable CCI summary with enriched signals."""
+        summary = f"CCI={cci_value:.1f}"
 
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
             streak = zone_analysis[zone]["streak_length"]
             if streak > 0:
-                summary += f" ({zone} for {streak} periods)"
+                summary += f" ({zone}, {streak}p)"
             else:
                 summary += f" ({zone})"
 
+        # Extreme readings
         if zone_analysis["overbought"]["extreme_reading"]:
-            summary += " - EXTREME HIGH"
+            summary += ". ⚠️ EXTREME HIGH (>200)"
         elif zone_analysis["oversold"]["extreme_reading"]:
-            summary += " - EXTREME LOW"
+            summary += ". ⚠️ EXTREME LOW (<-200)"
 
-        if "momentum_interpretation" in momentum_analysis:
-            momentum = momentum_analysis["momentum_interpretation"]
-            if "strong" in momentum:
-                summary += f", {momentum.replace('_', ' ')}"
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "positive" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "negative" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Acceleration/deceleration
+        if momentum_analysis:
+            accel = momentum_analysis.get("acceleration", 0)
+            if abs(accel) > 5:
+                if accel > 0:
+                    summary += ". Momentum accelerating"
+                else:
+                    summary += ". Momentum decelerating"
+
+        # Pattern analysis (hooks, rejections)
+        if pattern_analysis:
+            if "hook" in pattern_analysis:
+                hook = pattern_analysis["hook"]
+                if "rising" in hook.get("type", ""):
+                    summary += ". ✓ Rising hook from oversold"
+                elif "falling" in hook.get("type", ""):
+                    summary += ". ⚠️ Falling hook from overbought"
+
+            if "level_rejection" in pattern_analysis:
+                rejection = pattern_analysis["level_rejection"]
+                if "overbought" in rejection.get("type", ""):
+                    summary += ". ⚠️ Rejected at +100"
+                elif "oversold" in rejection.get("type", ""):
+                    summary += ". ✓ Rejected at -100"
 
         return summary
 

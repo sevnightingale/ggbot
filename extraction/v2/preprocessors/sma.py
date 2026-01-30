@@ -130,7 +130,8 @@ class SMAPreprocessor(BasePreprocessor):
                 },
                 "calculation_notes": f"SMA analysis based on {len(sma_c)} periods with length={length}"
             },
-            "summary": self._generate_sma_summary(cur_sma, cur_px, trend_analysis, price_relationship)
+            "summary": self._generate_sma_summary(cur_sma, cur_px, trend_analysis, price_relationship,
+                                               crossover_analysis, support_resistance)
         }
     
     def _analyze_sma_trend(self, sma: pd.Series, short_win: int = 3, medium_win: int = 8, long_win: int = 15) -> Dict[str, Any]:
@@ -496,22 +497,45 @@ class SMAPreprocessor(BasePreprocessor):
         return round(np.mean(confidence_factors), 3)
     
     def _generate_sma_summary(self, sma_value: float, price: Optional[float],
-                             trend_analysis: Dict, price_relationship: Dict) -> str:
-        """Generate human-readable SMA summary."""
+                             trend_analysis: Dict, price_relationship: Dict,
+                             crossover_analysis: Dict = None, support_resistance: Dict = None) -> str:
+        """Generate human-readable SMA summary with enriched signals."""
         consensus = trend_analysis.get("consensus", "mixed")
         trend_strength = trend_analysis.get("strength", 0)
 
-        summary = f"SMA {sma_value:.4f} - {consensus} trend"
+        summary = f"SMA={sma_value:.4f} ({consensus})"
 
-        if trend_strength > 0.6:
-            summary += f" (strong)"
-
+        # Price position relative to SMA
         if (price is not None) and price_relationship:
             position = price_relationship.get("position", "unknown")
             distance_pct = price_relationship.get("distance_pct", 0)
-
             if position in ["above", "below"]:
-                summary += f", price {position} ({distance_pct:+.1f}%)"
+                summary += f", price {position} by {abs(distance_pct):.1f}%"
+
+        # Trend strength
+        if trend_strength > 0.6:
+            summary += ". Strong trend"
+
+        # Recent crossover - important signal
+        if crossover_analysis:
+            latest_cross = crossover_analysis.get("latest_crossover")
+            if latest_cross and latest_cross.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "bullish" in latest_cross.get("type", "") else "bearish"
+                summary += f". ✓ {cross_type.capitalize()} crossover {latest_cross['periods_ago']}p ago"
+
+        # Acceleration
+        slope_analysis = trend_analysis.get("slope", 0)
+        if abs(slope_analysis) > 0.001:
+            if slope_analysis > 0:
+                summary += ". Trend accelerating"
+            else:
+                summary += ". Trend decelerating"
+
+        # Support/resistance effectiveness
+        if support_resistance and not support_resistance.get("no_price_data"):
+            effectiveness = support_resistance.get("effectiveness", "")
+            if effectiveness == "high":
+                summary += ". ✓ Strong dynamic S/R"
 
         return summary
 

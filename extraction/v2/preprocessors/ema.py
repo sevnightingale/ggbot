@@ -129,7 +129,8 @@ class EMAPreprocessor(BasePreprocessor):
                 },
                 "calculation_notes": f"EMA analysis based on {len(ema_clean)} aligned data points with period {length}"
             },
-            "summary": self._generate_ema_summary(current_ema, current_price, trend_analysis, responsiveness_analysis)
+            "summary": self._generate_ema_summary(current_ema, current_price, trend_analysis, responsiveness_analysis,
+                                               crossover_analysis, support_resistance)
         }
     
     def _analyze_ema_trend(self, ema: pd.Series, length: int) -> Dict[str, Any]:
@@ -537,23 +538,45 @@ class EMAPreprocessor(BasePreprocessor):
     # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
     
     def _generate_ema_summary(self, ema_value: float, price: Optional[float],
-                             trend_analysis: Dict, responsiveness_analysis: Dict) -> str:
-        """Generate human-readable EMA summary."""
+                             trend_analysis: Dict, responsiveness_analysis: Dict,
+                             crossover_analysis: Dict = None, support_resistance: Dict = None) -> str:
+        """Generate human-readable EMA summary with enriched signals."""
         consensus = trend_analysis.get("consensus", "mixed")
         trend_strength = trend_analysis.get("strength", 0)
-        responsiveness_rating = responsiveness_analysis.get("responsiveness_rating", "moderate")
 
-        summary = f"EMA {ema_value:.4f} - {consensus} trend"
+        summary = f"EMA={ema_value:.4f} ({consensus})"
 
-        if trend_strength > 0.5:
-            summary += f" (strength: {trend_strength:.2f})"
-
-        summary += f", {responsiveness_rating} responsiveness"
-
+        # Price position relative to EMA
         if price is not None:
             ema_denom = max(1e-12, abs(ema_value))
             distance_pct = (price - ema_value) / ema_denom * 100
-            summary += f", price {distance_pct:+.1f}%"
+            position = "above" if distance_pct > 0 else "below"
+            summary += f", price {position} by {abs(distance_pct):.1f}%"
+
+        # Trend strength
+        if trend_strength > 0.7:
+            summary += ". Strong trend"
+
+        # Recent crossover - important signal
+        if crossover_analysis:
+            latest_cross = crossover_analysis.get("latest_crossover")
+            if latest_cross and latest_cross.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "rising" in latest_cross.get("type", "") else "bearish"
+                summary += f". ✓ {cross_type.capitalize()} crossover {latest_cross['periods_ago']}p ago"
+
+        # Acceleration
+        acceleration = trend_analysis.get("acceleration", 0)
+        if abs(acceleration) > 0.001:
+            if acceleration > 0:
+                summary += ". Trend accelerating"
+            else:
+                summary += ". Trend decelerating"
+
+        # Support/resistance effectiveness
+        if support_resistance and not support_resistance.get("no_price_data"):
+            effectiveness = support_resistance.get("effectiveness", "")
+            if effectiveness == "high":
+                summary += ". ✓ Strong dynamic S/R"
 
         return summary
 

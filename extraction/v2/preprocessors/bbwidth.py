@@ -263,19 +263,42 @@ class BollingerWidthPreprocessor(BasePreprocessor):
             return "poor_setup"
     
     
-    def _generate_bb_width_summary(self, current_width: float, volatility_analysis: Dict, 
-                                  squeeze_analysis: Dict) -> str:
-        """Generate human-readable BB Width summary."""
+    def _generate_bb_width_summary(self, current_width: float, volatility_analysis: Dict,
+                                  squeeze_analysis: Dict, expansion_analysis: Dict = None) -> str:
+        """Generate human-readable BB Width summary with enriched signals."""
         volatility_level = volatility_analysis.get("level", "average")
         percentile = volatility_analysis.get("percentile_rank", 50)
-        
-        summary = f"BB Width {current_width:.2f}% - {volatility_level.replace('_', ' ')} volatility ({percentile:.0f}th percentile)"
-        
+
+        summary = f"BBWidth={current_width:.2f}% ({volatility_level.replace('_', ' ')}, {percentile:.0f}%ile)"
+
+        # Squeeze detection - critical volatility signal
         if squeeze_analysis.get("is_squeeze", False):
             squeeze_periods = squeeze_analysis.get("squeeze_periods", 0)
             squeeze_quality = squeeze_analysis.get("squeeze_quality", "weak")
-            summary += f" - {squeeze_quality.upper()} SQUEEZE ({squeeze_periods}p)"
-        
+            if squeeze_quality in ["excellent", "good"]:
+                summary += f". ⚠️ {squeeze_quality.upper()} SQUEEZE ({squeeze_periods}p)"
+            else:
+                summary += f". Squeeze ({squeeze_periods}p)"
+
+        # Expansion analysis
+        if expansion_analysis:
+            expansion_type = expansion_analysis.get("type", "")
+            if "rapid" in expansion_type:
+                summary += ". ⚠️ Rapid volatility expansion"
+
+        # Width trend
+        width_trend = volatility_analysis.get("trend", "")
+        if width_trend == "contracting":
+            summary += ". Volatility contracting"
+        elif width_trend == "expanding":
+            summary += ". Volatility expanding"
+
+        # Extreme percentiles
+        if percentile < 10:
+            summary += ". ⚠️ Historically low volatility"
+        elif percentile > 90:
+            summary += ". ⚠️ Historically high volatility"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

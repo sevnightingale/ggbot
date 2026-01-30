@@ -545,23 +545,57 @@ class AroonPreprocessor(BasePreprocessor):
     
     
     def _generate_aroon_summary(self, aroon_up: float, aroon_down: float,
-                               trend_analysis: Dict, oscillator_analysis: Dict) -> str:
-        """Generate human-readable Aroon summary."""
-        summary = f"Aroon Up: {aroon_up:.1f}, Down: {aroon_down:.1f}"
-        
-        # Add trend information
-        current_trend = trend_analysis["current_trend"]
-        if current_trend != "sideways":
-            duration = trend_analysis["trend_duration"]
-            summary += f" - {current_trend} for {duration} periods"
+                               trend_analysis: Dict, oscillator_analysis: Dict,
+                               crossover_analysis: Dict = None, divergence: Dict = None) -> str:
+        """Generate human-readable Aroon summary with enriched signals."""
+        summary = f"Aroon Up={aroon_up:.0f}, Down={aroon_down:.0f}"
+
+        # Trend direction and strength
+        current_trend = trend_analysis.get("current_trend", "sideways")
+        trend_strength = trend_analysis.get("trend_strength", "")
+        duration = trend_analysis.get("trend_duration", 0)
+
+        if current_trend == "bullish":
+            if "strong" in trend_strength:
+                summary += ". ✓ Strong bullish trend"
+            else:
+                summary += f". Bullish ({duration}p)"
+        elif current_trend == "bearish":
+            if "strong" in trend_strength:
+                summary += ". ⚠️ Strong bearish trend"
+            else:
+                summary += f". Bearish ({duration}p)"
         else:
-            summary += " - sideways trend"
-        
-        # Add oscillator zone
-        osc_zone = oscillator_analysis["zone"]
-        if osc_zone != "neutral":
-            summary += f" ({osc_zone.replace('_', ' ')})"
-        
+            summary += ". Consolidating"
+
+        # Oscillator extremes
+        osc_zone = oscillator_analysis.get("zone", "neutral")
+        if osc_zone == "strong_bullish":
+            summary += ". ✓ Strong bullish zone (>50)"
+        elif osc_zone == "strong_bearish":
+            summary += ". ⚠️ Strong bearish zone (<-50)"
+
+        # Recent crossover
+        if crossover_analysis:
+            latest = crossover_analysis.get("latest_crossover")
+            if latest and latest.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "bullish" in latest.get("type", "") else "bearish"
+                summary += f". {cross_type.capitalize()} crossover {latest['periods_ago']}p ago"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "bullish" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "bearish" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Extreme readings (new high/low signals)
+        if aroon_up == 100:
+            summary += ". ✓ New period high"
+        elif aroon_down == 100:
+            summary += ". ⚠️ New period low"
+
         return summary
 
     def to_compact(self, full_output: dict, timeframe: str) -> dict:

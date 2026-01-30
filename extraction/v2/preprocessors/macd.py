@@ -113,7 +113,8 @@ class MACDPreprocessor(BasePreprocessor):
             },
             "summary": self._generate_macd_summary(
                 current_macd, current_signal, current_histogram,
-                crossover_analysis, trend_strength
+                crossover_analysis, trend_strength,
+                divergence, zero_line_analysis, histogram_analysis
             )
         }
     
@@ -271,16 +272,47 @@ class MACDPreprocessor(BasePreprocessor):
         return None
     
     def _generate_macd_summary(self, macd: float, signal: float, histogram: float,
-                              crossovers: Dict, trend_strength: Dict) -> str:
-        """Generate MACD summary."""
-        trend = "rising" if macd > signal else "falling"
-        momentum = "increasing" if histogram > 0 else "decreasing"
+                              crossovers: Dict, trend_strength: Dict,
+                              divergence: Dict = None, zero_line: Dict = None,
+                              histogram_analysis: Dict = None) -> str:
+        """Generate MACD summary with enriched signals."""
+        trend = "bullish" if macd > signal else "bearish"
+        momentum = "strengthening" if histogram > 0 else "weakening"
 
-        summary = f"MACD {trend} trend with {momentum} momentum"
+        summary = f"MACD {trend}, momentum {momentum}"
 
-        if crossovers["latest_crossover"] and crossovers["latest_crossover"]["periods_ago"] <= 5:
-            crossover = crossovers["latest_crossover"]
-            summary += f". Recent {crossover['type']} {crossover['periods_ago']}p ago"
+        # Zero line position (important context)
+        if zero_line:
+            position = zero_line.get("current_position", "")
+            if position == "above":
+                summary += " (above zero)"
+            elif position == "below":
+                summary += " (below zero)"
+
+        # Recent crossovers
+        if crossovers.get("latest_crossover"):
+            cross = crossovers["latest_crossover"]
+            if cross.get("periods_ago", 99) <= 5:
+                cross_type = "bullish" if "bullish" in cross.get("type", "") else "bearish"
+                strength = cross.get("strength_level", "")
+                summary += f". {strength.capitalize() + ' ' if strength else ''}{cross_type} crossover {cross['periods_ago']}p ago"
+
+        # ⚠️ DIVERGENCE - critical signal
+        if divergence:
+            div_type = divergence.get("type", "")
+            if "positive" in div_type:
+                summary += ". ✓ BULLISH DIVERGENCE"
+            elif "negative" in div_type:
+                summary += ". ⚠️ BEARISH DIVERGENCE"
+
+        # Histogram acceleration
+        if histogram_analysis:
+            accel = histogram_analysis.get("acceleration", 0)
+            if abs(accel) > 0.001:  # Significant acceleration
+                if accel > 0:
+                    summary += ". Histogram accelerating"
+                else:
+                    summary += ". Histogram decelerating"
 
         return summary
 
