@@ -41,6 +41,25 @@ export default function Footer() {
 
           {/* Links */}
           <div className="flex flex-col sm:flex-row gap-6 sm:gap-12">
+            {/* Resources */}
+            <div className="flex flex-col gap-3">
+              <h4 className="text-ivory/70 text-xs font-semibold uppercase tracking-wider">Learn</h4>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/blog"
+                  className="text-ivory/50 hover:text-ivory text-sm transition-colors"
+                >
+                  Blog
+                </Link>
+                <Link
+                  href="/arena"
+                  className="text-ivory/50 hover:text-ivory text-sm transition-colors"
+                >
+                  ggArena
+                </Link>
+              </div>
+            </div>
+
             {/* Legal Links */}
             <div className="flex flex-col gap-3">
               <h4 className="text-ivory/70 text-xs font-semibold uppercase tracking-wider">Legal</h4>

@@ -20,8 +20,8 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-obsidian/95 backdrop-blur-sm border-b border-ivory/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Legal Links */}
-          <div className="flex items-center gap-6">
+          {/* Logo */}
+          <div className="flex items-center">
             <Image
               src="/ggbots_logo.png"
               alt="ggbots.ai"
@@ -29,15 +29,6 @@ export default function Header() {
               height={40}
               className="h-8 w-auto"
             />
-            <div className="hidden sm:flex items-center gap-3 text-xs text-ivory/40">
-              <Link href="/privacy" className="hover:text-ivory/70 transition-colors">
-                Privacy
-              </Link>
-              <span>·</span>
-              <Link href="/terms" className="hover:text-ivory/70 transition-colors">
-                Terms
-              </Link>
-            </div>
           </div>
 
           {/* Desktop Navigation */}
@@ -67,6 +58,12 @@ export default function Header() {
               >
                 Pricing
               </button>
+              <Link
+                href="/blog"
+                className="text-ivory/80 hover:text-ivory transition-colors text-sm font-medium"
+              >
+                Blog
+              </Link>
             </div>
           </nav>
 
@@ -125,23 +122,13 @@ export default function Header() {
               >
                 Pricing
               </button>
-              {/* Legal Links (Mobile) */}
-              <div className="flex items-center gap-4 px-4 pt-3 mt-2 border-t border-ivory/10">
-                <Link
-                  href="/privacy"
-                  className="text-ivory/50 hover:text-ivory text-sm transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Privacy
-                </Link>
-                <Link
-                  href="/terms"
-                  className="text-ivory/50 hover:text-ivory text-sm transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Terms
-                </Link>
-              </div>
+              <Link
+                href="/blog"
+                className="block w-full text-left px-4 py-2 text-ivory/80 hover:text-ivory hover:bg-ivory/5 rounded-sm transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Blog
+              </Link>
             </div>
           </div>
         )}
