@@ -6,6 +6,36 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-30 - Landing Page Quick Wins + Webapp Testing Skill
+
+**Purpose**: Improve landing page conversion via social proof, CTAs, and design system compliance. Add Playwright-based testing capability.
+
+**New Components** (`frontend/components/new-landing/`):
+- `SocialProof.tsx` (NEW) - ggArena banner + live stats (470+ bots, 5.9K trades, 86K decisions)
+- Replaced Arcade demo embed (outdated, confusing CTA)
+
+**Landing Page Updates** (`frontend/components/new-landing/*.tsx`):
+- Process.tsx - Added CTA "Build your first bot in 2 minutes"
+- Features.tsx - Added CTA "Watch live bots compete", removed shadows
+- Hero.tsx - Removed brass glow shadow
+- Pricing.tsx - Removed all shadow effects
+- PersonalStory.tsx - Removed shadow, cleaner button
+- FAQ.tsx - Contact CTA → Telegram community link with icon
+- Header.tsx - Added "Sign Up" link alongside "Launch App"
+- Footer.tsx - Fixed stretched logo via object-contain
+
+**Webapp Testing Skill** (`.claude/skills/webapp-testing/`):
+- Downloaded from anthropics/skills repo
+- Installed Playwright + Chromium browser
+- Added `screenshot_url.py` script for visual verification
+- Can now take screenshots of deployed pages for review
+
+**Activity Modal** (`frontend/components/activity-modal.tsx`):
+- Upgraded to standardized `lg` sizing (576→672px desktop)
+- Replaced inline styles with Tailwind classes matching modal.tsx standards
+
+---
+
 ## 2026-01-30 - Enriched Preprocessor Summaries (Option A)
 
 **Purpose**: Surface rich indicator signals (divergence, crossovers, squeeze, acceleration) in LLM-readable summaries. Token-neutral approach - signals appear only when detected.

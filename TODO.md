@@ -273,30 +273,23 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ## 🚀 **Landing Page Quick Wins**
 
-**Status**: 🟡 IN PROGRESS
+**Status**: 🟢 PHASE 1-4 COMPLETE
 **Priority**: High - Product solid, time to optimize funnel
-**Estimated Effort**: ~4-6 hours
 
-**Goal**: Improve conversion on existing landing page before larger redesign.
+**Completed (2026-01-30)**:
+- [x] Removed Arcade demo embed → replaced with SocialProof component
+- [x] Added live stats: 470+ bots, 5,900+ trades, 86K+ AI decisions
+- [x] ggArena Season 1 banner with "LIVE NOW" badge + "Watch the competition" CTA
+- [x] Added CTA after Process section ("Build your first bot in 2 minutes")
+- [x] Added CTA after Features section ("Watch live bots compete in ggArena")
+- [x] Removed shadows from Hero/Features/Pricing/PersonalStory
+- [x] Updated FAQ contact → Telegram community link
+- [x] Added "Sign Up" to header navigation
+- [x] Fixed footer logo stretching
 
-### **Phase 1: Remove & Replace** (~1 hour)
-- [ ] Remove Arcade demo embed (outdated, confusing "Get Started" CTA)
-- [ ] Replace with static hero image or simple animation
-
-### **Phase 2: Add Social Proof** (~2 hours)
-- [ ] Add live stats section: "X bots running", "Y trades executed", "Z users"
-- [ ] ggArena Season 1 banner: "$2,500 prize pool • 33 bots competing"
-- [ ] Consider: testimonial or tweet embed (if available)
-
-### **Phase 3: CTA Optimization** (~1 hour)
-- [ ] Add CTA after Process section (currently dead end)
-- [ ] Add CTA after Features section (currently dead end)
-- [ ] Vary CTA copy per section (not all "Start for free")
-
-### **Phase 4: Design Cleanup** (~1 hour)
-- [ ] Remove shadows from Hero/Features (violates design system)
-- [ ] Update FAQ contact CTA → Telegram community link
-- [ ] Add "Sign Up" to header (currently only "Launch App")
+### **Future Enhancements**
+- [ ] Testimonial or tweet embed (when available)
+- [ ] Dynamic stats from API (currently hardcoded)
 
 ---
 
