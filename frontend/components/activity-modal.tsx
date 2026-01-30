@@ -250,12 +250,14 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
   const confidence = Number(details.confidence || 0)
 
   // Try to parse structured sections from thought
-  const keySignal = thought.match(/KEY[_\s]?SIGNAL:?\s*([\s\S]+?)(?=SUPPORTING|RISK|SUMMARY|$)/i)?.[1]?.trim()
-  const supporting = thought.match(/SUPPORTING:?\s*([\s\S]+?)(?=RISK|SUMMARY|$)/i)?.[1]?.trim()
-  const risk = thought.match(/RISK:?\s*([\s\S]+?)(?=SUMMARY|$)/i)?.[1]?.trim()
-  const summary = thought.match(/SUMMARY:?\s*([\s\S]+?)$/i)?.[1]?.trim()
+  // Order-agnostic regex: each section captures until ANY other section header or end of string
+  const keySignal = thought.match(/KEY[_\s]?SIGNAL[S]?:?\s*([\s\S]+?)(?=KEY[_\s]?SIGNAL:|SUPPORTING:|RISK:|SUMMARY:|WARNING:|$)/i)?.[1]?.trim()
+  const supporting = thought.match(/SUPPORTING:?\s*([\s\S]+?)(?=KEY[_\s]?SIGNAL:|SUPPORTING:|RISK:|SUMMARY:|WARNING:|$)/i)?.[1]?.trim()
+  const risk = thought.match(/RISK:?\s*([\s\S]+?)(?=KEY[_\s]?SIGNAL:|SUPPORTING:|RISK:|SUMMARY:|WARNING:|$)/i)?.[1]?.trim()
+  const summary = thought.match(/SUMMARY:?\s*([\s\S]+?)(?=KEY[_\s]?SIGNAL:|SUPPORTING:|RISK:|WARNING:|$)/i)?.[1]?.trim()
+  const warning = thought.match(/WARNING[S]?:?\s*([\s\S]+?)(?=KEY[_\s]?SIGNAL:|SUPPORTING:|RISK:|SUMMARY:|$)/i)?.[1]?.trim()
 
-  const isStructured = keySignal || supporting || risk || summary
+  const isStructured = keySignal || supporting || risk || summary || warning
 
   return (
     <div className="space-y-4">
@@ -293,17 +295,22 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
       {/* Structured or raw reasoning */}
       {isStructured ? (
         <div className="space-y-3">
+          {/* Summary first - the main takeaway */}
+          {summary != null && (
+            <ReasoningSection title="Summary" content={summary} colorVar="--text-primary" />
+          )}
           {keySignal != null && (
-            <ReasoningSection title="Key Signal" content={keySignal} colorVar="--signal" />
+            <ReasoningSection title="Key Signals" content={keySignal} colorVar="--signal" />
           )}
           {supporting != null && (
             <ReasoningSection title="Supporting" content={supporting} colorVar="--accent" />
           )}
+          {/* Warnings and risks at the bottom */}
+          {warning != null && (
+            <ReasoningSection title="Warnings" content={warning} colorVar="--ember" />
+          )}
           {risk != null && (
             <ReasoningSection title="Risk" content={risk} colorVar="--ember" />
-          )}
-          {summary != null && (
-            <ReasoningSection title="Summary" content={summary} colorVar="--text-primary" />
           )}
         </div>
       ) : (
