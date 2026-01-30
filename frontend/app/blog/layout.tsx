@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { ThemeProvider } from '@/lib/theme'
 
 export const metadata: Metadata = {
   title: {
@@ -22,6 +23,7 @@ export default function BlogLayout({
   children: React.ReactNode
 }) {
   return (
+    <ThemeProvider>
     <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* Header */}
       <header className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
@@ -79,5 +81,6 @@ export default function BlogLayout({
         </div>
       </footer>
     </div>
+    </ThemeProvider>
   )
 }
