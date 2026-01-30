@@ -578,11 +578,8 @@ export default function ActivityModal({
               animate={{ opacity: 1, scale: 1, x: swipeDirection === 'left' ? -10 : swipeDirection === 'right' ? 10 : 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden pointer-events-auto"
-              style={{
-                width: 'min(calc(100vw - 32px), 500px)',
-                maxHeight: 'min(calc(100vh - 64px), 700px)',
-              }}
+              className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden pointer-events-auto
+                         w-full sm:max-w-xl lg:max-w-2xl max-h-[calc(100vh-64px)] sm:max-h-[85vh]"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
