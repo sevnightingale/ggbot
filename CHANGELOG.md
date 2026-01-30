@@ -6,6 +6,67 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-30 - SEO Infrastructure + Blog Launch
+
+**Purpose**: Complete SEO foundation and launch blog with first cornerstone article.
+
+**Documentation**: [frontend/SEO.md](frontend/SEO.md)
+
+**Technical SEO** (`frontend/app/`):
+- `sitemap.ts` - Dynamic sitemap with all pages + blog posts
+- `robots.ts` - Crawl rules blocking /forge, /admin, /settings
+- `layout.tsx` - Full OG, Twitter cards, keywords, canonical URLs
+- `landing/page.tsx` - JSON-LD SoftwareApplication schema
+- `opengraph-image.png`, `twitter-image.png` - Generated via Playwright (1200×630)
+- `arena/opengraph-image.png` - Competition-specific social image
+
+**PWA Icons** (`frontend/public/`):
+- `icon-192.png`, `icon-512.png` - Android home screen
+- `apple-touch-icon.png` - iOS home screen (180×180)
+- `manifest.json` - Updated with brand colors (#0b0b0c, #c1a87d)
+
+**Blog Infrastructure** (`frontend/`):
+- `lib/blog.ts` - Post loading, frontmatter parsing, BlogPosting schema generation
+- `app/blog/page.tsx` - Blog index with post listing
+- `app/blog/[slug]/page.tsx` - Individual posts with SSG
+- `app/blog/layout.tsx` - Blog layout with ThemeProvider
+- `app/feed.xml/route.ts` - RSS feed auto-generated from posts
+- `content/blog/what-is-vibe-trading.mdx` - First cornerstone (~3,200 words)
+
+**OG Image Generation** (`frontend/scripts/`):
+- `og-image-template.html`, `og-image-arena.html` - Editable HTML templates
+- `generate_og_image.py` - Playwright-based screenshot generator
+- Brand colors from VIBE.md (#c1a87d brass, #0b0b0c obsidian)
+
+**Landing Page Updates**:
+- Header: Removed Privacy/Terms (Google verified), added Blog link
+- Footer: Added "Learn" section with Blog + ggArena links
+
+---
+
+## 2026-01-30 - Performance: Remove UX Delays + Refactor Planning
+
+**Purpose**: Quick win for API performance, revised refactor plan addressing root cause.
+
+**ggbot.py Performance Fix**:
+- Removed 6 artificial `asyncio.sleep()` calls from orchestrator (13s total per cycle)
+- `_run_autonomous_trading_cycle()`: removed 3s + 7s + 3s delays
+- `_run_signal_validation_cycle()`: removed 3s + 7s + 3s delays
+- SSE phase updates still fire instantly, just no artificial pauses between them
+
+**Refactor Planning** (`DOCS/todo/ORCHESTRATOR_REFACTOR.md`):
+- NEW planning doc supersedes over-engineered API_EXTRACTION_REFACTOR.md
+- Root cause analysis: psycopg2 sync DB is primary bottleneck, not process architecture
+- Phased approach: Quick wins → Scheduler separation → Async DB → Code organization
+- Scale considerations: Current (35 bots) → Near-term (200) → Long-term (1000+)
+
+**TODO.md Updated**:
+- Compressed 7-phase plan to 4 focused phases
+- Added success metrics table (current vs target)
+- Marked Phase 1 (quick wins) complete
+
+---
+
 ## 2026-01-30 - Landing Page Quick Wins + Webapp Testing Skill
 
 **Purpose**: Improve landing page conversion via social proof, CTAs, and design system compliance. Add Playwright-based testing capability.

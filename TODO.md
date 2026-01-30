@@ -78,79 +78,61 @@ Tables with conflicting RLS policies that OR together (review and consolidate):
 
 ---
 
-## 🔧 **API Extraction Refactor - Scheduler Process Separation**
+## 🔧 **Orchestrator Refactor - Performance First**
 
-**Status**: 🔴 CRITICAL - Production 502s during bot execution
-**Planning Doc**: [DOCS/todo/API_EXTRACTION_REFACTOR.md](DOCS/todo/API_EXTRACTION_REFACTOR.md)
-**Complexity**: High (~64 hours / 5 weeks)
+**Status**: 🟡 IN PROGRESS - Quick wins done, scheduler separation next
+**Planning Doc**: [DOCS/todo/ORCHESTRATOR_REFACTOR.md](DOCS/todo/ORCHESTRATOR_REFACTOR.md)
 **Priority**: P0 - Blocking user experience
 
-**Problem**: ggbot.py is 4345-line monolith with FastAPI + APScheduler in same process. Long-running LLM calls (10-30s) during bot execution block event loop, causing 502 errors on API endpoints and SSE stream disconnects.
+**Problem**: API returns 502s and SSE streams disconnect during bot execution.
 
-**Solution**: Split into two independent processes:
-- `ggbot-api.py` - FastAPI server (port 8000)
-- `ggbot-scheduler.py` - APScheduler bot execution (no HTTP)
+**Root Causes** (in order of impact):
+1. **psycopg2 is synchronous** — DB queries block entire event loop
+2. **Single process** — API and scheduler compete for same event loop
+3. **5,260-line monolith** — maintenance burden (not performance)
 
-**Communication**: Redis pub/sub for instant updates, DB polling fallback
+### **Phase 1: Quick Wins** ✅ COMPLETE
 
-### **Implementation Phases**
+- [x] Remove artificial UX delays (13s saved per cycle) — 2026-01-30
+- [ ] Add timing instrumentation to identify actual bottlenecks
+- [ ] Verify connection pooling is properly configured
 
-**Phase 1: Extract Orchestrator** (~4 hours, Low Risk)
-- [ ] Create `core/orchestrator/orchestrator.py`
-- [ ] Move GGBotOrchestrator class (lines 312-1177)
-- [ ] Update imports in ggbot.py
-- [ ] Run integration tests
+### **Phase 2: Scheduler Separation** (~16-24 hours)
 
-**Phase 2: Extract Scheduler Logic** (~6 hours, Medium Risk)
-- [ ] Create `core/orchestrator/scheduler.py`
-- [ ] Move APScheduler functions (lines 1188-1388)
-- [ ] Test scheduler startup/shutdown
-- [ ] Verify bot lifecycle endpoints
+**Goal**: API server never blocks on LLM calls.
 
-**Phase 3: Add Lifecycle Communication** (~8 hours, Medium Risk)
-- [ ] Create `core/orchestrator/lifecycle.py`
-- [ ] Add `next_run_at` column to configurations table
-- [ ] Implement Redis pub/sub (bot_lifecycle channel)
-- [ ] Update scheduler to write next_run_at to DB
-- [ ] Test Redis message passing
+- [ ] Create `ggbot-scheduler.py` (APScheduler, no HTTP)
+- [ ] Create `core/orchestrator/lifecycle.py` (Redis pub/sub)
+- [ ] Update `ggbot.py` (remove scheduler startup)
+- [ ] Update PM2 config (two processes)
+- [ ] Test: API responsive during bot execution
 
-**Phase 4: Create Scheduler Process** (~10 hours, High Risk)
-- [ ] Create `ggbot-scheduler.py`
-- [ ] Implement Redis lifecycle listener
-- [ ] Implement DB reconciliation loop (5min interval)
-- [ ] Add health check endpoint (port 8001)
-- [ ] Test standalone execution
+### **Phase 3: Async Database** (~40-60 hours)
 
-**Phase 5: Create API Process** (~12 hours, High Risk)
-- [ ] Create `ggbot-api.py` (all endpoints, no scheduler)
-- [ ] Update bot lifecycle endpoints (notify_scheduler_*)
-- [ ] Update /api/v2/scheduler/status (read from DB)
-- [ ] Test all 60+ endpoints
-- [ ] Verify SSE stream stability
+**Goal**: True async concurrency for DB operations.
 
-**Phase 6: Integration Testing** (~16 hours, High Risk)
-- [ ] Update PM2 configuration (two processes)
-- [ ] Deploy to staging environment
-- [ ] Stress test: 50+ concurrent bot executions
-- [ ] Test scheduler crash recovery
-- [ ] Verify no 502s during peak execution
-- [ ] Monitor API latency (<100ms target)
+- [ ] Create `core/common/async_db.py` (asyncpg pool)
+- [ ] Migrate hot paths (SSE stream, bot lifecycle)
+- [ ] Gradually migrate all endpoints
+- [ ] Feature flag for gradual rollout
 
-**Phase 7: Production Deployment** (~8 hours, Medium Risk)
-- [ ] Update ACTIVE.md documentation
-- [ ] Create rollback plan (monolith fallback)
-- [ ] Deploy during off-peak (03:00 UTC)
-- [ ] Monitor for 24 hours
-- [ ] Verify all active bots running
+### **Phase 4: Code Organization** (Optional, parallel)
+
+**Goal**: Elegant, maintainable codebase.
+
+- [ ] Extract billing endpoints to `api/billing.py`
+- [ ] Extract arena endpoints to `api/arena.py`
+- [ ] Extract bot lifecycle to `api/bot_lifecycle.py`
+- [ ] Create shared `api/dependencies.py` (config ownership check)
+- [ ] Move GGBotOrchestrator to `core/orchestrator/`
 
 ### **Success Metrics**
-- API p99 latency: <100ms during bot execution (currently 3-10s)
-- 502 errors: 0 during peak hours (currently 10-20/hour)
-- SSE stream uptime: 99.9% (currently 95%)
-- Bot execution success rate: >98% (no regression)
 
-### **Rollback Plan**
-If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Expected recovery: 5 minutes.
+| Metric | Current | Phase 2 | Phase 3 |
+|--------|---------|---------|---------|
+| API p99 latency | 3-10s | <500ms | <100ms |
+| 502 errors/hour | 10-20 | <5 | 0 |
+| SSE uptime | 95% | 98% | 99.9% |
 
 ---
 
@@ -295,40 +277,46 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ## 📈 **SEO & Content Strategy**
 
-**Status**: 🔴 NOT STARTED
-**Priority**: High - Compounds over time, start now
-**Estimated Effort**: ~8-12 hours initial setup
+**Status**: 🟢 PHASE 1-3 COMPLETE
+**Documentation**: [frontend/SEO.md](frontend/SEO.md)
+**Priority**: High - Foundation complete, content pipeline active
 
-**Goal**: Establish SEO foundation and content pipeline for organic growth.
+### **Completed (2026-01-30)**
 
-### **Phase 1: Technical SEO Audit** (~2 hours)
-- [ ] Audit meta titles/descriptions on all pages
-- [ ] Generate and submit sitemap.xml
-- [ ] Add schema markup to FAQ section (FAQ schema)
-- [ ] Add schema markup to pricing (Product schema)
-- [ ] Verify robots.txt allows crawling
-- [ ] Check page load speed (Core Web Vitals)
+**Phase 1: Technical SEO** ✅
+- [x] `sitemap.ts` - Auto-generated sitemap with all pages + blog posts
+- [x] `robots.ts` - Crawl rules blocking protected routes
+- [x] OG images generated via Playwright (1200×630, brand colors)
+- [x] Twitter cards configured
+- [x] PWA icons (192, 512, apple-touch-icon)
+- [x] JSON-LD schema on landing (SoftwareApplication) and blog (BlogPosting)
+- [x] Meta titles/descriptions on all public pages
+- [x] Canonical URLs configured
 
-### **Phase 2: Keyword Research** (~2 hours)
-- [ ] Identify target keywords: "AI trading bot", "crypto trading automation", etc.
-- [ ] Map keywords to pages (landing, blog posts, docs)
+**Phase 3: Blog Infrastructure** ✅
+- [x] `/blog` route with MDX support
+- [x] Blog post template with frontmatter (title, description, author, keywords)
+- [x] RSS feed at `/feed.xml`
+- [x] First cornerstone article published: "What is Vibe Trading?"
+- [x] Blog linked in landing header + footer
+
+### **Remaining Work**
+
+**Phase 2: Keyword Research** (~2 hours)
 - [ ] Analyze competitor keywords (3commas, Pionex, etc.)
+- [ ] Map keywords to future blog posts
 
-### **Phase 3: Blog Setup** (~3 hours)
-- [ ] Create `/blog` route with proper structure
-- [ ] Set up blog post template with SEO fields
-- [ ] Publish first blog post (already written)
-- [ ] Create 2-3 cornerstone content pieces:
-  - [ ] "How AI Trading Bots Work (And Why Most Fail)"
-  - [ ] "ggbots vs Traditional Bots: What's Different"
-  - [ ] "Getting Started with AI Trading in 2026"
-
-### **Phase 4: Content Calendar** (~1 hour)
+**Phase 4: Content Calendar**
 - [ ] Plan 4-8 blog posts for next 2 months
 - [ ] Topics: tutorials, comparisons, case studies, ggArena updates
 - [ ] Consider: newsletter signup for content distribution
 
-### **Future Considerations**
+**Future Cornerstone Content**:
+- [ ] "How AI Trading Bots Work (And Why Most Fail)"
+- [ ] "ggbots vs Traditional Bots: What's Different"
+- [ ] "Getting Started with AI Trading in 2026"
+
+**Future Considerations**:
 - [ ] Mintlify docs setup (when user questions increase)
 - [ ] Lead magnet: "5 AI Trading Strategies" PDF
 - [ ] Email capture on landing page
