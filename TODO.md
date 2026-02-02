@@ -43,7 +43,7 @@ See planning doc for complete provider-specific instructions and verification st
 
 ## 🗄️ **Supabase Database Optimizations**
 
-**Status**: 🟡 PARTIAL - Disk IO fixes done, policy fixes pending
+**Status**: 🟡 PARTIAL - Infrastructure upgraded, policy fixes pending
 **Reference**: `NOTE.md` (Supabase advisor output), `SQL.md` (migration scripts)
 
 ### **Completed (2026-01-29)**
@@ -52,6 +52,11 @@ See planning doc for complete provider-specific instructions and verification st
 - [x] Added `idx_paper_trades_decision` FK index
 - [x] Renamed duplicate/unused indexes to `_deprecated_*`
 - [x] Code change: stop storing prompts in decisions table
+
+### **Completed (2026-01-30)**
+- [x] Upgraded Supabase compute tier (disk IO budget exhausted)
+- [x] Switched to Supabase Pooler connection (direct DB was IPv6-only, VM has no IPv6)
+- [x] DATABASE_URL now uses `pooler.supabase.com` with project ref in username
 
 ### **Pending: Drop Deprecated Indexes** (after 3-7 day monitoring)
 - [ ] Drop `_deprecated_idx_snapshots_config_time` (10 MB)

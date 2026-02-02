@@ -74,6 +74,23 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-30 - Infrastructure: Supabase Pooler + Mobile Touch Fix
+
+**Supabase Connection Fix**:
+- Disk IO budget exhausted → upgraded compute tier
+- Direct DB connection (IPv6-only) unreachable from VM → switched to Supabase Pooler
+- `.env` DATABASE_URL: `db.xxx.supabase.co` → `aws-1-ap-southeast-1.pooler.supabase.com`
+- Username format updated: `postgres` → `postgres.ciinauxtnkweyebyhucl` (pooler requires project ref)
+- Result: 46ms connect, 7ms queries (was timing out)
+
+**Mobile Touch Fix** (`frontend/app/forge/components/layout/`):
+- `BotManagementMenu.tsx`: click-outside handler `mousedown` → `pointerdown` (unified mouse/touch)
+- Added `data-bot-menu` attribute to dropdown containers (main menu, delete confirm, reset confirm)
+- `BotRail.tsx`: parent onClick now excludes `[data-bot-menu]` clicks (was only excluding trigger)
+- 3-dot menu actions now work on mobile touch devices
+
+---
+
 ## 2026-01-30 - Landing Page Quick Wins + Webapp Testing Skill
 
 **Purpose**: Improve landing page conversion via social proof, CTAs, and design system compliance. Add Playwright-based testing capability.
