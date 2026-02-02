@@ -6,9 +6,9 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2026-01-30 - SEO Infrastructure + Blog Launch
+## 2026-01-30 - SEO Infrastructure + Blog Launch + Keyword Research
 
-**Purpose**: Complete SEO foundation and launch blog with first cornerstone article.
+**Purpose**: Complete SEO foundation, launch blog, and develop keyword strategy.
 
 **Documentation**: [frontend/SEO.md](frontend/SEO.md)
 
@@ -41,6 +41,13 @@ Complete history of features, fixes, and improvements. For current status see AC
 **Landing Page Updates**:
 - Header: Removed Privacy/Terms (Google verified), added Blog link
 - Footer: Added "Learn" section with Blog + ggArena links
+
+**Keyword Research** (`frontend/SEO.md`):
+- Competitive analysis: vibetrading.dev, vibetradingai.com, Gainium, 3Commas, Pionex
+- 4-tier keyword strategy (high-volume → long-tail → question-based)
+- ggbots differentiators: confidence scoring, multi-agent architecture, ggArena
+- Q1 2026 content calendar: 8 articles planned with target keywords
+- Article templates by type: Educational, Strategy, Comparison
 
 ---
 

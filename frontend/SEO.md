@@ -210,6 +210,83 @@ Templates use official brand colors:
 
 ---
 
+## Keyword Strategy
+
+### Competitive Landscape Analysis (January 2026)
+
+**"Vibe Trading" Term Status:**
+The term "vibe trading" has evolved from niche to mainstream. Key competitors:
+- [VibeTrading.dev](https://vibetrading.dev/) - AI agents for quantitative trading
+- [VibeTradingAI.com](https://www.vibetradingai.com/) - Platform competitor
+- [Gainium](https://gainium.io/vibe-trading) - Has vibe trading feature
+- Multiple Medium articles and GitHub repos
+
+**Market Context:**
+- AI crypto trading bot market: $36.5B (2023) → $92.2B projected by 2031 (14% CAGR)
+- 60%+ institutional investors exploring AI trading automation
+- Key distinction emerging: "trading bots" vs "AI agents" (agents adapt, bots follow rules)
+
+### Keyword Tiers
+
+#### Tier 1: High-Volume, High-Competition (Brand Building)
+| Keyword | Competition | Strategy |
+|---------|-------------|----------|
+| best crypto trading bots 2026 | HIGH | Comparison article, mention ggbots |
+| ai trading bot | HIGH | Target via multiple supporting articles |
+| crypto trading bot | HIGH | Long-term SEO play |
+
+#### Tier 2: Medium-Volume, Winnable (Primary Targets)
+| Keyword | Competition | Article |
+|---------|-------------|---------|
+| vibe trading | MEDIUM | ✅ "What is Vibe Trading?" (live) |
+| ai trading agent | MEDIUM | "AI Trading Agents Explained" |
+| autonomous trading | MEDIUM | Within vibe trading article |
+| trading bot vs ai agent | MEDIUM | "Trading Bots vs AI Agents: 2026 Guide" |
+
+#### Tier 3: Long-Tail, Low-Competition (Quick Wins)
+| Keyword | Search Intent | Article Idea |
+|---------|---------------|--------------|
+| what is vibe trading | Informational | ✅ Published |
+| how do ai trading bots work | Informational | "How AI Trading Bots Work" |
+| ai trading confidence score | Technical | "Confidence-Based Position Sizing" |
+| mean reversion crypto bot | Strategy | "Mean Reversion Strategy Guide" |
+| vibe trading vs algo trading | Comparison | Within vibe trading article |
+| ai trading bot risk management | Technical | "Risk Management for AI Trading" |
+
+#### Tier 4: Question-Based (Featured Snippet Targets)
+| Question | Featured Snippet Potential |
+|----------|---------------------------|
+| how do ai trading bots work | HIGH |
+| are ai trading bots profitable | HIGH |
+| what is the difference between ai trading bot and ai agent | HIGH |
+| how to set up a crypto trading bot | MEDIUM |
+| what is vibe trading | HIGH - ✅ We rank for this |
+
+### ggbots Differentiators (Content Gaps in Market)
+
+These topics have LOW competition because they're unique to our approach:
+
+1. **Confidence Scoring System** - No competitor explains this well
+   - Article: "How AI Confidence Scores Determine Position Size"
+   - Unique angle: Breaking confidence into components to avoid LLM 7/10 bias
+
+2. **Multi-Agent Architecture** - Separation of concerns (extraction → decision → execution)
+   - Article: "Why Single-LLM Trading Fails (And What Works Instead)"
+   - Data point: GPT-5 lost 62% in Alpha Arena with monolithic approach
+
+3. **AI Trading Competitions** - ggArena is unique
+   - Article: "What AI Trading Competitions Teach Us About Bot Performance"
+   - Leverage real data from ggArena Season 1
+
+4. **Strategy Advisor Analysis** - Our pattern correlation + AI synthesis
+   - Article: "How to Analyze Your Trading Bot's Performance"
+   - Showcase the feature, provide methodology
+
+5. **Paper Trading → Live Pipeline** - Risk management journey
+   - Article: "From Paper Trading to Live: A Safe Migration Guide"
+
+---
+
 ## Content Strategy
 
 ### Cornerstone Content
@@ -220,14 +297,56 @@ Our first cornerstone article targets the primary keyword "vibe trading":
 - ~3,200 words (long-form authority signal)
 - Primary keywords: "what is vibe trading", "vibe trading explained", "ai autonomous trading"
 - Secondary keywords: "ai trading bots 2026", "vibe trading vs algo trading"
+- **Ranking target:** Featured snippet for "what is vibe trading"
 
-### Content Pillars (Planned)
+### Content Pillars
 
 1. **Vibe Trading Education** - What it is, how it works, getting started
 2. **AI Trading Strategy** - Strategy types, confidence scoring, risk management
 3. **Platform Tutorials** - How to use ggbots features
 4. **Case Studies** - Real bot performance, lessons learned
 5. **Industry Analysis** - Market trends, competition results (ggArena)
+6. **Comparisons** - ggbots vs competitors, bots vs agents
+
+### Content Calendar (Q1 2026)
+
+| Week | Article | Primary Keyword | Pillar | Est. Words |
+|------|---------|-----------------|--------|------------|
+| ✅ Jan 30 | What is Vibe Trading? | what is vibe trading | Education | 3,200 |
+| Feb 7 | Trading Bots vs AI Agents: What's Different in 2026 | trading bot vs ai agent | Comparison | 2,500 |
+| Feb 14 | How AI Confidence Scores Determine Position Size | ai trading confidence score | Strategy | 2,000 |
+| Feb 21 | ggArena Season 1 Results: What the Data Shows | ai trading competition | Analysis | 1,800 |
+| Feb 28 | Mean Reversion Strategy for AI Trading Bots | mean reversion crypto bot | Strategy | 2,200 |
+| Mar 7 | Why Single-LLM Trading Fails (Multi-Agent Architecture) | autonomous trading architecture | Education | 2,500 |
+| Mar 14 | Getting Started with AI Trading in 2026 | how to start ai trading | Tutorial | 2,800 |
+| Mar 21 | Risk Management for AI Trading Bots | ai trading bot risk management | Strategy | 2,000 |
+
+### Article Templates
+
+**Educational (Pillar: Education)**
+- Hook with problem/question
+- Clear definition section (featured snippet target)
+- "How it works" breakdown
+- Real examples (use ggArena data)
+- Common misconceptions
+- Getting started steps
+- CTA to ggbots
+
+**Strategy (Pillar: Strategy)**
+- Strategy overview
+- When to use it
+- Key indicators/signals
+- Risk management rules
+- Example configuration
+- Backtesting results (if available)
+- CTA to try on ggbots
+
+**Comparison (Pillar: Comparison)**
+- Side-by-side comparison table (featured snippet bait)
+- Detailed breakdown of each
+- Use cases for each approach
+- Our recommendation
+- How ggbots handles it
 
 ### Distribution Checklist
 
