@@ -448,17 +448,11 @@ class GGBotOrchestrator:
                 extraction_engine, config, user_id, requested_indicators, timeframes
             )
 
-            # UX delay: Give extraction phase time to display
-            await asyncio.sleep(3)
-
             await set_execution_phase(config_id, "deciding", "Analyzing market conditions for trading opportunities...")
 
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
             )
-
-            # UX delay: Give decision phase time to display (longest phase for AI reasoning)
-            await asyncio.sleep(7)
 
             action = decision_result.get('action', 'wait')
             if action in ['wait', 'no_action', 'hold']:
@@ -478,9 +472,6 @@ class GGBotOrchestrator:
                 config, user_id, decision_result
             )
 
-            # UX delay: Give trading phase time to display
-            await asyncio.sleep(3)
-            
             if self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
                     config, {}, decision_result
@@ -553,17 +544,11 @@ class GGBotOrchestrator:
                 override_symbol=symbol
             )
 
-            # UX delay: Give extraction phase time to display
-            await asyncio.sleep(3)
-
             await set_execution_phase(config_id, "deciding", "Analyzing signal against current market conditions...")
 
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result, signal_data
             )
-
-            # UX delay: Give decision phase time to display (longest phase for AI reasoning)
-            await asyncio.sleep(7)
 
             action = decision_result.get('action', 'wait')
             if action in ['wait', 'no_action', 'hold']:
@@ -577,9 +562,6 @@ class GGBotOrchestrator:
                 config, user_id, decision_result
             )
 
-            # UX delay: Give trading phase time to display
-            await asyncio.sleep(3)
-            
             if self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
                     config, signal_data, decision_result
@@ -4617,6 +4599,11 @@ async def handle_checkout_completed(session):
                 logger.bind(user_id=user_id).info(
                     f"Credit grant created: ${amount_cents / 100:.2f}"
                 )
+
+                # Clear credit notification state so user can receive future alerts
+                from core.monitoring.usage_monitor import clear_credit_notification_state
+                clear_credit_notification_state(user_id)
+
             except stripe.error.StripeError as e:
                 logger.error(f"Failed to create credit grant: {e}")
                 # Don't raise - subscription still needs to be processed
@@ -5173,6 +5160,10 @@ async def nowpayments_webhook(request: Request):
         logger.bind(user_id=user_id).info(
             f"Crypto credit grant created: ${amount_cents / 100:.2f}"
         )
+
+        # Clear credit notification state so user can receive future alerts
+        from core.monitoring.usage_monitor import clear_credit_notification_state
+        clear_credit_notification_state(user_id)
 
         # Mark as completed (30-day TTL for audit trail)
         redis_client.setex(processed_key, 86400 * 30, "completed")
