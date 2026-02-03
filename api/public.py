@@ -23,7 +23,7 @@ COMPETITION_START = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)
 
 # Redis cache for arena performance
 ARENA_CACHE_KEY = "arena:performance"
-ARENA_CACHE_TTL = 60  # 60 seconds
+ARENA_CACHE_TTL = 300  # 5 minutes - leaderboard doesn't need real-time updates
 
 def _get_redis_client():
     """Get Redis client for caching."""
@@ -48,6 +48,8 @@ async def get_arena_performance(
 
     Note: Data always starts from COMPETITION_START (Jan 21 12:00 UTC) regardless
     of the hours parameter, to ensure fair comparison from competition start.
+
+    Data is downsampled to hourly granularity for performance (reduces ~81k rows to ~2k).
 
     Args:
         hours: Time window in hours (ignored for Season 1 - uses competition start)
@@ -98,25 +100,18 @@ async def get_arena_performance(
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Get equity snapshots for showcase bots only
-            # Formula: total_equity = current_balance + unrealized_pnl
-            # (Matches AccountMetricsCalculator.calculate_total_equity)
+            # Get equity snapshots for showcase bots - OPTIMIZED TWO-QUERY APPROACH
+            # Problem: JSONB extraction (config_data->...) is expensive when done 81k times
+            # Solution: Fetch bot metadata once (30 bots), then fetch snapshots separately
+
+            # Query 1: Get bot metadata with config_data (extracted only ~30 times)
             cur.execute("""
                 SELECT
                     c.config_id,
                     c.config_name,
                     c.profile_image_url,
-                    s.timestamp,
-                    COALESCE(s.current_balance, 0) +
-                    COALESCE(s.unrealized_pnl, 0) as total_equity,
-                    s.total_pnl,
-                    s.total_trades,
-                    s.win_rate,
-                    s.open_positions,
-                    pa.initial_balance,
-                    s.current_balance,
-                    s.unrealized_pnl,
                     c.description,
+                    pa.initial_balance,
                     c.config_data->'decision'->>'analysis_frequency' as frequency,
                     c.config_data->'llm_config'->>'model' as model,
                     c.config_data->>'selected_pair' as symbol,
@@ -124,64 +119,77 @@ async def get_arena_performance(
                     c.config_data->'trading'->'risk_management'->>'default_stop_loss_percent' as stop_loss,
                     c.config_data->'trading'->'risk_management'->>'default_take_profit_percent' as take_profit,
                     c.config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin
+                FROM configurations c
+                LEFT JOIN paper_accounts pa ON c.config_id = pa.config_id
+                WHERE c.is_public_performance = true AND c.state = 'active'
+            """)
+            bot_metadata = {row[0]: row for row in cur.fetchall()}
+
+            # Query 2: Get hourly snapshots (no JSONB extraction - fast!)
+            cur.execute("""
+                SELECT DISTINCT ON (s.config_id, date_trunc('hour', s.timestamp))
+                    s.config_id,
+                    s.timestamp,
+                    COALESCE(s.current_balance, 0) + COALESCE(s.unrealized_pnl, 0) as total_equity,
+                    s.total_pnl,
+                    s.total_trades,
+                    s.win_rate,
+                    s.open_positions,
+                    s.current_balance,
+                    s.unrealized_pnl
                 FROM account_snapshots s
-                JOIN configurations c ON s.config_id = c.config_id
-                LEFT JOIN paper_accounts pa ON s.config_id = pa.config_id
-                WHERE c.is_public_performance = true
-                AND c.state = 'active'
+                WHERE s.config_id IN (SELECT config_id FROM configurations WHERE is_public_performance = true AND state = 'active')
                 AND s.timestamp >= %s
-                ORDER BY c.config_name, s.timestamp ASC
+                ORDER BY s.config_id, date_trunc('hour', s.timestamp), s.timestamp DESC
             """, (cutoff_time,))
+            snapshots = cur.fetchall()
 
-            rows = cur.fetchall()
-
-            # Group by bot
+            # Build bots_data by combining metadata with snapshots
+            # Metadata columns: config_id, config_name, profile_image_url, description,
+            #                   initial_balance, frequency, model, symbol, data_sources,
+            #                   stop_loss, take_profit, max_margin
+            # Snapshot columns: config_id, timestamp, total_equity, total_pnl, total_trades,
+            #                   win_rate, open_positions, current_balance, unrealized_pnl
             bots_data = {}
-            for row in rows:
-                config_id = row[0]
-                config_name = row[1]
-                profile_image_url = row[2]
-                timestamp = row[3]
-                total_equity = float(row[4])
-                total_pnl = float(row[5] or 0)
-                total_trades = row[6] or 0
-                win_rate = float(row[7] or 0)
-                open_positions = row[8] or 0
-                initial_balance = float(row[9] or 10000)
-                current_balance = float(row[10] or 0)
-                unrealized_pnl = float(row[11] or 0)
-                description = row[12]
-                frequency = row[13]
-                model = row[14]
-                symbol = row[15]
-                data_sources = row[16]  # JSONB - already parsed
-                stop_loss = row[17]
-                take_profit = row[18]
-                max_margin = row[19]
+            for snap in snapshots:
+                config_id = snap[0]
+                timestamp = snap[1]
+                total_equity = float(snap[2])
+                total_pnl = float(snap[3] or 0)
+                total_trades = snap[4] or 0
+                win_rate = float(snap[5] or 0)
+                open_positions = snap[6] or 0
+                current_balance = float(snap[7] or 0)
+                unrealized_pnl = float(snap[8] or 0)
 
                 if config_id not in bots_data:
+                    # Get metadata for this bot (extracted only once per bot)
+                    meta = bot_metadata.get(config_id)
+                    if not meta:
+                        continue  # Skip if no metadata found
+
                     bots_data[config_id] = {
                         "config_id": config_id,
-                        "config_name": config_name,
-                        "profile_image_url": profile_image_url,
-                        "description": description,
+                        "config_name": meta[1],
+                        "profile_image_url": meta[2],
+                        "description": meta[3],
                         "data_points": [],
                         "current_equity": total_equity,
                         "current_pnl": total_pnl,
-                        "initial_balance": initial_balance,
+                        "initial_balance": float(meta[4] or 10000),
                         "total_trades": total_trades,
                         "win_rate": win_rate,
                         "open_positions": open_positions,
                         "current_balance": current_balance,
                         "unrealized_pnl": unrealized_pnl,
-                        # Config details
-                        "frequency": frequency,
-                        "model": model,
-                        "symbol": symbol,
-                        "data_sources": data_sources,
-                        "stop_loss": stop_loss,
-                        "take_profit": take_profit,
-                        "max_margin": max_margin
+                        # Config details (from metadata - extracted once)
+                        "frequency": meta[5],
+                        "model": meta[6],
+                        "symbol": meta[7],
+                        "data_sources": meta[8],
+                        "stop_loss": meta[9],
+                        "take_profit": meta[10],
+                        "max_margin": meta[11]
                     }
 
                 # Add data point

@@ -849,8 +849,8 @@ function ForgeApp() {
           setTimeout(() => setShowOnboardingTour(true), 1500)
         }
 
-        // Trigger first run automatically (this uses the free first run for new users)
-        if (configData) {
+        // Trigger first run automatically only for the user's very first bot
+        if (isFirstBot && configData) {
           console.log('🚀 Triggering first run for new bot:', verifyBot.config_id)
           try {
             await apiClient.triggerBotManually(verifyBot.config_id)

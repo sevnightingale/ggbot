@@ -58,6 +58,14 @@ See planning doc for complete provider-specific instructions and verification st
 - [x] Switched to Supabase Pooler connection (direct DB was IPv6-only, VM has no IPv6)
 - [x] DATABASE_URL now uses `pooler.supabase.com` with project ref in username
 
+### **Completed (2026-02-03)** - Major Query Optimizations
+- [x] Denormalized `initial_equity` on `configurations` table (eliminates expensive DISTINCT ON scan)
+- [x] SSE dashboard query: removed `first_activities` CTE, uses `bc.initial_equity` directly
+- [x] Arena query: split into two queries to avoid JSONB extraction for 81k rows (9.7s → 0.46s, 21x faster)
+- [x] Added `idx_configurations_is_public_performance` index
+- [x] Added `idx_activities_platform_cost` index
+- [x] Arena cache TTL: 60s → 300s
+
 ### **Pending: Drop Deprecated Indexes** (after 3-7 day monitoring)
 - [ ] Drop `_deprecated_idx_snapshots_config_time` (10 MB)
 - [ ] Drop `_deprecated_idx_snapshots_heartbeat` (12 MB)
@@ -173,7 +181,7 @@ Tables with conflicting RLS policies that OR together (review and consolidate):
 
 **Completed** (2026-01-27):
 - ✅ React Query at root level (`providers.tsx`, `queries.ts`, `layout.tsx`)
-- ✅ Redis caching on Arena endpoint (60s TTL)
+- ✅ Redis caching on Arena endpoint (300s TTL, updated 2026-02-03)
 - ✅ Arena page redesign: Top3Chart + Sparklines (eliminated Recharts spaghetti)
 - ✅ Bundle: 212KB → 168KB first load JS (44KB reduction)
 - ✅ Forge page hooks: `useDataSources()` (10min), `useBotList()`, `useLatestActivity()` (30s refetch)

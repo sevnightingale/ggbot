@@ -157,8 +157,8 @@ async def insert_config():
         # Always insert as new configuration (never update)
         await conn.execute(
             """
-            INSERT INTO configurations (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO configurations (config_id, user_id, config_type, config_name, config_data, initial_equity, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, 10000.00, $6, $7)
             """,
             config_id,
             user_id,

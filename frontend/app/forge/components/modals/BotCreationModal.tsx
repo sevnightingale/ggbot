@@ -808,7 +808,7 @@ export function BotCreationModal({
                 </>
               ) : (
                 <>
-                  Create & Test Run
+                  {existingBotCount === 0 ? 'Create & Test Run' : 'Create'}
                   <Sparkles className="h-4 w-4" />
                 </>
               )}

@@ -6,6 +6,76 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-03 - SSE Dashboard Query Optimization (Denormalize initial_equity)
+
+**Purpose**: Eliminate expensive `DISTINCT ON` scan of activities table in dashboard SSE query.
+
+**Problem**: Dashboard query ran every 5s per user, included `first_activities` CTE that scanned entire activities table to find first `total_equity` per bot. Accounted for ~80% of DB time.
+
+**Solution**: Denormalize `initial_equity` onto `configurations` table.
+
+**Database** (`configurations` table):
+- Added `initial_equity NUMERIC` column
+- Backfilled 478 existing bots using reset-aware query (respects `last_reset_at`)
+- Arena bots correctly use $10,000 post-reset baseline
+
+**Code Changes**:
+- `core/sse/dashboard_data.py` - Removed `first_activities` CTE, now uses `bc.initial_equity`
+- `trading/paper/supabase_service.py:731-755` - `reset_account()` sets `initial_equity = 10000`
+- `core/services/config_service.py:253-264` - New bots created with `initial_equity = 10000`
+- `core/config/repository.py:129-132` - New bots created with `initial_equity = 10000`
+- `core/common/db.py:187-191` - New bots created with `initial_equity = 10000`
+- `core/config/insert_config.py`, `import_user_config.py` - Same
+
+**Note**: Arena leaderboard (`api/public.py`) unaffected - uses separate query with `COMPETITION_START` filter and `paper_accounts.initial_balance`.
+
+**Additional Indexes**:
+- `idx_configurations_is_public_performance` - btree on `is_public_performance` (16 KB) - Arena filter
+- `idx_activities_platform_cost` - btree on `platform_cost_usd` - Billing query optimization (21% faster)
+
+**Arena Query Optimization** (`api/public.py`):
+- Problem: Arena query took 9.7s due to JSONB extraction (`config_data->...`) for 81k rows
+- Root cause: JSONB fields extracted inside DISTINCT ON, so 81k extractions instead of 30
+- Fix: Split into two queries - (1) bot metadata with JSONB (30 rows), (2) hourly snapshots without JSONB (7k rows)
+- Also: Downsample to hourly using `DISTINCT ON`, increased cache TTL 60s → 300s
+- Result: **9.7s → 0.46s (21x faster)** 🚀
+
+---
+
+## 2026-02-02 - Billing Fixes + Memory Leak Fix + DB Indexes
+
+**Purpose**: Fix prepaid credit tracking bug, failed payment handling, memory leak, and slow queries.
+
+**Database Indexes** (Arena query optimization):
+- Added `idx_configurations_state` - btree on `state` column (16 KB)
+- Added `idx_snapshots_timestamp` - btree on `timestamp` column (3.6 MB)
+- Arena leaderboard query was 8.4s average, should improve significantly
+
+**Prepaid Balance Bug** (`core/monitoring/usage_monitor.py`, `api/admin.py`):
+- Bug: Prepaid users showed incorrect balance because Stripe Credit Grants only decrease when applied to invoices (prepaid users never get invoices)
+- Fix: `get_balance_status()` now uses all-time `SUM(platform_cost_usd) FROM activities` for prepaid tier instead of monthly Redis counter
+- Admin page (`api/admin.py:717-739`) also fixed - calculates `available = total_purchased - total_usage_cost` for prepaid users
+- `cache_usage_summaries()` also fixed - UserProfile dropdown now shows correct balance for prepaid users
+- Added `_get_total_purchased_from_stripe()` helper to sum all Credit Grant amounts
+
+**$10 Spending Cap** (`ggbot.py`, `scripts/add_billing_thresholds.py`):
+- Added `billing_thresholds.amount_gte = 1000` to all usage_based subscriptions
+- Stripe auto-generates invoice when usage hits $10, limiting bad debt exposure
+- Script updated 7 existing subscriptions
+
+**Payment Failure Handling** (`ggbot.py:4757-4860`):
+- Enhanced `handle_payment_failed()` webhook handler
+- Now pauses ALL user's bots on payment failure (not just subscription)
+- Sends email notification via Resend
+- Publishes to Redis for real-time UI updates
+
+**Memory Leak Fix** (`ggbot.py:314-334`, `:833-854`, `:1006-1022`):
+- Bug: `_extraction_engines` and `_decision_engines` dicts grew unbounded (300MB → 1GB over hours)
+- Fix: LRU eviction using `OrderedDict` with `MAX_EXTRACTION_ENGINES=30`, `MAX_DECISION_ENGINES=50`
+- Oldest engines evicted with proper cleanup (`ExtractionEngineV2.cleanup()` disconnects data client)
+
+---
+
 ## 2026-01-30 - SEO Infrastructure + Blog Launch + Keyword Research
 
 **Purpose**: Complete SEO foundation, launch blog, and develop keyword strategy.

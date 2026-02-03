@@ -1,66 +1,65 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-29 17:10:24 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-02-03 02:54:00 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 310
-- **Prepaid Users**: 16 (16 active subscriptions)
-- **Free Users**: 286
-- **Users with Bots**: 301 (97.1%)
+- **Total Users**: 312
+- **Prepaid Users**: 17 (17 active subscriptions)
+- **Free Users**: 287
+- **Users with Bots**: 303 (97.1%)
 
 ### Bot Statistics
 - **Total Bots**: 477
-- **Active Bots**: 35 (7.3%)
-  - Paper: 34
+- **Active Bots**: 36 (7.5%)
+  - Paper: 35
   - Symphony (Live): 1
   - Aster (DEX): 0
-- **Inactive Bots**: 442
+- **Inactive Bots**: 441
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,650
-  - Wins: 1,706
-  - Losses: 3,944
-  - Platform Win Rate: 30.19%
-  - Total P&L: $-20,974.32
+- **Total Trades (All Time)**: 5,936
+  - Wins: 1,827
+  - Losses: 4,109
+  - Platform Win Rate: 30.78%
+  - Total P&L: $-28,227.80
 - **Recent Activity**:
-  - Last 24 hours: 66 trades
-  - Last 7 days: 214 trades
-  - Last 30 days: 440 trades
+  - Last 24 hours: 104 trades
+  - Last 7 days: 448 trades
+  - Last 30 days: 737 trades
 
 ### Open Positions
-- **Open Positions**: 19
-- **Unique Symbols**: 5
-- **Total Exposure**: $1,098,555.24
-- **Unrealized P&L**: $7,960.86
+- **Open Positions**: 15
+- **Unique Symbols**: 4
+- **Total Exposure**: $420,661.17
+- **Unrealized P&L**: $-1,274.83
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,931.78
+- **Average Balance**: $9,916.54
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $11,470.59
+- **Highest Balance**: $16,489.26
 
 ### Top Trading Symbols (Active Bots)
 
 - **BTC/USDT**: 20 bots
-- **SOL/USDT**: 8 bots
-- **ETH/USDT**: 3 bots
-- **SOL/USDC**: 2 bots
-- **LINK/USDT**: 1 bots
+- **SOL/USDT**: 12 bots
+- **ETH/USDT**: 2 bots
+- **RENDER/USDT**: 1 bots
+- **SOL/USDC**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 883 decisions (avg confidence: 47.0%)
-- **enter**: 68 decisions (avg confidence: 72.3%)
-- **exit**: 25 decisions (avg confidence: 70.4%)
-- **long**: 3 decisions (avg confidence: 65.0%)
-- **close**: 2 decisions (avg confidence: 62.0%)
-- **enter_long**: 1 decisions (avg confidence: 65.0%)
+- **wait**: 1598 decisions (avg confidence: 42.3%)
+- **enter**: 105 decisions (avg confidence: 71.5%)
+- **exit**: 67 decisions (avg confidence: 74.3%)
+- **close**: 1 decisions (avg confidence: 87.0%)
+- **long**: 1 decisions (avg confidence: 78.0%)
 
 ### System Health
-- **Decisions (last hour)**: 59
+- **Decisions (last hour)**: 91
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -69,21 +68,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 34MB | 37m | 11 |
-| market-data-ws | 🟢 online | 2.4% | 133MB | 37m | 10 |
-| ggbot | 🟢 online | 1% | 440MB | 37m | 65 |
-| account-monitor | 🟢 online | 0.6% | 153MB | 37m | 30 |
-| telegram-bot | 🟢 online | 0% | 34MB | 37m | 6 |
+| error-alerts | 🟢 online | 0% | 35MB | 4h 34m | 13 |
+| market-data-ws | 🟢 online | 1.3% | 170MB | 4h 34m | 13 |
+| ggbot | 🟢 online | 1.1% | 274MB | 2m | 84 |
+| account-monitor | 🟢 online | 0.4% | 169MB | 4h 34m | 37 |
+| telegram-bot | 🟢 online | 0% | 37MB | 4h 34m | 8 |
 
 ### VM Resources
 
-- **Disk**: 46G / 78G (59%)
-- **Memory**: 2.3Gi / 3.8Gi
-- **CPU Load**: 0.69 / 0.29 / 0.21 (1m/5m/15m)
+- **Disk**: 50G / 78G (64%)
+- **Memory**: 2.4Gi / 3.8Gi
+- **CPU Load**: 0.53 / 0.35 / 0.27 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 16.47M)
+- **Redis**: 🟢 connected (Memory: 17.61M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -449,7 +448,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-29 17:10:26 UTC
+**Last Updated**: 2026-02-03 02:54:01 UTC
 
 ---
 
@@ -461,10 +460,11 @@ df -h
 - `config_id` → `configurations(config_id)`
 
 **Indexes**:
-- `idx_snapshots_config_time` on (config_id, timestamp)
-- `idx_snapshots_heartbeat` on (config_id, timestamp, is_heartbeat)
+- `_deprecated_idx_snapshots_config_time` on (config_id, timestamp)
+- `_deprecated_idx_snapshots_heartbeat` on (config_id, timestamp, is_heartbeat)
 - `idx_snapshots_latest` on (config_id, timestamp)
 - `idx_snapshots_mode_time` on (trading_mode, timestamp)
+- `idx_snapshots_timestamp` on (timestamp)
 - `idx_snapshots_user_time` on (user_id, timestamp)
 
 | Column | Type | Nullable | Default |
@@ -511,6 +511,7 @@ df -h
 - `idx_activities_config_billing` on (config_id, created_at)
 - `idx_activities_config_time` on (config_id, created_at)
 - `idx_activities_decision` on (decision_id)
+- `idx_activities_platform_cost` on (platform_cost_usd)
 - `idx_activities_symbol` on (config_id, related_symbol, created_at)
 - `idx_activities_trade` on (trade_id)
 - `idx_activities_type` on (config_id, activity_type, created_at)
@@ -615,12 +616,14 @@ df -h
 | `created_at` | timestamp with time zone | ✓ | now() |
 | `updated_at` | timestamp with time zone | ✓ | now() |
 
-### `configurations` (16 columns)
+### `configurations` (17 columns)
 
 **Primary Key**: `config_id`
 
 **Indexes**:
+- `idx_configurations_is_public_performance` on (is_public_performance)
 - `idx_configurations_public` on (is_public_performance)
+- `idx_configurations_state` on (state)
 - `idx_configurations_type` on (config_type)
 - `idx_configurations_user_id` on (user_id)
 
@@ -642,6 +645,7 @@ df -h
 | `first_run_used` | boolean | ✓ | false |
 | `free_runs_remaining` | integer | ✓ | 3 |
 | `arena_registered_at` | timestamp with time zone | ✓ |  |
+| `initial_equity` | numeric | ✓ |  |
 
 ### `data_points` (11 columns)
 
@@ -897,6 +901,8 @@ df -h
 **Indexes**:
 - `idx_paper_trades_account` on (account_id)
 - `idx_paper_trades_close_reason` on (close_reason)
+- `idx_paper_trades_config_status` on (config_id, status, opened_at)
+- `idx_paper_trades_decision` on (decision_id)
 - `idx_paper_trades_status` on (status)
 - `idx_paper_trades_symbol_opened` on (symbol, opened_at)
 - `idx_paper_trades_user_config` on (user_id, config_id)
@@ -1335,7 +1341,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-29 17:10:26 UTC
+**Last Updated**: 2026-02-03 02:54:01 UTC
 
 ---
 

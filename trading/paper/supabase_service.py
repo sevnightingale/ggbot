@@ -743,6 +743,15 @@ class SupabasePaperTradingService:
                     """, (config_id, user_id))
 
                     result = cur.fetchone()
+
+                    # Also reset initial_equity on configurations table
+                    # This ensures performance calculations start fresh after reset
+                    cur.execute("""
+                        UPDATE configurations
+                        SET initial_equity = 10000.00
+                        WHERE config_id = %s
+                    """, (config_id,))
+
                     conn.commit()
 
                     if not result:

@@ -57,9 +57,9 @@ class UsageMonitor:
         self.cache_interval = 300  # 5 minutes
         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-        # Track warnings sent to avoid spam (user_id -> last_warned_timestamp)
-        self.warned_users = {}
-        self.warn_cooldown = 3600  # Don't re-warn within 1 hour
+        # State tracking moved to Redis for persistence across restarts
+        # Key format: credit_state:{user_id} → "ok" | "low" | "depleted"
+        # Notifications only sent on state transitions (ok→low, low→depleted, ok→depleted)
 
         logger.info("✨ UsageMonitor initialized")
 
@@ -120,15 +120,18 @@ class UsageMonitor:
         Check single user's credit status with tier-specific handling.
 
         - PREPAID users: Hard block on depletion (pause bots immediately)
-        - USAGE_BASED users: Soft warning only (they'll be billed for overage)
+        - USAGE_BASED users: Check subscription status and enforce $10 threshold
 
         Returns: 'ok', 'warned', 'paused'
         """
-        balance = await self.get_balance_status(user_id)
-
-        # Get user profile to check tier
+        # Get user profile to check tier and subscription status
         profile = await user_service.get_profile(user_id)
         is_prepaid = profile.is_prepaid_tier if profile else False
+
+        # Pass is_prepaid to get_balance_status for correct usage calculation
+        # PREPAID: all-time usage from activities table
+        # USAGE_BASED: monthly usage from Redis
+        balance = await self.get_balance_status(user_id, is_prepaid=is_prepaid)
 
         if is_prepaid:
             # PREPAID: Hard block - pause bots when credits depleted
@@ -142,7 +145,17 @@ class UsageMonitor:
                 await self._notify_user(user_id, "prepaid_low", balance)
                 return "warned"
         else:
-            # USAGE_BASED: Soft handling - just warn, they'll be billed
+            # USAGE_BASED: Check if subscription is past_due (payment failed)
+            # This is a backup in case the webhook was missed
+            subscription_status = await self._get_subscription_status(user_id)
+            if subscription_status == 'past_due':
+                # Payment has failed - pause bots immediately
+                logger.warning(f"⚠️ User {user_id} is past_due with active bots - pausing")
+                await self._pause_all_user_bots(user_id, reason="payment_failed")
+                await self._notify_user(user_id, "payment_failed", balance)
+                return "paused"
+
+            # Soft handling for credits - just warn, they'll be billed
             if balance.is_depleted:
                 # Don't pause - usage_based users get billed for overage
                 await self._notify_user(user_id, "credits_depleted", balance)
@@ -154,17 +167,47 @@ class UsageMonitor:
 
         return "ok"
 
-    async def get_balance_status(self, user_id: str) -> BalanceStatus:
-        """Get combined credit + usage status for a user."""
-        period = datetime.utcnow().strftime("%Y-%m")
+    async def _get_subscription_status(self, user_id: str) -> Optional[str]:
+        """Get user's subscription status from database."""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT subscription_status FROM user_profiles WHERE user_id = %s",
+                        (user_id,)
+                    )
+                    result = cur.fetchone()
+                    return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Failed to get subscription status for {user_id}: {e}")
+            return None
 
-        # Get usage from Redis (instant)
-        usage_key = f"usage:user:{user_id}:{period}"
-        usage_raw = self.redis.get(usage_key)
-        usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+    async def get_balance_status(self, user_id: str, is_prepaid: bool = None) -> BalanceStatus:
+        """
+        Get combined credit + usage status for a user.
 
+        For PREPAID users: Uses ALL-TIME usage from activities table (credits don't reset)
+        For USAGE_BASED users: Uses monthly Redis counter (they get invoiced each period)
+        """
         # Get credits from Stripe
         credits = await self._get_stripe_credits(user_id)
+
+        # Determine usage based on tier
+        if is_prepaid is None:
+            # Check tier if not provided
+            is_prepaid = await self._is_prepaid_tier(user_id)
+
+        if is_prepaid:
+            # PREPAID: Use ALL-TIME usage from activities table
+            # Credits don't reset monthly - they're a fixed pool
+            usage = await self._get_total_usage_from_activities(user_id)
+        else:
+            # USAGE_BASED: Use monthly Redis counter
+            # They get invoiced each period, so monthly tracking is correct
+            period = datetime.utcnow().strftime("%Y-%m")
+            usage_key = f"usage:user:{user_id}:{period}"
+            usage_raw = self.redis.get(usage_key)
+            usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
         net = credits - usage
 
@@ -182,6 +225,44 @@ class UsageMonitor:
             is_low=is_low,
             is_depleted=net <= 0 and credits > 0  # Only depleted if they HAD credits
         )
+
+    async def _is_prepaid_tier(self, user_id: str) -> bool:
+        """Check if user is on prepaid tier."""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT subscription_tier FROM user_profiles WHERE user_id = %s",
+                        (user_id,)
+                    )
+                    result = cur.fetchone()
+                    # 'prepaid' is stored as 'ggbase' in database (legacy enum value)
+                    return result[0] in ('prepaid', 'ggbase') if result else False
+        except Exception as e:
+            logger.error(f"Failed to check prepaid tier for {user_id}: {e}")
+            return False
+
+    async def _get_total_usage_from_activities(self, user_id: str) -> Decimal:
+        """
+        Get ALL-TIME usage from activities table for prepaid users.
+
+        This is the source of truth - prepaid credits don't reset monthly,
+        so we need to track total spend against the credit pool.
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT COALESCE(SUM(platform_cost_usd), 0)
+                        FROM activities
+                        WHERE user_id = %s
+                        AND platform_cost_usd > 0
+                    """, (user_id,))
+                    result = cur.fetchone()
+                    return Decimal(str(result[0])) if result and result[0] else Decimal("0")
+        except Exception as e:
+            logger.error(f"Failed to get total usage for {user_id}: {e}")
+            return Decimal("0")
 
     async def _get_stripe_credits(self, user_id: str) -> Decimal:
         """Get available credit balance from Stripe."""
@@ -205,6 +286,32 @@ class UsageMonitor:
             return Decimal("0")
         except Exception as e:
             logger.error(f"Unexpected error getting Stripe credits for {user_id}: {e}")
+            return Decimal("0")
+
+    async def _get_total_purchased_from_stripe(self, user_id: str) -> Decimal:
+        """
+        Get total credits purchased from Stripe Credit Grants.
+
+        For prepaid users, we need the TOTAL purchased (sum of all grants),
+        not the "available" balance (which never decreases for prepaid).
+        """
+        customer_id = await self._get_stripe_customer_id(user_id)
+        if not customer_id:
+            return Decimal("0")
+
+        try:
+            grants = stripe.billing.CreditGrant.list(customer=customer_id, limit=100)
+            total = Decimal("0")
+            for grant in grants.data:
+                # Stripe returns cents
+                amount = Decimal(str(grant.amount.monetary.value / 100))
+                total += amount
+            return total
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe credit grants error for {user_id}: {e}")
+            return Decimal("0")
+        except Exception as e:
+            logger.error(f"Unexpected error getting credit grants for {user_id}: {e}")
             return Decimal("0")
 
     async def _get_stripe_customer_id(self, user_id: str) -> Optional[str]:
@@ -283,20 +390,59 @@ class UsageMonitor:
         except Exception as e:
             logger.error(f"Failed to pause bots for user {user_id}: {e}")
 
+    def _get_credit_state(self, user_id: str) -> str:
+        """Get user's last known credit state from Redis."""
+        state = self.redis.get(f"credit_state:{user_id}")
+        return state if state else "ok"
+
+    def _set_credit_state(self, user_id: str, state: str):
+        """Set user's credit state in Redis (persists across restarts)."""
+        # TTL of 90 days - if user is inactive that long, they can be re-notified
+        self.redis.setex(f"credit_state:{user_id}", 90 * 24 * 3600, state)
+
+    def clear_credit_state(self, user_id: str):
+        """
+        Clear user's credit state (call when credits are added).
+
+        This allows them to receive new notifications if they go low again.
+        """
+        self.redis.delete(f"credit_state:{user_id}")
+        logger.debug(f"Cleared credit state for user {user_id} (credits added)")
+
     async def _notify_user(self, user_id: str, notification_type: str, balance: BalanceStatus):
         """
         Send notification to user via email.
 
-        Rate-limited to avoid spam - won't re-notify within cooldown period.
+        Uses state-based tracking to prevent spam:
+        - Only sends notifications on state transitions (ok→low, low→depleted, ok→depleted)
+        - State persists in Redis across service restarts
+        - State cleared when user adds credits (enabling future notifications)
         """
-        now = time.time()
-        last_warned = self.warned_users.get(user_id, 0)
+        # Determine new state from notification type
+        if notification_type in ["credits_depleted", "prepaid_depleted", "payment_failed"]:
+            new_state = "depleted"
+        elif notification_type in ["credits_low", "prepaid_low"]:
+            new_state = "low"
+        else:
+            return  # Unknown notification type
 
-        if now - last_warned < self.warn_cooldown:
-            # Already warned recently, skip
+        # Get current persisted state
+        current_state = self._get_credit_state(user_id)
+
+        # State priority: ok < low < depleted
+        state_priority = {"ok": 0, "low": 1, "depleted": 2}
+
+        # Only notify on downward transitions (state getting worse)
+        if state_priority.get(new_state, 0) <= state_priority.get(current_state, 0):
+            # Already notified about this state or worse, skip
+            logger.debug(
+                f"Skipping {notification_type} for {user_id}: "
+                f"already in state '{current_state}'"
+            )
             return
 
-        self.warned_users[user_id] = now
+        # Update state BEFORE sending (even if email fails, don't spam retries)
+        self._set_credit_state(user_id, new_state)
 
         # Log the notification
         if notification_type in ["credits_depleted", "prepaid_depleted"]:
@@ -395,6 +541,16 @@ class UsageMonitor:
                 )
                 logger.info(f"📧 Sent credits depleted email to {user_email}")
 
+            elif notification_type == "payment_failed":
+                # Payment failed notification - email already sent by webhook handler
+                # This is a backup check, just log it
+                logger.warning(
+                    f"🚨 PAYMENT FAILED (backup check) for {user_id}: "
+                    f"Bots paused due to past_due subscription status"
+                )
+                # Don't send email - webhook handler already sent it
+                return
+
             elif notification_type == "credits_low":
                 title = "Low Credit Balance Warning"
                 message = f"""
@@ -426,6 +582,10 @@ class UsageMonitor:
         Pre-compute usage summaries for fast API reads.
 
         Called every 5 minutes. Caches summaries in Redis for instant API responses.
+
+        IMPORTANT: Prepaid and usage_based users require different calculations:
+        - Prepaid: credits = total_purchased, usage = all-time (from activities)
+        - Usage-based: credits = Stripe available, usage = monthly (from Redis)
         """
         period = datetime.utcnow().strftime("%Y-%m")
 
@@ -442,17 +602,30 @@ class UsageMonitor:
                         continue
 
                     user_id = parts[2]
-                    usage_raw = self.redis.get(key)
-                    usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
-                    # Get credits from Stripe
-                    credits = await self._get_stripe_credits(user_id)
+                    # Check if prepaid tier - they need different calculation
+                    is_prepaid = await self._is_prepaid_tier(user_id)
+
+                    if is_prepaid:
+                        # PREPAID: Use total purchased and all-time usage from activities
+                        # Stripe's "available" balance is wrong because credits never
+                        # get consumed (prepaid users don't get invoices)
+                        credits = await self._get_total_purchased_from_stripe(user_id)
+                        usage = await self._get_total_usage_from_activities(user_id)
+                    else:
+                        # USAGE-BASED: Use Stripe available balance and monthly Redis
+                        usage_raw = self.redis.get(key)
+                        usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+                        credits = await self._get_stripe_credits(user_id)
+
+                    # Calculate net balance (never negative for display)
+                    net_balance = max(Decimal("0"), credits - usage)
 
                     summary = {
                         "period": period,
                         "usage_usd": float(usage),
                         "credits_usd": float(credits),
-                        "net_balance_usd": float(credits - usage),
+                        "net_balance_usd": float(net_balance),
                         "updated_at": datetime.utcnow().isoformat()
                     }
 
@@ -472,6 +645,30 @@ class UsageMonitor:
 
         except Exception as e:
             logger.error(f"Failed to cache usage summaries: {e}")
+
+
+# =============================================================================
+# UTILITY FUNCTIONS (for use by external modules like ggbot.py)
+# =============================================================================
+
+def clear_credit_notification_state(user_id: str, redis_url: str = None):
+    """
+    Clear a user's credit notification state after they add credits.
+
+    Call this after creating a credit grant to allow the user to
+    receive future low/depleted notifications if they run low again.
+
+    Args:
+        user_id: The user's ID
+        redis_url: Optional Redis URL (defaults to REDIS_URL env var)
+    """
+    import os
+    redis_client = redis.from_url(
+        redis_url or os.getenv('REDIS_URL', 'redis://localhost:6379'),
+        decode_responses=True
+    )
+    redis_client.delete(f"credit_state:{user_id}")
+    logger.debug(f"Cleared credit notification state for user {user_id} (credits added)")
 
 
 # Standalone test function

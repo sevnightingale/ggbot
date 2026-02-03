@@ -185,9 +185,9 @@ def save_configuration(user_id, config_type, config_data, config_name=None):
                     # Insert new configuration
                     config_id = str(uuid.uuid4())
                     cur.execute("""
-                        INSERT INTO configurations 
-                        (config_id, user_id, config_type, config_name, config_data, created_at, updated_at) 
-                        VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                        INSERT INTO configurations
+                        (config_id, user_id, config_type, config_name, config_data, initial_equity, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, 10000.00, NOW(), NOW())
                     """, (config_id, user_id, config_type, config_name, config_data))
                 
                 conn.commit()

@@ -313,7 +313,12 @@ app.include_router(usage_router)
 
 class GGBotOrchestrator:
     """Main orchestrator class coordinating all V2 modules with full integration."""
-    
+
+    # Maximum cached engines to prevent memory leaks
+    # Engines are evicted LRU-style when limit is exceeded
+    MAX_EXTRACTION_ENGINES = 30  # Per user_id
+    MAX_DECISION_ENGINES = 50    # Per config_id
+
     def __init__(self):
         self.config_service = config_service
         self.llm_service = llm_service
@@ -322,8 +327,10 @@ class GGBotOrchestrator:
         self.aster_trading = AsterDEXV3LiveTradingService()
         self._log = logger.bind(component="orchestrator")
 
-        self._extraction_engines = {}
-        self._decision_engines = {}
+        # Use OrderedDict for LRU eviction (oldest first)
+        from collections import OrderedDict
+        self._extraction_engines: OrderedDict = OrderedDict()
+        self._decision_engines: OrderedDict = OrderedDict()
     
     async def run_autonomous_cycle(
         self,
@@ -824,14 +831,28 @@ class GGBotOrchestrator:
         }
 
     async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
-        """Get or create V2 extraction engine for user."""
-        if user_id not in self._extraction_engines:
-            self._extraction_engines[user_id] = ExtractionEngineV2(
-                user_id=user_id,
-                use_advanced_preprocessing=True,
-                use_database_storage=True,
-                use_file_storage=False
-            )
+        """Get or create V2 extraction engine for user with LRU eviction."""
+        if user_id in self._extraction_engines:
+            # Move to end (most recently used)
+            self._extraction_engines.move_to_end(user_id)
+            return self._extraction_engines[user_id]
+
+        # Evict oldest if at capacity
+        while len(self._extraction_engines) >= self.MAX_EXTRACTION_ENGINES:
+            oldest_user_id, oldest_engine = self._extraction_engines.popitem(last=False)
+            try:
+                await oldest_engine.cleanup()
+                self._log.info(f"Evicted extraction engine for user {oldest_user_id} (LRU)")
+            except Exception as e:
+                self._log.warning(f"Error cleaning up evicted extraction engine: {e}")
+
+        # Create new engine
+        self._extraction_engines[user_id] = ExtractionEngineV2(
+            user_id=user_id,
+            use_advanced_preprocessing=True,
+            use_database_storage=True,
+            use_file_storage=False
+        )
         return self._extraction_engines[user_id]
     
     async def _run_extraction_v2(
@@ -983,12 +1004,23 @@ class GGBotOrchestrator:
             }
     
     async def _get_decision_engine(self, config_id: str, user_id: str) -> DecisionEngineV2:
-        """Get or create V2 decision engine for config."""
-        if config_id not in self._decision_engines:
-            engine = DecisionEngineV2(config_id, user_id)
-            await engine.initialize()
-            self._decision_engines[config_id] = engine
-        return self._decision_engines[config_id]
+        """Get or create V2 decision engine for config with LRU eviction."""
+        if config_id in self._decision_engines:
+            # Move to end (most recently used)
+            self._decision_engines.move_to_end(config_id)
+            return self._decision_engines[config_id]
+
+        # Evict oldest if at capacity
+        while len(self._decision_engines) >= self.MAX_DECISION_ENGINES:
+            oldest_config_id, oldest_engine = self._decision_engines.popitem(last=False)
+            self._log.info(f"Evicted decision engine for config {oldest_config_id} (LRU)")
+            # DecisionEngineV2 doesn't have cleanup(), but releasing reference allows GC
+
+        # Create new engine
+        engine = DecisionEngineV2(config_id, user_id)
+        await engine.initialize()
+        self._decision_engines[config_id] = engine
+        return engine
     
     async def _run_decision_v2(
         self,
@@ -4454,6 +4486,13 @@ async def create_checkout_session(
             'allow_promotion_codes': request.plan != 'usage',  # No promos for usage plan
         }
 
+        # Add $10 billing threshold for usage-based plans to limit bad debt exposure
+        # When usage hits $10, Stripe will automatically generate an invoice
+        if request.plan == 'usage':
+            checkout_params['subscription_data']['billing_thresholds'] = {
+                'amount_gte': 1000  # $10.00 in cents
+            }
+
         # Add trial only for monthly/annual plans (not usage-based)
         if request.plan in ['monthly', 'annual']:
             checkout_params['subscription_data']['trial_period_days'] = 14
@@ -4748,22 +4787,117 @@ async def handle_subscription_deleted(subscription):
 
 
 async def handle_payment_failed(invoice):
-    """Handle failed payment."""
+    """
+    Handle failed payment - mark user as past_due and pause their bots.
+
+    This is triggered by Stripe's invoice.payment_failed webhook, including
+    when billing thresholds ($10 cap) trigger an invoice that fails.
+    """
     from core.common.db import get_db_connection
 
     subscription_id = invoice['subscription']
+    customer_id = invoice.get('customer')
+    amount_due = invoice.get('amount_due', 0) / 100  # Convert cents to dollars
+
+    user_id = None
+    user_email = None
+    paused_bots = []
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            # Update user status and get user_id
             cur.execute("""
                 UPDATE user_profiles
                 SET subscription_status = 'past_due',
                     updated_at = NOW()
                 WHERE stripe_subscription_id = %s
+                RETURNING user_id
             """, (subscription_id,))
+            result = cur.fetchone()
+
+            if result:
+                user_id = str(result[0])
+
+                # Pause all active bots for this user
+                cur.execute("""
+                    UPDATE configurations
+                    SET state = 'inactive', updated_at = NOW()
+                    WHERE user_id = %s AND state = 'active'
+                    RETURNING config_id, config_name
+                """, (user_id,))
+                paused_bots = cur.fetchall()
+
+                # Get user email for notification
+                cur.execute(
+                    "SELECT email FROM auth.users WHERE id = %s",
+                    (user_id,)
+                )
+                email_result = cur.fetchone()
+                user_email = email_result[0] if email_result else None
+
             conn.commit()
 
-    logger.warning(f"Payment failed for subscription: {subscription_id}")
+    # Log the action
+    if paused_bots:
+        logger.warning(
+            f"⚠️ Payment failed for subscription {subscription_id}: "
+            f"${amount_due:.2f} - Paused {len(paused_bots)} bots for user {user_id}"
+        )
+
+        # Notify via Redis pub/sub for real-time updates
+        try:
+            import redis
+            redis_client = redis.from_url(
+                os.getenv('REDIS_URL', 'redis://localhost:6379'),
+                decode_responses=True
+            )
+            for config_id, config_name in paused_bots:
+                redis_client.publish("bot_lifecycle", json.dumps({
+                    "action": "pause",
+                    "config_id": str(config_id),
+                    "user_id": user_id,
+                    "reason": "payment_failed"
+                }))
+        except Exception as e:
+            logger.error(f"Failed to publish bot pause event: {e}")
+    else:
+        logger.warning(f"Payment failed for subscription: {subscription_id} (${amount_due:.2f})")
+
+    # Send email notification to user
+    if user_email:
+        try:
+            from core.services.resend_service import resend_service
+
+            bot_names = [name or 'Unnamed Bot' for _, name in paused_bots] if paused_bots else []
+            bot_list_html = "".join([f"<li>{name}</li>" for name in bot_names[:5]])
+            if len(bot_names) > 5:
+                bot_list_html += f"<li>...and {len(bot_names) - 5} more</li>"
+
+            message = f"""
+            <p>We were unable to process your payment of <strong>${amount_due:.2f}</strong>.</p>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>Amount Due:</strong> ${amount_due:.2f}</p>
+                <p style="margin: 5px 0;"><strong>Status:</strong> Payment Declined</p>
+            </div>
+
+            {"<p><strong>The following bots have been paused:</strong></p><ul>" + bot_list_html + "</ul>" if bot_list_html else ""}
+
+            <p>Please update your payment method to resume your bots. Your bots will remain paused until payment is successful.</p>
+            """
+
+            resend_service.send_generic_notification(
+                user_email=user_email,
+                title="Payment Failed - Bots Paused",
+                message=message,
+                action_text="Update Payment Method",
+                action_url="https://app.ggbots.ai/settings",
+                notification_type="error"
+            )
+            logger.info(f"📧 Sent payment failed email to {user_email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send payment failed email: {e}")
 
 
 # =============================================================================

@@ -251,8 +251,8 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         INSERT INTO configurations
-                        (config_id, user_id, config_type, config_name, config_data, trading_mode, symphony_agent_id, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        (config_id, user_id, config_type, config_name, config_data, trading_mode, symphony_agent_id, initial_equity, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 10000.00, NOW(), NOW())
                     """, (
                         config_id,
                         user_id,
@@ -515,7 +515,7 @@ class ConfigService:
             # Validate updated configuration
             errors = updated_config.validate()
             if errors:
-                self._log.error(f"Updated configuration validation failed: {errors}")
+                self._log.error(f"Updated configuration validation failed for config {config_id} (user {user_id}): {errors}")
                 return None
             
             # Update in database

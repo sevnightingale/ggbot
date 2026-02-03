@@ -80,11 +80,14 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     """Execute the unified dashboard query against PostgreSQL."""
     
     # Optimized single query using CTEs with proper filtering and limits
+    # Note: initial_equity is denormalized on configurations table to avoid expensive
+    # DISTINCT ON scan of activities table (set on bot creation and reset)
     query = """
     WITH bot_configs AS (
         SELECT c.config_id, c.user_id, c.config_name, c.config_type, c.state, c.config_data,
                c.trading_mode, c.symphony_agent_id, c.profile_image_url,
                c.first_run_used, c.free_runs_remaining,
+               c.initial_equity,
                c.created_at, c.updated_at
         FROM configurations c
         WHERE c.user_id = %s AND c.state != 'archived'
@@ -132,15 +135,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         ) ranked_decisions
         WHERE rn <= 5  -- 5 most recent decisions per bot (no time filter)
     ),
-    first_activities AS (
-        -- Get first activity for each bot (for performance calculation)
-        SELECT DISTINCT ON (config_id)
-               config_id,
-               total_equity as initial_equity
-        FROM activities
-        WHERE total_equity IS NOT NULL
-        ORDER BY config_id, created_at ASC
-    ),
+    -- NOTE: first_activities CTE removed - initial_equity now stored on configurations table
     latest_activities AS (
         -- Get latest activity for each bot (for performance calculation)
         SELECT DISTINCT ON (config_id)
@@ -167,15 +162,14 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                asn.win_rate,
                asn.timestamp as updated_at,
                asn.trading_mode as source,
-               -- Calculate performance percentage from activities
+               -- Calculate performance percentage using denormalized initial_equity
                CASE
-                   WHEN fa.initial_equity IS NOT NULL AND fa.initial_equity > 0 AND la.current_equity IS NOT NULL
-                   THEN ((la.current_equity - fa.initial_equity) / fa.initial_equity * 100)
+                   WHEN bc.initial_equity IS NOT NULL AND bc.initial_equity > 0 AND la.current_equity IS NOT NULL
+                   THEN ((la.current_equity - bc.initial_equity) / bc.initial_equity * 100)
                    ELSE 0
                END as performance_pct
         FROM account_snapshots asn
         INNER JOIN bot_configs bc ON asn.config_id = bc.config_id
-        LEFT JOIN first_activities fa ON asn.config_id = fa.config_id
         LEFT JOIN latest_activities la ON asn.config_id = la.config_id
         ORDER BY asn.config_id, asn.timestamp DESC
     )

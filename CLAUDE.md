@@ -51,6 +51,19 @@ pm2 restart ggbot       # Restart after code changes
 
 ---
 
+## Workflow Orchestration
+
+**From Boris Cherny's Claude Code tips - for heavy dev sessions:**
+
+1. **Plan Mode for Non-Trivial Tasks** - Use plan mode for 3+ step tasks or architectural decisions
+2. **Subagent Strategy** - Offload research/exploration to subagents for parallel work
+3. **Autonomous Bug Fixing** - When given a bug report: just fix it, don't ask for hand-holding
+4. **Verification Before Done** - Never mark complete without proving it works (run tests, check logs)
+5. **Demand Elegance** - Challenge hacky solutions, ask "is there a more elegant way?"
+6. **Self-Improvement Loop** - After corrections, update docs/patterns to prevent repeat mistakes
+
+---
+
 ## Development Guidelines
 
 ### Code Style

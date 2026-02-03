@@ -68,6 +68,22 @@ scripts/
 
 **Cost Formula**: `platform_cost_usd = provider_cost_usd × 1.70` (70% markup)
 
+### $10 Spending Cap (Usage-Based)
+
+To limit bad debt exposure, usage_based subscriptions have a **$10 billing threshold**:
+
+1. When usage hits $10, Stripe automatically generates an invoice
+2. Invoice is charged to customer's payment method
+3. If payment succeeds: User continues, counter resets
+4. If payment fails: User marked `past_due`, all bots paused, email sent
+
+**Implementation**:
+- Stripe `billing_thresholds.amount_gte = 1000` on all usage_based subscriptions
+- `invoice.payment_failed` webhook pauses bots via `handle_payment_failed()`
+- UsageMonitor provides backup check for missed webhooks
+
+**Max bad debt exposure**: $10 (vs unlimited previously)
+
 ### PREPAID vs USAGE_BASED
 
 | Aspect | PREPAID | USAGE_BASED |
@@ -191,6 +207,39 @@ pipe.execute()
 is_low = (credits > 0) and (net < credits * 0.2 or net < 5)
 is_depleted = (net <= 0) and (credits > 0)
 ```
+
+### Prepaid vs Usage-Based Balance Calculation
+
+**Critical Difference**: Prepaid and usage-based users require different balance calculations.
+
+| Tier | Usage Source | Why |
+|------|--------------|-----|
+| `prepaid` | `SUM(platform_cost_usd) FROM activities` (all-time) | Credits don't reset monthly; Stripe balance is unreliable |
+| `usage_based` | Redis monthly counter `usage:user:{id}:{YYYY-MM}` | Billing resets monthly; Redis accurate for current period |
+
+**Why Stripe balance is unreliable for prepaid**: Stripe Credit Grants only decrease when applied to invoices. Prepaid users never get invoices (they pay upfront), so Stripe always reports the full credit grant amount as "available" even after usage.
+
+**Fix Location**: `get_balance_status()` in `usage_monitor.py` and admin endpoint in `api/admin.py` both check tier and route to appropriate usage source.
+
+### Email Notification Logic
+
+**State-based notifications** prevent spam by tracking user credit state in Redis:
+
+| State | Trigger | Notification |
+|-------|---------|--------------|
+| `ok` → `low` | Balance < 20% or < $5 | Low balance email (once) |
+| `low` → `depleted` | Balance ≤ $0 | Depleted email (once) |
+| `ok` → `depleted` | Sudden depletion | Depleted email (once) |
+
+**Key features:**
+- Redis key: `credit_state:{user_id}` → `"ok"` | `"low"` | `"depleted"`
+- Notifications only sent on **state transitions** (not repeatedly)
+- State persists across service restarts (90-day TTL)
+- State cleared automatically when credits are added → enables future alerts
+
+**Credit state cleared by:**
+- `handle_checkout_completed()` in ggbot.py (Stripe card payments)
+- `nowpayments_webhook()` in ggbot.py (Crypto payments)
 
 ---
 
@@ -360,6 +409,8 @@ python -m billing.stripe_meter_reporter
 1. Check Stripe dashboard for Credit Grants
 2. Verify `stripe_customer_id` in user_profiles
 3. Check usage monitor logs for Stripe API errors
+4. **For prepaid users**: Verify balance uses activities table, not Stripe API (Stripe balance doesn't decrease for prepaid)
+5. Check admin page shows `total_purchased - total_usage_cost` for prepaid tier
 
 ### Bots Not Pausing on Depletion
 

@@ -693,6 +693,9 @@ async def get_user_detail(
         "credit_grants": []
     }
 
+    # Check if user is on prepaid tier - they use credit grants, not metered billing
+    is_prepaid = user.get("subscription_tier") in ('prepaid', 'ggbase')
+
     stripe_customer_id = user.get("stripe_customer_id")
     if stripe_customer_id:
         try:
@@ -711,23 +714,31 @@ async def get_user_detail(
                 })
             credit_info["total_purchased"] = round(total_purchased, 2)
 
-            # Get current balance
-            try:
-                balance_summary = stripe.billing.CreditBalanceSummary.retrieve(
-                    customer=stripe_customer_id,
-                    filter={
-                        'type': 'applicability_scope',
-                        'applicability_scope': {'price_type': 'metered'}
-                    }
-                )
-                if balance_summary.balances and len(balance_summary.balances) > 0:
-                    balance = balance_summary.balances[0]
-                    available = balance.available_balance.monetary.value / 100 if balance.available_balance else 0
-                    ledger = balance.ledger_balance.monetary.value / 100 if balance.ledger_balance else 0
-                    credit_info["available_balance"] = round(available, 2)
-                    credit_info["used_balance"] = round(total_purchased - available, 2)
-            except stripe.error.StripeError as e:
-                logger.warning(f"Could not fetch credit balance for {stripe_customer_id}: {e}")
+            # For prepaid users: calculate available from activities table (all-time usage)
+            # Stripe Credit Grants don't decrease because prepaid users never get invoices
+            # This matches the fix in usage_monitor.py
+            if is_prepaid:
+                # Use our activities table for accurate tracking
+                available = max(0, total_purchased - total_usage_cost)
+                credit_info["available_balance"] = round(available, 2)
+                credit_info["used_balance"] = round(total_usage_cost, 2)
+            else:
+                # For usage_based users: query Stripe's balance (they have invoices)
+                try:
+                    balance_summary = stripe.billing.CreditBalanceSummary.retrieve(
+                        customer=stripe_customer_id,
+                        filter={
+                            'type': 'applicability_scope',
+                            'applicability_scope': {'price_type': 'metered'}
+                        }
+                    )
+                    if balance_summary.balances and len(balance_summary.balances) > 0:
+                        balance = balance_summary.balances[0]
+                        available = balance.available_balance.monetary.value / 100 if balance.available_balance else 0
+                        credit_info["available_balance"] = round(available, 2)
+                        credit_info["used_balance"] = round(total_purchased - available, 2)
+                except stripe.error.StripeError as e:
+                    logger.warning(f"Could not fetch credit balance for {stripe_customer_id}: {e}")
 
         except stripe.error.StripeError as e:
             logger.warning(f"Could not fetch credit grants for {stripe_customer_id}: {e}")

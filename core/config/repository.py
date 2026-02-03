@@ -127,8 +127,8 @@ class ConfigRepository:
                     else:
                         # Insert new configuration
                         cur.execute("""
-                            INSERT INTO configurations (config_id, user_id, config_type, config_data, config_name, created_at, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            INSERT INTO configurations (config_id, user_id, config_type, config_data, config_name, initial_equity, created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, 10000.00, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """, (config_id, user_id, config_type or "autonomous_trading", config_dict, config_name))
                     
                     conn.commit()
