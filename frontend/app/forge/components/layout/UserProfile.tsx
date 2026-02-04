@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { User, LogOut, Crown, CreditCard, Settings, Plus, Coins } from 'lucide-react'
+import { User, LogOut, Crown, CreditCard, Settings, Plus, Coins, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/permissions'
@@ -229,6 +229,13 @@ export function UserProfile({}: UserProfileProps) {
                           ${usageSummary.net_balance_usd?.toFixed(2) ?? '0.00'}
                         </span>
                       </div>
+                      {/* Depleted credits warning for prepaid users */}
+                      {isPrepaid && usageSummary.net_balance_usd !== null && usageSummary.net_balance_usd <= 0 && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-red-500">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>Credits depleted — bots paused</span>
+                        </div>
+                      )}
                     </>
                   ) : (
                     // Metered user - show just usage

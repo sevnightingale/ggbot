@@ -106,6 +106,7 @@ export interface BotConfiguration {
   is_public_performance?: boolean
   first_run_used?: boolean  // Tracks if free first run has been used
   free_runs_remaining?: number  // Number of free manual "Run Once" clicks remaining (default 3)
+  pause_reason?: string | null  // Reason bot was paused by system (e.g., 'prepaid_credits_exhausted')
   created_at: string
   updated_at: string
 }

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from core.common.db import get_db_connection, DecimalEncoder
 from core.common.logger import logger
-from .redis_status import get_execution_phase, get_bot_status_color, get_bot_status_message
+from .redis_status import get_execution_phase, get_bot_status_color, get_bot_status_message, get_redis_client
 from trading.paper.positions import PositionManager
 
 
@@ -42,6 +42,9 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
         if db_data.get('bots'):
             for bot in db_data['bots']:
                 _enhance_bot_with_runtime_data(bot)
+
+            # Fetch pause_reason from Redis for inactive bots (async operation)
+            await _fetch_pause_reasons_for_bots(db_data['bots'])
 
         # Enrich Symphony/Aster positions with live API data
         # account_snapshots handles account-level metrics, but individual positions
@@ -230,29 +233,33 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
 def _enhance_bot_with_runtime_data(bot: Dict[str, Any]) -> None:
     """
     Enhance bot data with runtime information from scheduler and Redis.
-    
+
     Adds:
     - execution_status from Redis
     - status_color, status_message for UI
     - show_spinner flag
     - next_run, is_scheduled from APScheduler (TODO)
+    - pause_reason when bot is inactive (for credit exhaustion feedback)
     """
     config_id = bot.get('config_id')
     if not config_id:
         return
-        
+
     # Get current execution status from Redis
     execution_status = get_execution_phase(config_id)
     bot['execution_status'] = execution_status
-    
+
     # Get bot state from database
     bot_state = bot.get('state', 'inactive')
-    
+
     # Calculate UI status info
     bot['status_color'] = get_bot_status_color(bot_state, execution_status)
     bot['status_message'] = get_bot_status_message(bot_state, execution_status)
     bot['show_spinner'] = execution_status.get('phase') in ['extracting', 'deciding', 'trading'] if execution_status else False
-    
+
+    # Note: pause_reason is fetched separately in _fetch_pause_reasons_for_bots()
+    # because it requires async Redis access
+
     # Get scheduler info from APScheduler
     from ggbot import get_next_run_from_scheduler, has_scheduler_job
 
@@ -264,6 +271,34 @@ def _enhance_bot_with_runtime_data(bot: Dict[str, Any]) -> None:
         bot['next_run'] = None
         bot['is_scheduled'] = bot_state == 'active'
 
+
+async def _fetch_pause_reasons_for_bots(bots: List[Dict[str, Any]]) -> None:
+    """
+    Fetch pause_reason from Redis for inactive bots.
+
+    When UsageMonitor pauses bots due to credit exhaustion, it stores the reason
+    in Redis. This function fetches those reasons for the frontend to display
+    appropriate messaging.
+    """
+    try:
+        redis_client = get_redis_client()
+
+        for bot in bots:
+            config_id = bot.get('config_id')
+            bot_state = bot.get('state', 'inactive')
+
+            if bot_state == 'inactive' and config_id:
+                # Key format: bot:pause_reason:{config_id}
+                pause_reason = await redis_client.get(f"bot:pause_reason:{config_id}")
+                bot['pause_reason'] = pause_reason  # Will be None if not set
+            else:
+                bot['pause_reason'] = None
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch pause reasons from Redis: {e}")
+        # Set pause_reason to None for all bots on error
+        for bot in bots:
+            bot['pause_reason'] = None
 
 
 async def _enhance_accounts_with_portfolio_data(accounts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

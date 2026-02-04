@@ -1,0 +1,322 @@
+---
+title: "How AI Confidence Scores Determine Position Size in Trading Bots"
+description: "Learn how AI trading agents use confidence scoring to size positions dynamically. Avoid the LLM 7/10 bias and implement smarter risk management."
+date: "2026-02-14"
+author: "Sev"
+authorTwitter: "@SevNightingale"
+keywords:
+  - ai trading confidence score
+  - confidence based position sizing
+  - ai trading bot risk management
+  - llm confidence scoring
+  - dynamic position sizing
+---
+
+Most AI trading bots either risk too much or too little on every trade.
+
+The problem isn't the strategy. It's that they treat every opportunity the same. A screaming setup gets the same position size as a marginal one.
+
+Confidence-based position sizing solves this. Here's how it works and why most implementations get it wrong.
+
+## The Problem: Fixed Position Sizes
+
+Traditional trading bots use fixed position sizes:
+- Always trade 5% of balance
+- Always use 3x leverage
+- Same risk on every trade
+
+This made sense when bots were purely rules-based. If RSI drops below 30, buy. The bot doesn't have an opinion on how strong the signal is.
+
+AI agents are different. They can evaluate opportunity quality. But most implementations don't use this capability properly.
+
+## Confidence Scoring: The Concept
+
+The idea is simple: AI evaluates each opportunity and outputs a confidence score (0-100). Position size scales to confidence.
+
+**Example:**
+- Max position size: 20% of balance
+- Confidence score: 75%
+- Actual position: 15% of balance (75% of 20%)
+
+Low confidence = small position. High confidence = larger position. Dynamic risk management.
+
+## The LLM 7/10 Bias Problem
+
+Here's where most AI trading implementations fail.
+
+Ask an LLM to rate something 1-10, and it defaults to 7. This isn't a bug - it's learned human behavior from training data.
+
+**The naive approach:**
+```
+Prompt: "Evaluate this trading opportunity and assign a confidence score 0-100."
+LLM Response: 70
+```
+
+Every trade gets scored around 70. Position sizing becomes meaningless. You're back to fixed sizes with extra steps.
+
+**Why this happens:**
+- LLMs learn from human data
+- Humans default to moderate ratings
+- 7/10 is the most common human rating
+- LLM replicates this bias
+
+## The Solution: Component-Based Scoring
+
+Instead of asking for a final confidence score, break it into components.
+
+**Bad (single score):**
+> "What's your confidence in this long opportunity? (0-100)"
+
+**Good (component scoring):**
+> "Score each factor 0-10:
+> - Technical setup strength
+> - Volume confirmation
+> - Trend alignment
+> - Risk/reward ratio
+> - Timing quality
+>
+> Sum the scores for total confidence (0-50)."
+
+The LLM evaluates specific factors individually. Summing components produces more accurate differentiation than asking for one holistic score.
+
+**Result:**
+- Strong setup with all factors aligned: 42/50 (84%)
+- Mediocre setup with mixed signals: 28/50 (56%)
+- Weak setup with poor timing: 15/50 (30%)
+
+Actual differentiation between opportunity quality.
+
+## Position Sizing Mechanics
+
+Once you have a reliable confidence score, position sizing becomes straightforward.
+
+**Formula:**
+```
+Position Size = (Confidence / 100) × Max Position Size
+```
+
+**Example configuration:**
+- Max position: 20% of balance
+- Confidence: 84% (42/50 scored setup)
+- Actual position: 16.8% of balance
+
+**With leverage:**
+```
+Position Size = (Confidence / 100) × Max Position × Leverage
+```
+
+**Example:**
+- Max position: 10% of balance
+- Leverage: 3x
+- Confidence: 56%
+- Actual position: 16.8% (10% × 3 × 0.56)
+
+The agent risks more on high-confidence opportunities, less on uncertain ones.
+
+## Real-World Application
+
+Here's how this plays out in practice:
+
+**Scenario 1: Strong Conviction Trade**
+
+Market conditions:
+- BTC oversold after capitulation event
+- Volume spike with reversal candle
+- Funding rate extremely negative
+- Support level holding
+
+Component scores:
+- Technical setup: 9/10
+- Volume confirmation: 8/10
+- Trend alignment: 7/10
+- Risk/reward: 9/10
+- Timing: 8/10
+- **Total: 41/50 (82%)**
+
+Position sizing:
+- Max: 20%
+- Confidence: 82%
+- **Actual: 16.4% of balance**
+
+**Scenario 2: Marginal Setup**
+
+Market conditions:
+- Technical indicator shows oversold
+- Volume declining
+- Mixed trend signals
+- Mediocre risk/reward
+
+Component scores:
+- Technical setup: 6/10
+- Volume confirmation: 4/10
+- Trend alignment: 5/10
+- Risk/reward: 6/10
+- Timing: 5/10
+- **Total: 26/50 (52%)**
+
+Position sizing:
+- Max: 20%
+- Confidence: 52%
+- **Actual: 10.4% of balance**
+
+Same strategy, different opportunity quality. The agent risks 60% more on the strong setup than the marginal one.
+
+## Common Implementation Mistakes
+
+### Mistake 1: Asking for Final Confidence
+
+```
+Bad: "How confident are you in this trade? (0-100)"
+Good: "Score these 5 factors individually, then sum."
+```
+
+Final confidence scores default to ~70. Component scoring forces actual evaluation.
+
+### Mistake 2: Too Few Components
+
+```
+Bad: "Rate technical setup and timing (0-20 total)"
+Good: "Rate 5-7 specific factors (0-50 total)"
+```
+
+More components = better differentiation. Three components still leave too much room for LLM averaging.
+
+### Mistake 3: Vague Component Definitions
+
+```
+Bad: "Rate market conditions (0-10)"
+Good: "Rate volume confirmation: Is volume 2x+ recent average? (0-10)"
+```
+
+Specific, measurable components produce consistent scoring. Vague prompts get vague scores.
+
+### Mistake 4: No Calibration
+
+Run your agent on paper trading for 50+ trades. Check score distribution:
+- If everything clusters 30-35/50: Components too similar or vague
+- If everything clusters 40-50/50: LLM is too optimistic, adjust prompts
+- If distribution is flat: Good - agent is differentiating
+
+Calibrate component prompts until you see meaningful differentiation.
+
+## Advanced: Multi-Factor Confidence
+
+Sophisticated implementations use multiple confidence layers:
+
+**Layer 1: Setup Confidence**
+- Is this a valid trading opportunity?
+- Component scoring for technical factors
+
+**Layer 2: Execution Confidence**
+- Is this the right time to enter?
+- Market volatility, liquidity, timing
+
+**Layer 3: Risk Confidence**
+- How certain are stop-loss and take-profit levels?
+- Position may be smaller if exits are uncertain
+
+**Combined:**
+```
+Final Position = Max Position × Setup Confidence × Execution Confidence × Risk Confidence
+```
+
+Example:
+- Max: 20%
+- Setup: 80% (strong technical)
+- Execution: 90% (good timing)
+- Risk: 70% (stops somewhat uncertain)
+- **Final: 20% × 0.8 × 0.9 × 0.7 = 10.08%**
+
+This compounds conservatism. Agent must be confident across all dimensions to size large.
+
+## Setting Guardrails
+
+Confidence scoring enables dynamic sizing, but you still need limits:
+
+**Minimum position:**
+- Don't trade below 5% of max size
+- If confidence too low, skip the trade
+- Example: If max is 20%, minimum actual position is 1%
+
+**Maximum position:**
+- Cap at max regardless of confidence
+- Even 100% confidence doesn't exceed limit
+- Protects against overconfidence
+
+**Leverage limits:**
+- Confidence can't override leverage cap
+- If max leverage is 3x, 100% confidence still ≤ 3x
+- Prevents catastrophic risk
+
+**Example guardrails:**
+```
+Max position: 20%
+Min position: 5% (of max = 1% of balance)
+Max leverage: 3x
+Confidence floor: 50% (below 50% = skip trade)
+```
+
+These prevent the agent from being too aggressive (overconfident) or too timid (underconfident).
+
+## Why This Matters
+
+Confidence-based position sizing is one of the key differentiators between "AI-assisted trading" and truly autonomous AI agents.
+
+**Traditional bots:**
+- Fixed position sizes
+- Every setup treated equally
+- Can't adapt risk to opportunity
+
+**AI agents with proper confidence scoring:**
+- Dynamic position sizing
+- Risk scaled to conviction
+- Compound edge from better opportunities
+
+This compounds over dozens of trades. An agent that sizes 60% larger on its best setups and 60% smaller on marginal ones will dramatically outperform a fixed-size approach.
+
+## Implementation in ggbots
+
+The ggbots platform handles this automatically:
+
+1. **Component Definition**: Define scoring factors in your strategy prompt
+2. **Score Aggregation**: Agent evaluates each component and sums
+3. **Position Scaling**: Platform scales position to confidence automatically
+4. **Guardrails**: Set min/max position sizes and leverage limits in UI
+
+You design the scoring logic. The platform handles execution.
+
+**Example strategy prompt:**
+```
+Score each factor 0-10:
+1. RSI oversold strength (< 30 = 10, 30-40 = 7, > 40 = 0)
+2. Volume confirmation (2x average = 10, scaling down)
+3. Support level proximity (within 2% = 10, scaling)
+4. Trend alignment (downtrend = 0, ranging = 5, uptrend = 10)
+5. Funding rate extremity (very negative = 10, scaling)
+
+Sum total score (0-50).
+Trade only if score > 25.
+Position size: (score / 50) × max position.
+```
+
+The Decision Agent scores components. Trading Agent sizes position. You monitor and iterate.
+
+## Getting Started
+
+If you're building AI trading agents with confidence-based position sizing:
+
+1. **Define 5-7 specific, measurable scoring components**
+2. **Prompt agent to score each individually, then sum**
+3. **Paper trade 50+ opportunities to calibrate**
+4. **Adjust component definitions if scores cluster**
+5. **Set conservative guardrails (min/max position, leverage caps)**
+6. **Monitor score distribution - should see differentiation**
+7. **Iterate on component definitions as markets change**
+
+Confidence scoring isn't "set it and forget it." It's an evolving system. As market conditions change, component definitions may need adjustment.
+
+But once calibrated, it's the difference between an AI bot that sizes blindly and an AI agent that allocates risk intelligently.
+
+---
+
+**Building your first AI trading agent?** Check out our guide on [What is Vibe Trading?](/blog/what-is-vibe-trading) or see confidence scoring in action at [ggArena](https://arena.ggbots.ai).

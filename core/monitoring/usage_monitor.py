@@ -186,8 +186,12 @@ class UsageMonitor:
         """
         Get combined credit + usage status for a user.
 
-        For PREPAID users: Uses ALL-TIME usage from activities table (credits don't reset)
-        For USAGE_BASED users: Uses monthly Redis counter (they get invoiced each period)
+        Both tiers now use Redis monthly counter for consistency with decision engine.
+        The activities table has incomplete records, so Redis is the source of truth.
+
+        Note: For prepaid users, credits don't reset monthly but usage tracking does.
+        This is acceptable because we're checking "can they afford THIS month's usage"
+        rather than "have they exceeded their total lifetime credits".
         """
         # Get credits from Stripe
         credits = await self._get_stripe_credits(user_id)
@@ -197,17 +201,13 @@ class UsageMonitor:
             # Check tier if not provided
             is_prepaid = await self._is_prepaid_tier(user_id)
 
-        if is_prepaid:
-            # PREPAID: Use ALL-TIME usage from activities table
-            # Credits don't reset monthly - they're a fixed pool
-            usage = await self._get_total_usage_from_activities(user_id)
-        else:
-            # USAGE_BASED: Use monthly Redis counter
-            # They get invoiced each period, so monthly tracking is correct
-            period = datetime.utcnow().strftime("%Y-%m")
-            usage_key = f"usage:user:{user_id}:{period}"
-            usage_raw = self.redis.get(usage_key)
-            usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+        # Use Redis monthly counter for BOTH tiers - this is the source of truth
+        # The activities table has incomplete records (usage gets logged to Redis first)
+        # This matches what decision engine uses, ensuring consistency
+        period = datetime.utcnow().strftime("%Y-%m")
+        usage_key = f"usage:user:{user_id}:{period}"
+        usage_raw = self.redis.get(usage_key)
+        usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
         net = credits - usage
 
@@ -376,6 +376,15 @@ class UsageMonitor:
                     conn.commit()
 
             if paused:
+                # Store pause reason for each bot (for frontend display via SSE)
+                # TTL of 24 hours - reason persists for user to see why bot was paused
+                for config_id, config_name in paused:
+                    self.redis.setex(
+                        f"bot:pause_reason:{config_id}",
+                        86400,  # 24h TTL
+                        reason
+                    )
+
                 # Notify via Redis pub/sub for real-time updates
                 for config_id, config_name in paused:
                     self.redis.publish("bot_lifecycle", json.dumps({
@@ -583,9 +592,8 @@ class UsageMonitor:
 
         Called every 5 minutes. Caches summaries in Redis for instant API responses.
 
-        IMPORTANT: Prepaid and usage_based users require different calculations:
-        - Prepaid: credits = total_purchased, usage = all-time (from activities)
-        - Usage-based: credits = Stripe available, usage = monthly (from Redis)
+        Both tiers now use Redis monthly counter for usage (source of truth).
+        Credits come from Stripe for both tiers.
         """
         period = datetime.utcnow().strftime("%Y-%m")
 
@@ -603,20 +611,13 @@ class UsageMonitor:
 
                     user_id = parts[2]
 
-                    # Check if prepaid tier - they need different calculation
-                    is_prepaid = await self._is_prepaid_tier(user_id)
+                    # Use Redis monthly counter for usage (source of truth for both tiers)
+                    # This matches decision engine's credit check
+                    usage_raw = self.redis.get(key)
+                    usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
-                    if is_prepaid:
-                        # PREPAID: Use total purchased and all-time usage from activities
-                        # Stripe's "available" balance is wrong because credits never
-                        # get consumed (prepaid users don't get invoices)
-                        credits = await self._get_total_purchased_from_stripe(user_id)
-                        usage = await self._get_total_usage_from_activities(user_id)
-                    else:
-                        # USAGE-BASED: Use Stripe available balance and monthly Redis
-                        usage_raw = self.redis.get(key)
-                        usage = Decimal(usage_raw) if usage_raw else Decimal("0")
-                        credits = await self._get_stripe_credits(user_id)
+                    # Get credits from Stripe
+                    credits = await self._get_stripe_credits(user_id)
 
                     # Calculate net balance (never negative for display)
                     net_balance = max(Decimal("0"), credits - usage)

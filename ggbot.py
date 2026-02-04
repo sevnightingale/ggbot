@@ -1292,6 +1292,15 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
     Job function executed by APScheduler for each bot.
     Implements Redis idempotency and calls the orchestrator.
     """
+    # CHECK STATE BEFORE EXECUTING - prevents inactive bots from running
+    # This catches bots paused by UsageMonitor (credit exhaustion) or other means
+    from core.services.config_service import config_service
+    state = await config_service.get_bot_state(config_id, user_id)
+    if state != 'active':
+        logger.info(f"Skipping execution for {config_id} - state is '{state}', removing scheduler job")
+        remove_bot_job(user_id, config_id, timeframe)
+        return
+
     close_ts = last_closed_close_ts(timeframe)
     key = format_redis_idempotency_key(user_id, config_id, timeframe, close_ts)
     

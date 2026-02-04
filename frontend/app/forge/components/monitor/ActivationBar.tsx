@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle, Coins } from 'lucide-react'
+import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle, Coins, AlertTriangle } from 'lucide-react'
 import { BotConfiguration, apiClient } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
@@ -79,6 +79,10 @@ export function ActivationBar({
   const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
   const isRegisteredForArena = selectedBot.is_public_performance === true
   const isPaperTrading = selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
+
+  // Check if bot was paused due to credit exhaustion (set by UsageMonitor)
+  const isPausedForCredits = selectedBot.state === 'inactive' &&
+                             selectedBot.pause_reason === 'prepaid_credits_exhausted'
 
   // Fetch config usage for cost display
   const [configUsage, setConfigUsage] = useState<{
@@ -174,6 +178,22 @@ export function ActivationBar({
   return (
     <>
       <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+        {/* Credit Exhaustion Warning Banner */}
+        {isPausedForCredits && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-500">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+              <span>Bot paused — your prepaid credits have run out</span>
+            </div>
+            <button
+              onClick={() => setAddCreditsOpen(true)}
+              className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-black hover:bg-amber-400 whitespace-nowrap"
+            >
+              Add Credits
+            </button>
+          </div>
+        )}
+
         {/* Row 1: Bot Name + Status + Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
           {/* Left: Profile Image + Bot Name + Status */}
