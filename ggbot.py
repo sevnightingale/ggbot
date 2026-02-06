@@ -331,7 +331,21 @@ class GGBotOrchestrator:
         from collections import OrderedDict
         self._extraction_engines: OrderedDict = OrderedDict()
         self._decision_engines: OrderedDict = OrderedDict()
-    
+
+    def invalidate_engines(self, config_id: str) -> None:
+        """Evict cached engines for a config so next run picks up fresh config."""
+        evicted = []
+        if config_id in self._extraction_engines:
+            engine = self._extraction_engines.pop(config_id)
+            if hasattr(engine, 'cleanup'):
+                engine.cleanup()
+            evicted.append("extraction")
+        if config_id in self._decision_engines:
+            self._decision_engines.pop(config_id)
+            evicted.append("decision")
+        if evicted:
+            self._log.info(f"Invalidated {', '.join(evicted)} engine(s) for config {config_id}")
+
     async def run_autonomous_cycle(
         self,
         config_id: str,
@@ -1978,9 +1992,12 @@ async def update_config(
         symphony_agent_id=symphony_agent_id,
         profile_image_url=profile_image_url
     )
-    
+
     if not config:
         raise HTTPException(status_code=404, detail="Configuration not found or update failed")
+
+    # Invalidate cached engines so next run picks up new config
+    orchestrator.invalidate_engines(config_id)
     
     # If bot was active, check if timeframe changed and reschedule if needed
     reschedule_info = None
@@ -5199,18 +5216,20 @@ async def nowpayments_webhook(request: Request):
     # Mark as processing (24h TTL to handle retries)
     redis_client.setex(processed_key, 86400, "processing")
 
-    # Extract user_id and amount from order_id (format: "credits_{user_id}_{amount_cents}")
+    # Extract user_id and amount from order_id
+    # Format: "credits_{user_id}_{amount_cents}_{timestamp}" (4 parts with timestamp for uniqueness)
     if not order_id.startswith("credits_"):
         logger.error(f"Invalid order_id format: {order_id}")
         raise HTTPException(400, "Invalid order_id")
 
     parts = order_id.split("_")
-    if len(parts) != 3:
+    if len(parts) < 3:
         logger.error(f"Invalid order_id format: {order_id}")
         raise HTTPException(400, "Invalid order_id format")
 
     user_id = parts[1]
     amount_cents = int(parts[2])
+    # parts[3] is optional timestamp, ignored here (used for uniqueness)
 
     # Get user email for Stripe customer creation
     from core.common.db import get_db_connection

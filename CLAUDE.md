@@ -256,6 +256,7 @@ case 'live_trading':
 | Agent behavior, MCP tools, strategy | `agent/README.md` |
 | Frontend components, SSE, bot rail | `frontend/README.md` |
 | SEO, blog, OG images, content strategy | `frontend/SEO.md` |
+| Nansen API, smart money data, MCP setup | `DOCS/NANSEN.md` |
 | Database schema questions | `ACTIVE.md` (Database Schema section) |
 | API endpoint behavior | `ACTIVE.md` (Core API Endpoints section) |
 

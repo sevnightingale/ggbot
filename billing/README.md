@@ -168,6 +168,13 @@ usage:config:{config_id}:{YYYY-MM-DD}    # Daily bot spend (90-day TTL)
 # Cached summaries (updated every 5min by usage monitor)
 usage:summary:{user_id}                   # JSON: usage + credits + net balance
 
+# Credit notification state (prevents spam)
+credit_state:{user_id}                    # "ok" | "low" | "depleted" (90-day TTL)
+
+# Bot pause tracking (for frontend UX)
+bot:pause_reason:{config_id}              # Reason bot was paused (24h TTL)
+                                          # Values: "prepaid_credits_exhausted", "payment_failed"
+
 # Idempotency tracking
 nowpayments:processed:{order_id}          # Prevents duplicate crypto credit grants
 ```
@@ -208,18 +215,43 @@ is_low = (credits > 0) and (net < credits * 0.2 or net < 5)
 is_depleted = (net <= 0) and (credits > 0)
 ```
 
-### Prepaid vs Usage-Based Balance Calculation
+### Balance Calculation (All Tiers)
 
-**Critical Difference**: Prepaid and usage-based users require different balance calculations.
+**Both prepaid and usage_based tiers use Redis monthly counter** for usage tracking:
 
-| Tier | Usage Source | Why |
-|------|--------------|-----|
-| `prepaid` | `SUM(platform_cost_usd) FROM activities` (all-time) | Credits don't reset monthly; Stripe balance is unreliable |
-| `usage_based` | Redis monthly counter `usage:user:{id}:{YYYY-MM}` | Billing resets monthly; Redis accurate for current period |
+| Component | Source | Why |
+|-----------|--------|-----|
+| Credits | Stripe Credit Balance API | Total credits purchased |
+| Usage | Redis `usage:user:{id}:{YYYY-MM}` | Real-time, matches decision engine |
 
-**Why Stripe balance is unreliable for prepaid**: Stripe Credit Grants only decrease when applied to invoices. Prepaid users never get invoices (they pay upfront), so Stripe always reports the full credit grant amount as "available" even after usage.
+**Why Redis for all tiers** (updated 2026-02-04): The activities table can have incomplete records due to async logging, while Redis is updated synchronously during LLM calls. Using Redis ensures UsageMonitor and decision engine see identical usage values.
 
-**Fix Location**: `get_balance_status()` in `usage_monitor.py` and admin endpoint in `api/admin.py` both check tier and route to appropriate usage source.
+**Why Stripe balance is unreliable for usage**: Stripe Credit Grants only decrease when applied to invoices. Prepaid users never get invoices, so Stripe always reports full credit amount as "available" even after usage.
+
+**Fix Location**: `get_balance_status()` in `usage_monitor.py` uses Redis for both tiers.
+
+### Bot Pause Flow
+
+When UsageMonitor detects depleted credits:
+
+1. **Database**: Sets `state = 'inactive'` on all user's active bots
+2. **Redis**: Stores pause reason: `bot:pause_reason:{config_id}` = `"prepaid_credits_exhausted"` (24h TTL)
+3. **Pub/Sub**: Publishes to `bot_lifecycle` channel (for real-time SSE updates)
+4. **Email**: Sends depletion notification to user
+
+**Scheduler Enforcement** (`ggbot.py:run_once()`):
+
+When APScheduler fires for a bot, `run_once()` checks state BEFORE executing:
+
+```python
+state = await config_service.get_bot_state(config_id, user_id)
+if state != 'active':
+    logger.info(f"Skipping execution - state is '{state}', removing scheduler job")
+    remove_bot_job(user_id, config_id, timeframe)
+    return
+```
+
+This ensures paused bots don't execute even if the scheduler job wasn't removed yet.
 
 ### Email Notification Logic
 
@@ -324,13 +356,22 @@ Daily usage history for a bot (max 90 days).
 
 1. User selects amount
 2. Frontend calls `POST /api/v2/credits/crypto-checkout`
-3. Backend creates NOWPayments invoice
+3. Backend creates NOWPayments invoice with order_id
 4. User pays in crypto
 5. IPN callback triggers Credit Grant creation (with idempotency)
 
+**Order ID Format** (4 parts for uniqueness):
+```
+credits_{user_id}_{amount_cents}_{timestamp}
+
+Example: credits_b29178ce-9205-4e86-a0f9-5b7dfab29e35_1000_1770177090
+         └─────┘ └──────────────────────────────────┘ └──┘ └────────┘
+         prefix          user UUID                   $10   unix timestamp
+```
+
 ### Idempotency
 
-NOWPayments webhook (`ggbot.py:4710-4721`):
+NOWPayments webhook (`ggbot.py:nowpayments_webhook`):
 
 ```python
 # Check for duplicate processing
@@ -338,7 +379,14 @@ processed_key = f"nowpayments:processed:{order_id}"
 if redis_client.get(processed_key):
     return {"status": "duplicate"}
 redis_client.setex(processed_key, 86400, "processing")
-# ... process payment ...
+
+# Parse order_id (supports 3 or 4 parts)
+parts = order_id.split("_")
+user_id = parts[1]
+amount_cents = int(parts[2])
+# parts[3] is optional timestamp (ignored, used for uniqueness)
+
+# ... create Stripe Credit Grant ...
 redis_client.setex(processed_key, 86400 * 30, "completed")
 ```
 
@@ -409,14 +457,24 @@ python -m billing.stripe_meter_reporter
 1. Check Stripe dashboard for Credit Grants
 2. Verify `stripe_customer_id` in user_profiles
 3. Check usage monitor logs for Stripe API errors
-4. **For prepaid users**: Verify balance uses activities table, not Stripe API (Stripe balance doesn't decrease for prepaid)
-5. Check admin page shows `total_purchased - total_usage_cost` for prepaid tier
+4. **Verify Redis counter matches config counters**: User-level counter should equal sum of their config counters
+5. If counters diverged, fix with: `redis_client.set(f"usage:user:{user_id}:{period}", sum_of_config_counters)`
 
 ### Bots Not Pausing on Depletion
 
 1. Verify account-monitor PM2 service running: `pm2 status account-monitor`
 2. Check logs: `pm2 logs account-monitor`
 3. Verify user has `credits > 0` (depletion only triggers if user HAD credits)
+4. Check Redis usage counter matches what decision engine sees
+5. After pausing, verify `run_once()` state check is working: look for "Skipping execution" log
+
+### Crypto Payments Not Adding Credits
+
+1. Check NOWPayments dashboard for payment status (must be "finished")
+2. Check Redis for idempotency key: `redis-cli GET nowpayments:processed:{order_id}`
+3. If stuck at "processing", webhook failed - manually create Credit Grant
+4. Check ggbot logs for "Invalid order_id format" errors
+5. Verify order_id has correct format: `credits_{user_id}_{amount_cents}_{timestamp}`
 
 ### Double Billing
 
@@ -438,11 +496,29 @@ Adaptive display based on billing model:
    Used       -$12.34
    Balance    $37.66  // amber if < $5
 
+// Depleted prepaid user
+⚠️ Credits depleted — bots paused  // red warning
+
 // Metered users (credits = 0)
 🪙 This week  $12.34
 ```
 
 **API**: `getUsageSummary()` → `GET /api/v2/usage/me`
+
+### Credit Warning Banner (`frontend/.../ActivationBar.tsx`)
+
+When a bot is paused due to credit exhaustion, shows amber warning:
+
+```typescript
+// Bot with pause_reason === 'prepaid_credits_exhausted'
+┌────────────────────────────────────────────────────────┐
+│ ⚠️ Bot paused — your prepaid credits have run out  [Add Credits] │
+└────────────────────────────────────────────────────────┘
+```
+
+**Data source**: SSE dashboard data includes `pause_reason` from Redis for inactive bots.
+
+**Implementation**: `BotConfiguration.pause_reason` field populated by `_fetch_pause_reasons_for_bots()` in `core/sse/dashboard_data.py`.
 
 ### ActivationBar Daily Cost (`frontend/.../ActivationBar.tsx`)
 

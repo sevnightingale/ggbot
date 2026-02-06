@@ -633,6 +633,10 @@ async def update_full_config(
 
                 conn.commit()
 
+                # Invalidate cached engines so next run picks up new config
+                from ggbot import orchestrator
+                orchestrator.invalidate_engines(config_id)
+
                 logger.bind(
                     user_id=user_id,
                     config_id=config_id,
