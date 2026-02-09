@@ -3652,6 +3652,54 @@ async def close_aster_position(
         )
 
 
+@app.post("/api/v2/positions/hyperliquid/{batch_id}/close")
+async def close_hyperliquid_position(
+    batch_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Close a Hyperliquid position by batch_id."""
+    try:
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT lt.config_id, c.user_id
+                    FROM live_trades lt
+                    JOIN configurations c ON lt.config_id = c.config_id
+                    WHERE lt.batch_id = %s AND lt.provider = 'hyperliquid' AND lt.closed_at IS NULL
+                """, (batch_id,))
+                result = cur.fetchone()
+
+                if not result:
+                    raise HTTPException(status_code=404, detail="Position not found or already closed")
+
+                config_id, user_id = result
+                if str(user_id) != current_user.user_id:
+                    raise HTTPException(status_code=403, detail="Unauthorized")
+
+        from trading.live.hyperliquid_service import HyperliquidLiveTradingService
+        hl_service = HyperliquidLiveTradingService()
+        close_result = await hl_service.close_position(batch_id, current_user.user_id)
+
+        if close_result.get("status") != "success":
+            raise HTTPException(
+                status_code=500,
+                detail=close_result.get("reason", "Failed to close position")
+            )
+
+        return close_result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to close Hyperliquid position: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to close Hyperliquid position: {str(e)}"
+        )
+
+
 @app.get("/api/v2/account/live/{config_id}")
 async def get_live_account_metrics(
     config_id: str,
@@ -3816,25 +3864,61 @@ async def get_bot_positions(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get live positions for a bot configuration."""
+    """Get live positions for a bot configuration (paper or Hyperliquid)."""
     try:
         from core.common.db import get_db_connection
-        
+
+        # Check trading mode
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        config_dict = config.to_jsonb() if hasattr(config, 'to_jsonb') else {}
+        trading_mode = config_dict.get('trading_mode', 'paper')
+
+        if trading_mode == 'hyperliquid':
+            # Fetch positions from Hyperliquid Info API
+            from trading.live.hyperliquid_service import HyperliquidLiveTradingService
+            hl_service = HyperliquidLiveTradingService()
+            hl_positions = await hl_service.get_open_positions(config_id, current_user.user_id)
+
+            positions = []
+            for pos in hl_positions:
+                positions.append({
+                    "symbol": pos.get('symbol'),
+                    "side": pos.get('side'),
+                    "size": float(pos.get('size', 0)) * float(pos.get('entry_price', 0)),
+                    "entryPrice": float(pos.get('entry_price', 0)),
+                    "currentPrice": float(pos.get('entry_price', 0)),  # Updated via SSE
+                    "unrealizedPnL": float(pos.get('unrealized_pnl', 0)),
+                    "liquidationPrice": float(pos.get('liquidation_price', 0)),
+                    "leverage": pos.get('leverage'),
+                    "marginType": pos.get('margin_type', 'cross'),
+                    "source": "hyperliquid"
+                })
+
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "positions": positions
+            }
+
+        # Default: paper trading positions
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT symbol, side, entry_price, current_price, size_usd, 
+                    SELECT symbol, side, entry_price, current_price, size_usd,
                            unrealized_pnl, leverage, opened_at
-                    FROM paper_trades 
+                    FROM paper_trades
                     WHERE config_id = %s AND user_id = %s AND status = 'open'
                     ORDER BY opened_at DESC
                 """, (config_id, current_user.user_id))
-                
+
                 positions = []
                 for row in cur.fetchall():
                     # Map database side to display format
                     side_display = "LONG" if row['side'].lower() == 'buy' else "SHORT"
-                    
+
                     positions.append({
                         "symbol": row['symbol'],
                         "side": side_display,
@@ -3844,13 +3928,15 @@ async def get_bot_positions(
                         "unrealizedPnL": float(row['unrealized_pnl'] or 0),
                         "timestamp": row['opened_at'].isoformat() + "Z"
                     })
-                
+
                 return {
                     "status": "success",
                     "config_id": config_id,
                     "positions": positions
                 }
-                
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get bot positions for {config_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get bot positions")
@@ -3910,17 +3996,83 @@ async def get_bot_account(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
-    Get account summary for a bot configuration.
+    Get account summary for a bot configuration (paper or Hyperliquid).
 
     Returns comprehensive account metrics including total equity,
     performance percentage, and margin details.
     """
     try:
-        from trading.paper.supabase_service import SupabasePaperTradingService
         from core.common.db import get_db_connection
         from core.domain.metrics_calculator import AccountMetricsCalculator
         from decimal import Decimal
 
+        # Check trading mode
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        config_dict = config.to_jsonb() if hasattr(config, 'to_jsonb') else {}
+        trading_mode = config_dict.get('trading_mode', 'paper')
+
+        if trading_mode == 'hyperliquid':
+            # Fetch account from Hyperliquid Info API
+            from trading.live.hyperliquid_service import HyperliquidLiveTradingService
+            hl_service = HyperliquidLiveTradingService()
+            metrics = await hl_service.get_account_metrics(config_id, current_user.user_id)
+
+            if metrics.get('status') != 'success':
+                return {
+                    "status": "success",
+                    "config_id": config_id,
+                    "account": {
+                        "initial_balance": 0.0,
+                        "current_balance": 0.0,
+                        "available_balance": 0.0,
+                        "margin_used": 0.0,
+                        "total_pnl": 0.0,
+                        "unrealized_pnl": 0.0,
+                        "realized_pnl": 0.0,
+                        "total_equity": 0.0,
+                        "performance_percent": 0.0,
+                        "open_positions": 0,
+                        "total_trades": 0,
+                        "win_trades": 0,
+                        "loss_trades": 0,
+                        "win_rate": 0.0,
+                        "source": "hyperliquid"
+                    }
+                }
+
+            account_value = metrics.get('balance', 0)
+            available = metrics.get('available_balance', 0)
+            unrealized_pnl = metrics.get('total_unrealized_pnl', 0)
+            positions = metrics.get('positions', [])
+            margin_used = account_value - available
+
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "account": {
+                    "initial_balance": account_value,  # No concept of initial for live
+                    "current_balance": account_value,
+                    "available_balance": available,
+                    "margin_used": margin_used,
+                    "total_pnl": unrealized_pnl,
+                    "unrealized_pnl": unrealized_pnl,
+                    "realized_pnl": 0.0,
+                    "total_equity": account_value,
+                    "performance_percent": 0.0,
+                    "open_positions": len(positions),
+                    "total_trades": 0,
+                    "win_trades": 0,
+                    "loss_trades": 0,
+                    "win_rate": 0.0,
+                    "source": "hyperliquid"
+                }
+            }
+
+        # Default: paper trading account
+        from trading.paper.supabase_service import SupabasePaperTradingService
         service = SupabasePaperTradingService()
 
         # Get account summary

@@ -26,7 +26,8 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
     - Recent decisions (5 per bot, last 2 hours)
     - Account summaries enhanced with portfolio analytics
 
-    Enhanced with runtime data from scheduler, Redis execution status, and Symphony API.
+    Enhanced with runtime data from scheduler, Redis execution status, and exchange APIs
+    (Symphony, AsterDEX, Hyperliquid).
 
     Args:
         user_id: User UUID string
@@ -46,22 +47,28 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
             # Fetch pause_reason from Redis for inactive bots (async operation)
             await _fetch_pause_reasons_for_bots(db_data['bots'])
 
-        # Enrich Symphony/Aster positions with live API data
+        # Enrich live positions with exchange API data
         # account_snapshots handles account-level metrics, but individual positions
         # need enrichment because the DB query returns NULL for live position details
-        if db_data.get('bots') and db_data.get('positions'):
-            enriched_positions, enriched_accounts = await _enrich_live_positions_and_accounts(
-                db_data.get('bots', []),
-                db_data.get('positions', []),
-                db_data.get('accounts', [])
+        if db_data.get('bots'):
+            # Check for any live trading bots (symphony, aster, hyperliquid)
+            has_live_bots = any(
+                b.get('trading_mode') in ('symphony', 'aster', 'hyperliquid')
+                for b in db_data['bots']
             )
-            db_data['positions'] = enriched_positions
-            # Merge enriched accounts (don't replace, as paper accounts come from DB)
-            if enriched_accounts:
-                existing_config_ids = {a.get('config_id') for a in db_data.get('accounts', [])}
-                for account in enriched_accounts:
-                    if account.get('config_id') not in existing_config_ids:
-                        db_data['accounts'].append(account)
+            if has_live_bots:
+                enriched_positions, enriched_accounts = await _enrich_live_positions_and_accounts(
+                    db_data.get('bots', []),
+                    db_data.get('positions', []) or [],
+                    db_data.get('accounts', [])
+                )
+                db_data['positions'] = enriched_positions
+                # Merge enriched accounts (don't replace, as paper accounts come from DB)
+                if enriched_accounts:
+                    existing_config_ids = {a.get('config_id') for a in db_data.get('accounts', [])}
+                    for account in enriched_accounts:
+                        if account.get('config_id') not in existing_config_ids:
+                            db_data['accounts'].append(account)
 
         return db_data
 
@@ -123,6 +130,16 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         FROM live_trades lt
         INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
         WHERE lt.closed_at IS NULL AND bc.trading_mode = 'aster'
+
+        UNION ALL
+
+        -- Hyperliquid trading positions (batch_ids only - details fetched from Hyperliquid Info API)
+        SELECT lt.config_id, lt.batch_id::text AS position_id, lt.symbol AS symbol, NULL AS side, NULL AS size_usd,
+               NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
+               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'hyperliquid' AS source
+        FROM live_trades lt
+        INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
+        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'hyperliquid'
         ORDER BY opened_at DESC
     ),
     recent_decisions AS (
@@ -364,11 +381,12 @@ async def _enrich_live_positions_and_accounts(
     accounts: List[Dict[str, Any]]
 ) -> tuple:
     """
-    Fetch Symphony and AsterDEX data for live/aster bots and merge with SSE response.
+    Fetch live exchange data for Symphony, AsterDEX, and Hyperliquid bots
+    and merge with SSE response.
 
     Args:
         bots: List of bot configurations
-        positions: List of positions from database (may include live/aster batch_ids)
+        positions: List of positions from database (may include live/aster/hyperliquid batch_ids)
         accounts: List of accounts from database (paper only)
 
     Returns:
@@ -376,15 +394,18 @@ async def _enrich_live_positions_and_accounts(
     """
     from trading.live.symphony_service import SymphonyLiveTradingService
     from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+    from trading.live.hyperliquid_service import HyperliquidLiveTradingService
 
     symphony = SymphonyLiveTradingService()
     aster = AsterDEXV3LiveTradingService()
+    hyperliquid = HyperliquidLiveTradingService()
 
-    # Filter for symphony and aster bots
+    # Filter bots by trading mode
     symphony_bots = [b for b in bots if b.get('trading_mode') == 'symphony']
     aster_bots = [b for b in bots if b.get('trading_mode') == 'aster']
+    hyperliquid_bots = [b for b in bots if b.get('trading_mode') == 'hyperliquid']
 
-    if not symphony_bots and not aster_bots:
+    if not symphony_bots and not aster_bots and not hyperliquid_bots:
         return positions, accounts
 
     enriched_positions = list(positions)
@@ -490,8 +511,82 @@ async def _enrich_live_positions_and_accounts(
                 elif isinstance(positions_result, Exception):
                     logger.warning(f"Failed to fetch Aster positions for {config_id}: {positions_result}")
 
+        # Fetch Hyperliquid data for hyperliquid bots
+        if hyperliquid_bots:
+            # Group bots by user_id to avoid duplicate API calls per user
+            user_bots: Dict[str, List[Dict[str, Any]]] = {}
+            for bot in hyperliquid_bots:
+                uid = bot.get('user_id', '')
+                if uid not in user_bots:
+                    user_bots[uid] = []
+                user_bots[uid].append(bot)
+
+            for user_id, bots_for_user in user_bots.items():
+                try:
+                    # Fetch account metrics + positions once per user
+                    # (all bots share same Hyperliquid account)
+                    hl_tasks = []
+                    for bot in bots_for_user:
+                        config_id = bot['config_id']
+                        hl_tasks.append(hyperliquid.get_account_metrics(config_id, user_id))
+                        hl_tasks.append(hyperliquid.get_open_positions(config_id, user_id))
+
+                    hl_results = await asyncio.gather(*hl_tasks, return_exceptions=True)
+
+                    for i, bot in enumerate(bots_for_user):
+                        config_id = bot['config_id']
+
+                        # Account metrics (even indices)
+                        account_result = hl_results[i * 2]
+                        if isinstance(account_result, dict) and account_result.get('status') == 'success':
+                            enriched_accounts.append({
+                                'config_id': config_id,
+                                'source': 'hyperliquid',
+                                'account_id': f"hyperliquid_{config_id}",
+                                'current_balance': account_result.get('balance'),
+                                'available_balance': account_result.get('available_balance'),
+                                'unrealized_pnl': account_result.get('total_unrealized_pnl'),
+                                'open_positions': account_result.get('positions_count', 0),
+                            })
+                        elif isinstance(account_result, Exception):
+                            logger.warning(f"Failed to fetch Hyperliquid account for {config_id}: {account_result}")
+
+                        # Positions (odd indices)
+                        positions_result = hl_results[i * 2 + 1]
+                        if isinstance(positions_result, list):
+                            # Remove placeholder hyperliquid positions from DB
+                            enriched_positions = [
+                                p for p in enriched_positions
+                                if not (p.get('config_id') == config_id and p.get('source') == 'hyperliquid')
+                            ]
+
+                            # Add enriched Hyperliquid positions
+                            for pos in positions_result:
+                                enriched_positions.append({
+                                    'config_id': config_id,
+                                    'position_id': pos.get('batch_id'),
+                                    'symbol': pos.get('symbol'),
+                                    'side': pos.get('side'),
+                                    'size_usd': float(pos.get('size', 0)) * float(pos.get('entry_price', 0)),
+                                    'entry_price': pos.get('entry_price'),
+                                    'current_price': None,  # Computed client-side from all_mids or price service
+                                    'unrealized_pnl': pos.get('unrealized_pnl'),
+                                    'opened_at': None,
+                                    'stop_loss': None,
+                                    'take_profit': None,
+                                    'liquidation_price': pos.get('liquidation_price'),
+                                    'leverage': pos.get('leverage'),
+                                    'margin_type': pos.get('margin_type', 'cross'),
+                                    'source': 'hyperliquid'
+                                })
+                        elif isinstance(positions_result, Exception):
+                            logger.warning(f"Failed to fetch Hyperliquid positions for {config_id}: {positions_result}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to enrich Hyperliquid data for user {user_id}: {e}")
+
     except Exception as e:
-        logger.error(f"Failed to enrich live/aster positions and accounts: {e}")
+        logger.error(f"Failed to enrich live positions and accounts: {e}")
         # Return original data on error
 
     return enriched_positions, enriched_accounts

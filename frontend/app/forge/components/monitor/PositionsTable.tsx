@@ -21,7 +21,7 @@ interface Position {
   take_profit?: number
   liquidation_price?: number  // Liquidation price (from Symphony)
   leverage: number
-  source?: 'paper' | 'live' | 'symphony' | 'aster'  // Track position source
+  source?: 'paper' | 'live' | 'symphony' | 'aster' | 'hyperliquid'  // Track position source
 }
 
 interface PositionsTableProps {
@@ -81,7 +81,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
   }
 
   // Handle closing a position (paper, symphony, or aster)
-  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' | 'symphony' | 'aster' = 'paper') => {
+  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' | 'symphony' | 'aster' | 'hyperliquid' = 'paper') => {
     if (!selectedConfigId) {
       console.error('No config ID selected')
       return
@@ -127,6 +127,21 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
         const result = await response.json()
         console.log('Aster position closed:', result)
         alert('✅ Aster position closed successfully!')
+      } else if (source === 'hyperliquid') {
+        // Close Hyperliquid position
+        const response = await fetch(`${baseUrl}/api/v2/positions/hyperliquid/${positionId}/close`, {
+          method: 'POST',
+          headers
+        })
+
+        if (!response.ok) {
+          const error = await response.text()
+          throw new Error(`Failed to close Hyperliquid position: ${error}`)
+        }
+
+        const result = await response.json()
+        console.log('Hyperliquid position closed:', result)
+        alert('✅ Hyperliquid position closed successfully!')
       } else {
         // Close paper position (existing logic)
         const result = await apiClient.closePosition(selectedConfigId, positionId)

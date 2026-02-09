@@ -32,8 +32,12 @@ python ggbot.py
 
 # Frontend
 cd frontend && npm run dev     # Development
-cd frontend && npm run build   # Production build
+cd frontend && npx tsc --noEmit  # Type-check only (use instead of build)
 cd frontend && npm run lint    # Lint check
+
+# IMPORTANT: Do NOT run `npm run build` locally — Web3 dependencies (wagmi, viem,
+# RainbowKit) cause OOM crashes on the VM. Use `npx tsc --noEmit` for type-checking
+# and let Vercel handle production builds via git push.
 
 # Testing (ALWAYS confirm with user before running)
 python -m tests.test_name
@@ -210,7 +214,7 @@ case 'live_trading':
 
 ### Frontend Deployment
 - We deploy frontend to Vercel by pushing to git. We do not use localhost for user testing.
-- You can test builds locally to see if they compile, but when it comes to seeing console logs, you will need to ask the user to share them.
+- **NEVER run `npm run build` locally** — Web3 dependencies cause OOM and crash the VM. Use `npx tsc --noEmit` for type-checking instead.
 - The user will access the deployed frontend on Vercel. Any changes you make if you want them tested will need to be done via this method of pushing to git and having the user share the console logs with you.
 
 ---

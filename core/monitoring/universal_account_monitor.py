@@ -16,7 +16,7 @@ from typing import Dict, Optional, List
 from core.common.db import get_db_connection
 from core.common.logger import logger as base_logger
 from core.domain.account_snapshot import AccountSnapshot
-from core.monitoring.adapters import PaperAccountAdapter, SymphonyAccountAdapter, AsterAccountAdapter
+from core.monitoring.adapters import PaperAccountAdapter, SymphonyAccountAdapter, AsterAccountAdapter, HyperliquidAccountAdapter
 from core.monitoring.usage_monitor import UsageMonitor
 
 # Create monitoring logger
@@ -47,7 +47,8 @@ class UniversalAccountMonitor:
         self.adapters = {
             'paper': PaperAccountAdapter(),
             'symphony': SymphonyAccountAdapter(),
-            'aster': AsterAccountAdapter()
+            'aster': AsterAccountAdapter(),
+            'hyperliquid': HyperliquidAccountAdapter()
         }
 
         # Usage monitoring for billing/credit enforcement

@@ -103,7 +103,9 @@ class AccountSnapshot:
             )
 
         else:
-            # Live modes (symphony/aster): total_pnl already includes everything
+            # Live modes (symphony/aster/hyperliquid): total_pnl = per-bot cumulative P&L
+            # For shared accounts (Hyperliquid), this is realized + unrealized for
+            # this bot's symbols only — not the shared account balance
             return self.total_pnl
 
     @property
