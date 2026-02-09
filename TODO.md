@@ -24,12 +24,11 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ## 🔥 **HIGH PRIORITY - Hyperliquid Live Trading Integration** [HYPERLIQUID_INTEGRATION.md]
 
-**Status**: 🟢 PHASE 2 COMPLETE — Forge integration live (Settings, Bot Creation, Activation)
+**Status**: 🟢 PHASE 3 COMPLETE — Dashboard monitoring + account adapter live
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
 **Priority**: P1 — Replaces blocked Symphony integration
-**Estimated Effort**: 32-44 hours across 4 phases
 
-**Summary**: Non-custodial live trading via Hyperliquid. Users connect wallet → deposit USDC → authorize ggbots API wallet → bot trades 291 perp markets. API wallets cryptographically cannot withdraw funds (protocol-enforced). Reuses existing Web3 infra from Arena (wagmi/RainbowKit).
+**Summary**: Non-custodial live trading via Hyperliquid. Users connect wallet → deposit USDC → authorize ggbots API wallet → bot trades 228 perp markets. API wallets cryptographically cannot withdraw funds (protocol-enforced). Reuses existing Web3 infra from Arena (wagmi/RainbowKit).
 
 ### **Phase 1: Backend Trading Service** ✅ COMPLETE (2026-02-08)
 - [x] Create `trading/live/hyperliquid_service.py` (HyperliquidLiveTradingService)
@@ -63,11 +62,16 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] `permissions.tsx` — `refreshProfile()` for real-time state updates after connect/disconnect
 - [x] `RiskAcknowledgmentModal.tsx` — accepts `'hyperliquid'` trading mode
 
-### **Phase 3: Dashboard Integration** (~6-8 hours)
-- [ ] Create `core/monitoring/adapters/hyperliquid_adapter.py`
-- [ ] Add Hyperliquid branch to SSE `_enrich_live_positions_and_accounts()`
-- [ ] Add 'hyperliquid' source type to `PositionsTable.tsx`
-- [ ] Add Hyperliquid position/trade API methods to `frontend/lib/api.ts`
+### **Phase 3: Dashboard Integration** ✅ COMPLETE (2026-02-09)
+- [x] `HyperliquidAccountAdapter` — queries Info API `user_state`, per-bot P&L via symbol attribution
+- [x] Registered in `UniversalAccountMonitor` (4 adapters: paper/symphony/aster/hyperliquid)
+- [x] SSE dashboard: Hyperliquid CTE in DB query + `_enrich_live_positions_and_accounts()` enrichment
+- [x] `PerformanceChart.tsx` — recognizes `source: 'hyperliquid'` → cumulative P&L mode (starts at $0)
+- [x] `PositionsTable.tsx` — close routing for Hyperliquid positions
+- [x] `POST /api/v2/positions/hyperliquid/{batch_id}/close` endpoint
+- [x] `GET /bot/{config_id}/account` and `/positions` handle `trading_mode='hyperliquid'`
+- [x] Info API exploration test (`scripts/tests/test_hyperliquid_info_api.py` — 12 endpoints)
+- **Key design**: Shared account problem solved — per-bot cumulative P&L (realized+unrealized), not shared balance. Same pattern as Symphony.
 
 ### **Phase 4: Polish + Production** (~4-6 hours)
 - [ ] Error handling (insufficient balance, rate limits, network errors)

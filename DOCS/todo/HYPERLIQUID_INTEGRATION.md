@@ -1,7 +1,7 @@
 # Hyperliquid Live Trading Integration
 
 **Created**: 2026-02-08
-**Updated**: 2026-02-08
+**Updated**: 2026-02-09
 **Purpose**: Replace Symphony/Aster with non-custodial Hyperliquid perpetual futures trading
 **Priority**: P1 — Core product feature, replaces blocked Symphony integration
 
@@ -235,44 +235,70 @@ ADD COLUMN hyperliquid_vault_id UUID;  -- Supabase Vault reference for API walle
 
 ---
 
-### Phase 2: Frontend Wallet Connection + Deposit (~10-14 hours)
+### Phase 1.5: Frontend Setup Page + Mainnet Test ✅ COMPLETE (2026-02-09)
 
-**Goal**: Users can connect wallet, deposit to Hyperliquid, and authorize ggbots.
+**Goal**: Isolated `/hyperliquid` page for complete setup flow + mainnet verification.
 
-#### 2a. Wallet Connection (Reuse Arena Infra)
+**Result**: Verified end-to-end — $10 USDC deposit → authorize → test trade (0.01 ETH @ $2,071.90) → close.
 
-**Existing files to extend**:
-- `frontend/lib/wagmi-config.ts` — Already has Scroll chain; add Arbitrum
-- `frontend/lib/contracts.ts` — Add USDC contract on Arbitrum + Hyperliquid bridge address
-- Web3 providers already in Arena page; extend to settings/live-trading page
+#### Files Created
 
-#### 2b. Hyperliquid Setup Modal
+| File | Purpose |
+|------|---------|
+| `frontend/lib/hyperliquid-config.ts` | Arbitrum wagmi config, EIP-712 domain/types, USDC + bridge addresses |
+| `frontend/components/hyperliquid/HyperliquidSetup.tsx` | Main component (~550 lines): wallet connect, deposit, withdraw, authorize, status, test trade |
+| `frontend/app/hyperliquid/page.tsx` | Route with `dynamic()` import, SSR disabled |
+| `frontend/app/hyperliquid/layout.tsx` | Metadata only |
 
-**New component**: `frontend/components/hyperliquid/HyperliquidSetupModal.tsx`
+#### Files Modified
 
-3-step guided flow:
-1. **Connect Wallet** — RainbowKit connect button (reuse)
-2. **Deposit USDC** — Amount input, "Deposit" button → `writeContract` USDC transfer to bridge
-3. **Authorize Trading** — "Authorize ggbots" button → signs `ApproveAgent` transaction
+| File | Changes |
+|------|---------|
+| `frontend/lib/api.ts` | Added `setupHyperliquid`, `getHyperliquidStatus`, `disconnectHyperliquid`, `testHyperliquidTrade` |
+| `ggbot.py` | Added 4 endpoints: `POST /setup`, `GET /status`, `POST /disconnect`, `POST /test-trade` under `/api/v2/hyperliquid/` |
 
-Backend endpoint to receive and store the API wallet key after step 3.
+#### Key Technical Decisions & Lessons
 
-#### 2c. Live Trading Settings Page
+**Separate wagmi config**: Arena uses Scroll chain, Hyperliquid uses Arbitrum. Each page gets its own `WagmiProvider` + `QueryClient` to avoid chain conflicts. Cannot share a single wagmi config across chains.
 
-**New section in settings or bot config**:
-- Connection status (wallet connected? deposited? authorized?)
-- Hyperliquid balance display (query Info API)
-- Deposit more / Withdraw buttons
-- Revoke authorization button (deregister agent)
+**EIP-712 signing chainId**: The Python SDK uses `0x66eee` (421614) as `signatureChainId`, but viem (browser) enforces that the EIP-712 domain `chainId` must match the connected wallet's active chain. Since the user is on Arbitrum (42161), we must use `0xa4b1` (42161) for both the domain and the `signatureChainId` in the action payload. Hyperliquid accepts any signatureChainId — their comment: *"signatureChainId is the chain used by the wallet to sign and can be any chain."*
 
-#### 2d. Trading Mode Selector
+**Deposit flow**: On-chain ERC-20 `transfer()` of USDC to Hyperliquid bridge contract (`0x2df1c51e09aecf9cacb7bc98cb1742757f163df7`). Uses wagmi's `useWriteContract` + `useWaitForTransactionReceipt`. Costs Arbitrum gas (~$0.01). Min $5.
+
+**Withdrawal flow**: Off-chain EIP-712 signed message (`withdraw3` action type) POSTed to Hyperliquid REST API. Zero gas. Uses `useSignTypedData` with the same domain as authorize. Funds arrive on Arbitrum in ~3-4 minutes.
+
+**market_open response gotcha**: Top-level `status: "ok"` does NOT mean the order was filled. Must check `response.data.statuses[]` for `"filled"` objects (success) or `"error"` strings (rejection). Initial test with 0.001 ETH silently failed — likely below minimum notional. 0.01 ETH works reliably.
+
+**MetaMask display**: The `verifyingContract: 0x0000...` shows as "null:0x0..." in MetaMask — this is cosmetic only, correct for Hyperliquid's off-chain signing pattern.
+
+#### Backend Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/v2/hyperliquid/setup` | POST | Store API wallet key + wallet address, verify account exists via `user_state()` |
+| `/api/v2/hyperliquid/status` | GET | Return connection status + live balance/positions from Hyperliquid Info API |
+| `/api/v2/hyperliquid/disconnect` | POST | Delete Vault secret, null profile columns, set all HL bots to paper mode |
+| `/api/v2/hyperliquid/test-trade` | POST | Open 0.01 ETH long at 3x, wait 2s, close. Returns entry price + close status |
+
+---
+
+### Phase 2: Forge Integration (~6-10 hours)
+
+**Goal**: Users can select `trading_mode='hyperliquid'` in the Forge bot configuration UI.
+
+#### 2a. Trading Mode Selector
 
 **File**: `frontend/app/forge/components/configure/TradeSettings.tsx`
 
 Add `hyperliquid` option alongside `paper`/`symphony`/`aster`:
-- Permission-gated (requires active subscription + wallet setup)
-- Shows warning about real money
+- Check Hyperliquid connection status via `/api/v2/hyperliquid/status`
+- If not connected, show link to `/hyperliquid` setup page
+- If connected, show account balance + allocation indicator
 - **Account allocation indicator**: Show how much of the user's Hyperliquid account is already allocated across other live bots (e.g., "60% allocated to other bots, 40% available"). Warn if `max_margin_percent` would push total over 100%.
+
+#### 2b. Activation Gate
+
+Bot activation (`can_activate_bots`) already gates all live trading. Additional check: require valid Hyperliquid credentials before allowing `trading_mode='hyperliquid'` bots to activate. If credentials are missing/invalid, show clear error with link to setup page.
 
 ---
 
@@ -361,16 +387,17 @@ Add Hyperliquid branch to `_enrich_live_positions_and_accounts()`:
 
 ## Estimated Timeline
 
-| Phase | Effort | Dependencies |
-|-------|--------|-------------|
-| Phase 1: Backend service | 12-16 hours | None |
-| Phase 2: Frontend wallet + deposit | 10-14 hours | Phase 1 |
-| Phase 3: Dashboard integration | 6-8 hours | Phase 1 |
-| Phase 4: Polish + production | 4-6 hours | Phase 2 + 3 |
-| **Total** | **32-44 hours** | |
+| Phase | Effort | Status |
+|-------|--------|--------|
+| Phase 1: Backend service | ~8 hours | ✅ COMPLETE (2026-02-08) |
+| Phase 1.5: Frontend setup + mainnet test | ~4 hours | ✅ COMPLETE (2026-02-09) |
+| Phase 2: Forge integration | 6-10 hours | ✅ COMPLETE (2026-02-09) |
+| Phase 3: Dashboard integration | 6-8 hours | ✅ COMPLETE (2026-02-09) |
+| Phase 4: Polish + production | 4-6 hours | Planned |
+| **Total** | **~28-36 hours** | |
 
-Phase 1 and partial Phase 3 (adapter) can be developed in parallel.
-Phase 2 and Phase 3 (SSE/frontend) can be developed in parallel after Phase 1.
+Phase 2 and Phase 3 can be developed in parallel.
+Phase 1.5 was originally scoped as a manual test but evolved into the full frontend setup page (deposit, withdraw, authorize, test trade) — pulling forward most of the planned Phase 2 wallet/deposit work.
 
 ---
 

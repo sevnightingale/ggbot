@@ -6,6 +6,39 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-09 - Hyperliquid Phase 3: Dashboard Monitoring + Account Adapter
+
+**Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
+
+**Summary**: Hyperliquid positions and P&L now flow through dashboard SSE. Per-bot P&L tracking via symbol attribution (shared wallet, per-bot cumulative P&L). Same pattern as Symphony — chart shows "Cumulative P&L" from $0.
+
+**New: HyperliquidAccountAdapter** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- Queries `Info.user_state()` (118ms) for account balance, margin, positions
+- Cross-references `live_trades` to attribute positions to specific bots by symbol
+- Computes per-bot realized P&L from `user_fills_by_time()` (77ms)
+- Detects closed positions via fill history, logs `trade_exit` activities
+- Caches wallet address per user_id to avoid repeated Vault lookups
+
+**Backend** (`ggbot.py`, `dashboard_data.py`, `account_snapshot.py`, `universal_account_monitor.py`):
+- `POST /api/v2/positions/hyperliquid/{batch_id}/close` — close with ownership verification
+- `/bot/{config_id}/account` + `/positions` handle `trading_mode='hyperliquid'`
+- SSE CTE: added `UNION ALL` for Hyperliquid `live_trades` in `open_positions`
+- `_enrich_live_positions_and_accounts()` fetches real positions from Info API, groups by user_id
+- `total_equity` property: returns `total_pnl` for all live modes (per-bot cumulative P&L)
+- `UniversalAccountMonitor`: 4 adapters (paper/symphony/aster/hyperliquid)
+
+**Frontend** (`PerformanceChart.tsx`, `PositionsTable.tsx`):
+- `source: 'hyperliquid'` triggers cumulative P&L mode (start at $0, title: "Cumulative P&L")
+- Position close routing via `/api/v2/positions/hyperliquid/{batch_id}/close`
+
+**Info API Exploration** (`scripts/tests/test_hyperliquid_info_api.py`):
+- 12 endpoints tested: user_state, open_orders, frontend_open_orders, user_fills, user_fills_by_time, all_mids, candles_snapshot, meta_and_asset_ctxs, portfolio, user_fees, user_funding_history, user_non_funding_ledger_updates, extra_agents, user_rate_limit
+- Latency: 73-258ms range. 228 perp markets, 512 mids (includes spot), 10,435 req/min cap
+
+**CLAUDE.md**: Added `npx tsc --noEmit` as type-check command; documented OOM risk with `npm run build` (Web3 deps)
+
+---
+
 ## 2026-02-09 - Hyperliquid Phase 2: Forge Integration (Live Trading)
 
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
