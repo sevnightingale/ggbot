@@ -805,11 +805,14 @@ class GGBotOrchestrator:
             from signals.publishing_service import publish_signal_to_telegram
 
             # Enrich signal_data with bot context for scheduled_trading bots
+            trading_mode = getattr(config, 'trading_mode', 'paper')
+            live_tag = 'Hyperliquid' if trading_mode == 'hyperliquid' else None
             enriched_signal_data = {
                 **signal_data,
                 'bot_name': config.config_name,
                 'symbol': config.selected_pair,
-                'config_type': config.config_type
+                'config_type': config.config_type,
+                'live_tag': live_tag
             }
 
             success = await publish_signal_to_telegram(

@@ -11,13 +11,15 @@ Key responsibilities:
 - Query open positions from Hyperliquid Info API
 - Save audit trail to live_trades table (provider='hyperliquid')
 - Idempotency protection (prevent duplicate trades)
+- Telegram exit notifications (entry notifications handled by orchestrator)
 
 SDK: hyperliquid-python-sdk
 Authentication: Per-user API wallet private key from Vault
-Rate Limits: 1,200 requests/min
+Rate Limits: 1,200 requests/min (measured ~10,400 actual)
 """
 
 import asyncio
+import time
 import uuid
 from typing import Dict, Any, List, Optional
 
@@ -32,6 +34,43 @@ from core.common.activity_logger import log_activity_safe
 from core.symbols.standardizer import UniversalSymbolStandardizer
 
 
+# Known Hyperliquid error patterns for categorization
+_INSUFFICIENT_MARGIN_PATTERNS = [
+    "insufficient margin",
+    "not enough margin",
+    "margin exceeded",
+    "account value too low",
+    "insufficient balance",
+]
+_RATE_LIMIT_PATTERNS = [
+    "rate limit",
+    "too many requests",
+    "429",
+]
+_AGENT_EXPIRED_PATTERNS = [
+    "agent not found",
+    "agent expired",
+    "unauthorized agent",
+    "not authorized",
+    "invalid api wallet",
+]
+
+
+def _classify_error(error_str: str) -> str:
+    """Classify a Hyperliquid error string into a category."""
+    lower = error_str.lower()
+    for pattern in _INSUFFICIENT_MARGIN_PATTERNS:
+        if pattern in lower:
+            return "insufficient_balance"
+    for pattern in _RATE_LIMIT_PATTERNS:
+        if pattern in lower:
+            return "rate_limit"
+    for pattern in _AGENT_EXPIRED_PATTERNS:
+        if pattern in lower:
+            return "credentials_expired"
+    return "unknown"
+
+
 class HyperliquidLiveTradingService:
     """
     Hyperliquid live trading service.
@@ -40,6 +79,10 @@ class HyperliquidLiveTradingService:
     Each user's main wallet authorizes an API wallet that can only trade (not withdraw).
     Saves trades to live_trades table with provider='hyperliquid'.
     """
+
+    # Retry config for transient failures
+    MAX_RETRIES = 2
+    RETRY_DELAY_BASE = 1.0  # seconds, doubles each retry
 
     def __init__(self):
         """Initialize Hyperliquid service."""
@@ -184,8 +227,8 @@ class HyperliquidLiveTradingService:
             available = account_value - total_margin_used
 
             if account_value <= 0:
-                self._log.warning("No account value found, using minimum quantity")
-                return 0.001
+                self._log.error("Hyperliquid account has zero balance — cannot size position")
+                return 0.0  # Signal to caller that position cannot be sized
 
             self._log.info(
                 f"Hyperliquid account: ${account_value:.2f} total, "
@@ -374,6 +417,13 @@ class HyperliquidLiveTradingService:
 
             # Validate minimum quantity
             min_quantity = 0.001
+            if quantity <= 0:
+                return {
+                    "status": "failed",
+                    "reason": "Insufficient balance on Hyperliquid. Deposit more USDC to trade.",
+                    "error_category": "insufficient_balance",
+                    "batch_id": None
+                }
             if quantity < min_quantity:
                 self._log.warning(
                     f"Quantity {quantity} below minimum {min_quantity}, adjusting to minimum"
@@ -418,37 +468,117 @@ class HyperliquidLiveTradingService:
                 except Exception as e:
                     self._log.warning(f"Failed to apply default SL/TP: {e}")
 
-            # Step 9: Execute market order
+            # Step 9: Execute market order with retry for transient errors
             is_buy = action.lower() == "long"
             self._log.info(
                 f"Placing market order: {'BUY' if is_buy else 'SELL'} {quantity} {hl_symbol}"
             )
 
-            order_result = exchange.market_open(
-                hl_symbol,
-                is_buy,
-                quantity,
-                slippage=0.05  # 5% slippage tolerance
-            )
+            order_result = None
+            last_error = None
+            for attempt in range(self.MAX_RETRIES + 1):
+                try:
+                    order_result = exchange.market_open(
+                        hl_symbol,
+                        is_buy,
+                        quantity,
+                        slippage=0.05  # 5% slippage tolerance
+                    )
+                    break  # Success — exit retry loop
+                except Exception as net_err:
+                    last_error = str(net_err)
+                    error_cat = _classify_error(last_error)
+                    if error_cat == "rate_limit" and attempt < self.MAX_RETRIES:
+                        delay = self.RETRY_DELAY_BASE * (2 ** attempt)
+                        self._log.warning(
+                            f"Rate limited on attempt {attempt + 1}, retrying in {delay:.1f}s"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    elif error_cat in ("insufficient_balance", "credentials_expired"):
+                        # Non-retryable — return immediately with clear message
+                        self._log.error(f"Non-retryable error: {last_error}")
+                        reason_map = {
+                            "insufficient_balance": "Insufficient balance on Hyperliquid. Deposit more USDC or reduce position size.",
+                            "credentials_expired": "API wallet expired or deregistered. Reconnect in Settings → Live Trading.",
+                        }
+                        return {
+                            "status": "failed",
+                            "reason": reason_map.get(error_cat, last_error),
+                            "error_category": error_cat,
+                            "batch_id": None
+                        }
+                    elif attempt < self.MAX_RETRIES:
+                        delay = self.RETRY_DELAY_BASE * (2 ** attempt)
+                        self._log.warning(
+                            f"Network error on attempt {attempt + 1}: {net_err}, retrying in {delay:.1f}s"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        self._log.error(f"All {self.MAX_RETRIES + 1} attempts failed: {net_err}")
+                        return {
+                            "status": "failed",
+                            "reason": f"Network error after {self.MAX_RETRIES + 1} attempts: {last_error}",
+                            "error_category": "network",
+                            "batch_id": None
+                        }
 
-            if order_result.get("status") != "ok":
-                self._log.error(f"Market order failed: {order_result}")
+            # Check top-level status
+            if not order_result or order_result.get("status") != "ok":
+                error_msg = str(order_result) if order_result else "No response"
+                error_cat = _classify_error(error_msg)
+                self._log.error(f"Market order failed: {error_msg}")
+                reason_map = {
+                    "insufficient_balance": "Insufficient balance on Hyperliquid. Deposit more USDC or reduce position size.",
+                    "credentials_expired": "API wallet expired or deregistered. Reconnect in Settings → Live Trading.",
+                }
                 return {
                     "status": "failed",
-                    "reason": f"Market order rejected: {order_result}",
+                    "reason": reason_map.get(error_cat, f"Market order rejected: {error_msg}"),
+                    "error_category": error_cat,
                     "batch_id": None
                 }
 
-            # Extract fill info
+            # Extract fill info — CRITICAL: top-level "ok" doesn't mean filled
+            # Must check statuses[] for "filled" or "error"
             statuses = order_result.get("response", {}).get("data", {}).get("statuses", [])
             filled_info = None
+            fill_error = None
             for status in statuses:
-                if "filled" in status:
+                if isinstance(status, dict) and "filled" in status:
                     filled_info = status["filled"]
                     break
+                elif isinstance(status, str) and "error" in status.lower():
+                    fill_error = status
+                elif isinstance(status, dict) and "error" in status:
+                    fill_error = status["error"]
 
-            entry_price = float(filled_info["avgPx"]) if filled_info else 0
-            filled_sz = float(filled_info["totalSz"]) if filled_info else quantity
+            if fill_error:
+                error_cat = _classify_error(str(fill_error))
+                self._log.error(f"Order fill error: {fill_error}")
+                reason_map = {
+                    "insufficient_balance": "Insufficient margin for this trade. Deposit more USDC or reduce position size/leverage.",
+                    "credentials_expired": "API wallet expired or deregistered. Reconnect in Settings → Live Trading.",
+                }
+                return {
+                    "status": "failed",
+                    "reason": reason_map.get(error_cat, f"Order rejected: {fill_error}"),
+                    "error_category": error_cat,
+                    "batch_id": None
+                }
+
+            if not filled_info:
+                self._log.error(f"No fill confirmation in statuses: {statuses}")
+                return {
+                    "status": "failed",
+                    "reason": "Order submitted but no fill confirmation received. Check Hyperliquid dashboard.",
+                    "error_category": "no_fill",
+                    "batch_id": None
+                }
+
+            entry_price = float(filled_info["avgPx"])
+            filled_sz = float(filled_info["totalSz"])
 
             # Generate batch_id for tracking
             batch_id = str(uuid.uuid4())
@@ -659,15 +789,37 @@ class HyperliquidLiveTradingService:
                 except Exception as e:
                     self._log.warning(f"Failed to cancel TP order {tp_order_id}: {e}")
 
-            # Step 4: Close position via market_close
+            # Step 4: Close position via market_close with retry
             self._log.info(f"Closing position: {hl_symbol}")
-            close_result = exchange.market_close(hl_symbol)
+            close_result = None
+            for attempt in range(self.MAX_RETRIES + 1):
+                try:
+                    close_result = exchange.market_close(hl_symbol)
+                    break
+                except Exception as net_err:
+                    error_cat = _classify_error(str(net_err))
+                    if error_cat == "rate_limit" and attempt < self.MAX_RETRIES:
+                        delay = self.RETRY_DELAY_BASE * (2 ** attempt)
+                        self._log.warning(f"Rate limited on close attempt {attempt + 1}, retrying in {delay:.1f}s")
+                        await asyncio.sleep(delay)
+                        continue
+                    elif attempt < self.MAX_RETRIES:
+                        delay = self.RETRY_DELAY_BASE * (2 ** attempt)
+                        self._log.warning(f"Network error on close attempt {attempt + 1}: {net_err}, retrying in {delay:.1f}s")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        return {
+                            "status": "failed",
+                            "reason": f"Failed to close position after {self.MAX_RETRIES + 1} attempts: {net_err}"
+                        }
 
             if not close_result or close_result.get("status") != "ok":
-                self._log.error(f"Failed to close position: {close_result}")
+                error_msg = str(close_result) if close_result else "No response"
+                self._log.error(f"Failed to close position: {error_msg}")
                 return {
                     "status": "failed",
-                    "reason": f"Failed to close position: {close_result}"
+                    "reason": f"Failed to close position: {error_msg}"
                 }
 
             # Step 5: Mark trade as closed
@@ -694,6 +846,38 @@ class HyperliquidLiveTradingService:
                 )
             except Exception as e:
                 self._log.warning(f"Failed to log close activity (non-critical): {e}")
+
+            # Step 7: Publish exit notification to Telegram
+            try:
+                from signals.publishing_service import publish_exit_to_telegram
+
+                # Get bot name from config
+                bot_name = 'ggbot'
+                try:
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT config_name FROM configurations WHERE config_id = %s", (config_id,))
+                            result = cur.fetchone()
+                            bot_name = result[0] if result else 'ggbot'
+                except Exception:
+                    pass
+
+                await publish_exit_to_telegram(
+                    config_id=str(config_id),
+                    user_id=str(user_id),
+                    exit_data={
+                        'bot_name': bot_name,
+                        'symbol': symbol,
+                        'side': 'unknown',  # Not tracked in live_trades
+                        'pnl': 0,
+                        'pnl_pct': 0,
+                        'close_reason': 'manual',
+                        'duration_seconds': 0,
+                        'live_tag': 'Hyperliquid'
+                    }
+                )
+            except Exception as e:
+                self._log.warning(f"Failed to publish exit to Telegram (non-critical): {e}")
 
             return {
                 "status": "success",

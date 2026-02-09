@@ -289,6 +289,7 @@ class SignalPublishingService:
                 ])
         else:
             # Scheduled trading: show bot name prominently
+            live_tag = signal_data.get('live_tag')  # e.g., "Hyperliquid"
             message_parts = [
                 f"🤖 {bot_name}",
                 "",
@@ -296,9 +297,10 @@ class SignalPublishingService:
                 f"Confidence: {confidence:.0%}",
                 "",
                 f"Reasoning: {reasoning}",
-                "",
-                "🌐 ggbots.ai"
             ]
+            if live_tag:
+                message_parts.append(f"Live on {live_tag}")
+            message_parts.extend(["", "🌐 ggbots.ai"])
 
         return "\n".join(message_parts)
 
@@ -403,6 +405,7 @@ def _format_exit_message(exit_data: Dict) -> str:
     pnl_pct = exit_data.get('pnl_pct', 0)
     close_reason = exit_data.get('close_reason', 'unknown')
     duration_seconds = exit_data.get('duration_seconds', 0)
+    live_tag = exit_data.get('live_tag')  # e.g., "Hyperliquid"
 
     # Format P&L with color indicator
     if pnl >= 0:
@@ -437,9 +440,12 @@ def _format_exit_message(exit_data: Dict) -> str:
         pnl_display,
         f"Duration: {duration_display}",
         f"Reason: {reason_display}",
-        "",
-        "🌐 ggbots.ai"
     ]
+
+    if live_tag:
+        message_parts.append(f"Live on {live_tag}")
+
+    message_parts.extend(["", "🌐 ggbots.ai"])
 
     return "\n".join(message_parts)
 

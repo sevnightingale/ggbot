@@ -12,11 +12,12 @@
 - **Users with Bots**: 305 (96.8%)
 
 ### Bot Statistics
-- **Total Bots**: 477
-- **Active Bots**: 38 (8.0%)
+- **Total Bots**: 477+
+- **Active Bots**: 38+ (8.0%)
   - Paper: 38
   - Symphony (Live): 0
   - Aster (DEX): 0
+  - Hyperliquid (Live): 1+
 - **Inactive Bots**: 439
 - **Avg Bots per User**: 1.6
 
@@ -191,6 +192,15 @@
 - `POST /api/v2/agent/execute-trade` - Agent trade execution with position size/leverage overrides
 - Note: Aster uses .env credentials (Pro API Web3 ECDSA), frontend UI pending
 
+**Hyperliquid Live Trading**
+- `POST /api/v2/hyperliquid/setup` - Store API wallet key + wallet address
+- `GET /api/v2/hyperliquid/status` - Connection status + live balance/positions
+- `POST /api/v2/hyperliquid/disconnect` - Remove credentials, set bots to paper mode
+- `POST /api/v2/hyperliquid/test-trade` - Open 0.01 ETH long → close (mainnet test)
+- `GET /api/v2/bot/{config_id}/positions` - Open positions (routes to Hyperliquid if trading_mode='hyperliquid')
+- `GET /api/v2/bot/{config_id}/account` - Account metrics from Hyperliquid Info API
+- `POST /api/v2/positions/hyperliquid/{batch_id}/close` - Close position with ownership verification
+
 **Stripe Subscription Management**
 - `POST /api/v2/create-checkout-session` - Create Stripe checkout session
 - `POST /api/v2/stripe-webhook` - Handle Stripe webhook events
@@ -235,11 +245,12 @@
 - **Paper Trading**: $10k isolated accounts per config with 3-second position monitoring
 - **Symphony Live Trading**: Real-money trading via Symphony.io (100 compatible symbols)
 - **AsterDEX Trading**: Decentralized futures with Web3 auth (33 symbols, up to 20x leverage, dynamic position sizing)
-- **Telegram Publishing**: Signal broadcasting to user channels (APPROVED/REJECTED status)
+- **Hyperliquid Live Trading**: Non-custodial DEX perps (228 markets, up to 50x, API wallets, retry logic)
+- **Telegram Publishing**: Signal broadcasting to user channels (APPROVED/REJECTED status, "Live on Hyperliquid" tag)
 - **REST API**: 30+ endpoints for bot control, positions, analytics
 
 ### **account-monitor Service**
-- **Universal Account Monitoring**: Unified monitoring for paper, Symphony, and Aster trading accounts
+- **Universal Account Monitoring**: Unified monitoring for paper, Symphony, Aster, and Hyperliquid trading accounts
 - **5-Second Check Intervals**: Continuous monitoring with on-change detection
 - **Redis Equity Cache**: Total equity cached every 5s for instant activity logging (30s TTL)
 - **Historical Snapshots**: 5-minute heartbeat storage in account_snapshots table
@@ -295,6 +306,7 @@
 - **Paper Trading**: Virtual $10k accounts, risk-free testing
 - **Live Trading**: Symphony.io integration (premium feature, ggBase required)
 - **AsterDEX Trading**: Decentralized futures (33 symbols, up to 20x leverage, competition-ready)
+- **Hyperliquid Live Trading**: Non-custodial DEX perps (228 markets, up to 50x, API wallet model, USDC on Arbitrum)
 
 ### **Rei Decision Engine** (Experimental - 2026-01-27)
 - **Purpose**: Alternative decision engine using Rei Core (reilabs.org) instead of OpenRouter LLMs
@@ -1048,6 +1060,8 @@ df -h
 | `aster_vault_id` | uuid | ✓ |  |
 | `aster_user_wallet` | character varying(42) | ✓ |  |
 | `aster_wallet` | character varying(42) | ✓ |  |
+| `hyperliquid_wallet_address` | character varying(42) | ✓ |  |
+| `hyperliquid_vault_id` | uuid | ✓ |  |
 
 ---
 

@@ -65,6 +65,131 @@ Decision Module → Symphony Trading Service → Symphony.io API → live_trades
 
 ---
 
+## Live Trading with Hyperliquid
+
+**Production-ready non-custodial perpetual futures trading** via Hyperliquid DEX. Users connect their Ethereum wallet, deposit USDC, authorize an API wallet, and their AI bots trade 228 perpetual markets — all without custody risk.
+
+### Key Features
+
+- **Non-Custodial**: API wallets can trade but CANNOT withdraw (protocol-enforced by Hyperliquid)
+- **228 Perp Markets**: Crypto, equities (AAPL, TSLA), commodities (gold, silver) via HIP-3
+- **Up to 50x Leverage**: Flexible leverage per symbol
+- **Zero KYC**: Ethereum wallet IS the account — no registration, no identity verification
+- **Per-User API Wallets**: Each user's private key stored in Supabase Vault
+- **Error Handling**: Retry logic for rate limits/network errors, clear messages for insufficient balance or expired credentials
+- **Telegram Notifications**: Entry and exit signals published with "Live on Hyperliquid" tag
+
+### Hyperliquid Integration Architecture
+
+**Service Layer** (`trading/live/hyperliquid_service.py`):
+```python
+from trading.live.hyperliquid_service import HyperliquidLiveTradingService
+
+service = HyperliquidLiveTradingService()
+
+# Execute trade intent (same format as paper/Symphony/Aster)
+result = await service.execute_trade_intent({
+    "config_id": "uuid",
+    "user_id": "uuid",
+    "symbol": "BTC-USDT",
+    "action": "long",
+    "confidence": 0.75,
+    "stop_loss_price": 95000,
+    "take_profit_price": 105000
+})
+# Returns: {"status": "executed", "batch_id": "uuid", "entry_price": 98500.0}
+```
+
+**What Gets Applied from Config:**
+1. **Position Sizing**: `confidence × max_margin_percent × total_account_value × leverage / price`
+2. **Leverage**: `config.trading.leverage` (1-50x)
+3. **Default SL/TP**: `config.trading.risk_management` defaults if not in decision
+4. **Safety Cap**: Margin capped at 95% of available balance
+
+**Execution Flow:**
+1. Decision Module generates intent with confidence score
+2. Service loads API wallet from Vault, initializes Exchange SDK
+3. Queries Hyperliquid Info API for account balance
+4. Calculates position size using config + confidence + balance
+5. Sets leverage via `exchange.update_leverage()`
+6. Places market order via `exchange.market_open()` with 5% slippage
+7. Validates fill via `statuses[]` (top-level "ok" ≠ filled)
+8. Places separate SL/TP trigger orders
+9. Saves to `live_trades` table with `provider='hyperliquid'`
+10. Retry logic: up to 2 retries for rate limits and network errors
+
+**Error Handling:**
+| Error | Category | User Message |
+|-------|----------|-------------|
+| Insufficient margin | `insufficient_balance` | "Deposit more USDC or reduce position size" |
+| API wallet expired | `credentials_expired` | "Reconnect in Settings → Live Trading" |
+| Rate limit | `rate_limit` | Automatic retry (2 attempts with exponential backoff) |
+| Network error | `network` | Automatic retry, then "Network error after N attempts" |
+| No fill confirmation | `no_fill` | "Check Hyperliquid dashboard" |
+
+### Trust Model
+
+```
+User's Wallet (MetaMask, Coinbase, etc.)
+  └── OWNS funds on Hyperliquid
+  └── CAN deposit, withdraw, trade
+  └── Signs one-time ApproveAgent transaction
+
+ggbots API Wallet (generated keypair)
+  └── CAN trade on behalf of user
+  └── CAN set leverage, manage positions
+  └── CANNOT withdraw funds (protocol-enforced)
+  └── Private key stored in Supabase Vault
+```
+
+### Database Schema
+
+**live_trades Table** (Shared with Symphony/Aster):
+```sql
+-- Provider='hyperliquid', batch_id is UUID (not exchange order ID)
+INSERT INTO live_trades (batch_id, config_id, decision_id, provider, symbol, ...)
+VALUES ('uuid', 'config-uuid', 'decision-uuid', 'hyperliquid', 'BTC-USDT', ...);
+```
+
+### Account Monitoring
+
+**Adapter**: `core/monitoring/adapters/hyperliquid_adapter.py`
+- Queries `Info.user_state()` for account data (118ms avg latency)
+- Per-bot P&L via symbol attribution (cross-references `live_trades`)
+- Shared account model: `current_balance=None` (all bots share one wallet)
+- `total_pnl = realized_pnl + unrealized_pnl` per-bot
+- Dashboard chart shows "Cumulative P&L" starting from $0
+
+### API Endpoints
+
+**Setup & Management** (under `/api/v2/hyperliquid/`):
+- `POST /setup` — Store API wallet + wallet address
+- `GET /status` — Connection status + live balance/positions
+- `POST /disconnect` — Remove credentials, set bots to paper mode
+- `POST /test-trade` — Open 0.01 ETH long, close after 2s
+
+**Trading**:
+- `POST /api/v2/bot/{config_id}/execute` — Routes to Hyperliquid if `trading_mode='hyperliquid'`
+- `GET /api/v2/bot/{config_id}/positions` — Open positions from Hyperliquid Info API
+- `GET /api/v2/bot/{config_id}/account` — Account metrics
+- `POST /api/v2/positions/hyperliquid/{batch_id}/close` — Close position
+
+### Symbol Compatibility
+
+**100 of 228 perp symbols** currently supported (limited by Binance candle pipeline).
+Hyperliquid uses bare base names: "BTC", "ETH", "SOL" (no /USDT suffix).
+See `core/symbols/registry.py` for `hyperliquid_compatible` flags.
+
+### Frontend Integration
+
+**Setup**: Settings modal → LiveTradingSetupModal (wagmi + RainbowKit on Arbitrum)
+**Bot Creation**: Paper + Live Trading modes in BotCreationModal
+**Dashboard**: PerformanceChart recognizes `source: 'hyperliquid'` → cumulative P&L mode
+**Positions**: PositionsTable routes close to `/api/v2/positions/hyperliquid/{batch_id}/close`
+**Activation**: Credential check + unique symbol per active bot
+
+---
+
 ## Live Trading with Symphony.io
 
 **Production-ready live trading** via Symphony.io API integration. Symphony is a non-custodial trading platform that executes trades on behalf of users using smart contracts.
