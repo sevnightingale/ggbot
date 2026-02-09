@@ -561,6 +561,186 @@ class VaultManager:
             logger.bind(user_id=user_id).error(f"Failed to delete Aster credential: {e}")
             return False
 
+    @staticmethod
+    async def store_hyperliquid_credential(
+        user_id: str,
+        api_wallet_private_key: str,
+        wallet_address: str
+    ) -> bool:
+        """
+        Store Hyperliquid API wallet key in Vault and wallet address in user_profiles.
+
+        The API wallet is a separate key authorized by the user's main wallet.
+        It can trade but CANNOT withdraw — enforced at the Hyperliquid protocol level.
+
+        Args:
+            user_id: UUID of the user
+            api_wallet_private_key: API wallet private key to encrypt and store
+            wallet_address: User's main Hyperliquid wallet address (0x...)
+
+        Returns:
+            True if stored successfully, False otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    vault_secret_name = f"hyperliquid_{user_id}".replace("-", "_")
+
+                    # Store API wallet key in Vault (secret first, then name)
+                    cur.execute(
+                        "SELECT vault.create_secret(%s, %s) as secret_id;",
+                        (api_wallet_private_key, vault_secret_name)
+                    )
+                    vault_secret_id = cur.fetchone()[0]
+
+                    # Update user_profiles with vault reference and wallet address
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET hyperliquid_vault_id = %s,
+                            hyperliquid_wallet_address = %s,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (vault_secret_id, wallet_address, user_id))
+
+                    if cur.rowcount == 0:
+                        logger.bind(user_id=user_id).error("User profile not found")
+                        return False
+
+                    conn.commit()
+
+                    logger.bind(user_id=user_id).info(
+                        "Stored Hyperliquid credentials securely"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to store Hyperliquid credential: {e}")
+            return False
+
+    @staticmethod
+    async def get_hyperliquid_credential(user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve Hyperliquid API wallet key from Vault.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            Dict with 'api_wallet_key' and 'wallet_address', or None if not found
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT hyperliquid_vault_id, hyperliquid_wallet_address
+                        FROM user_profiles
+                        WHERE user_id = %s;
+                    """, (user_id,))
+
+                    result = cur.fetchone()
+                    if not result or not result[0]:
+                        return None
+
+                    vault_secret_id, wallet_address = result
+
+                    # Retrieve decrypted API wallet key from Vault
+                    cur.execute("""
+                        SELECT decrypted_secret
+                        FROM vault.decrypted_secrets
+                        WHERE id = %s;
+                    """, (vault_secret_id,))
+
+                    vault_result = cur.fetchone()
+                    if not vault_result:
+                        logger.bind(user_id=user_id).error(
+                            "Vault secret not found for Hyperliquid credential"
+                        )
+                        return None
+
+                    api_wallet_key = vault_result[0]
+                    return {
+                        'api_wallet_key': api_wallet_key,
+                        'wallet_address': wallet_address
+                    }
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to retrieve Hyperliquid credential: {e}")
+            return None
+
+    @staticmethod
+    async def delete_hyperliquid_credential(user_id: str) -> bool:
+        """
+        Delete Hyperliquid credentials and disable hyperliquid trading for all user's bots.
+
+        Deletes the vault secret, nulls profile columns, and sets all hyperliquid
+        bots to paper mode.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get vault secret ID before clearing
+                    cur.execute("""
+                        SELECT hyperliquid_vault_id
+                        FROM user_profiles
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    result = cur.fetchone()
+                    vault_secret_id = result[0] if result else None
+
+                    # Delete the vault secret if it exists
+                    if vault_secret_id:
+                        try:
+                            cur.execute("""
+                                DELETE FROM vault.secrets
+                                WHERE id = %s
+                            """, (vault_secret_id,))
+                        except Exception as vault_error:
+                            logger.bind(user_id=user_id).warning(
+                                f"Could not delete vault secret: {vault_error}"
+                            )
+
+                    # Clear Hyperliquid credentials from user_profiles
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET hyperliquid_vault_id = NULL,
+                            hyperliquid_wallet_address = NULL,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    if cur.rowcount == 0:
+                        logger.bind(user_id=user_id).warning("User profile not found")
+                        return False
+
+                    # Disable hyperliquid trading on all user's bots
+                    cur.execute("""
+                        UPDATE configurations
+                        SET trading_mode = 'paper',
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                        AND trading_mode = 'hyperliquid'
+                    """, (user_id,))
+
+                    disabled_bots = cur.rowcount
+
+                    conn.commit()
+
+                    logger.bind(user_id=user_id).info(
+                        f"Deleted Hyperliquid credentials and disabled {disabled_bots} hyperliquid bot(s)"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to delete Hyperliquid credential: {e}")
+            return False
+
 
 # Convenience functions for common operations
 async def store_credential(user_id: str, name: str, provider: str, api_key: str) -> Optional[str]:
@@ -602,3 +782,15 @@ async def get_aster_credential(user_id: str) -> Optional[Dict[str, Any]]:
 async def delete_aster_credential(user_id: str) -> bool:
     """Delete AsterDEX credential. Convenience wrapper."""
     return await VaultManager.delete_aster_credential(user_id)
+
+async def store_hyperliquid_credential(user_id: str, api_wallet_private_key: str, wallet_address: str) -> bool:
+    """Store Hyperliquid credential. Convenience wrapper."""
+    return await VaultManager.store_hyperliquid_credential(user_id, api_wallet_private_key, wallet_address)
+
+async def get_hyperliquid_credential(user_id: str) -> Optional[Dict[str, Any]]:
+    """Get Hyperliquid credential. Convenience wrapper."""
+    return await VaultManager.get_hyperliquid_credential(user_id)
+
+async def delete_hyperliquid_credential(user_id: str) -> bool:
+    """Delete Hyperliquid credential. Convenience wrapper."""
+    return await VaultManager.delete_hyperliquid_credential(user_id)

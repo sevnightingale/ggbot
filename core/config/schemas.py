@@ -31,6 +31,7 @@ class TradingMode(str, Enum):
     PAPER = "paper"
     SYMPHONY = "symphony"  # Database stores as 'live' but canonical is 'symphony'
     ASTER = "aster"
+    HYPERLIQUID = "hyperliquid"
 
 class BotState(str, Enum):
     """Bot activation states."""

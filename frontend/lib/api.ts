@@ -945,6 +945,82 @@ export class ApiClient {
 
     return await response.json()
   }
+
+  // =============================================================================
+  // Hyperliquid Live Trading Setup
+  // =============================================================================
+
+  async setupHyperliquid(apiWalletKey: string, walletAddress: string): Promise<{
+    status: string
+    message: string
+    account_value?: number
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/hyperliquid/setup`, {
+      method: 'POST',
+      body: JSON.stringify({
+        api_wallet_key: apiWalletKey,
+        wallet_address: walletAddress,
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }))
+      throw new Error(error.detail || 'Failed to setup Hyperliquid')
+    }
+
+    return await response.json()
+  }
+
+  async getHyperliquidStatus(): Promise<{
+    connected: boolean
+    wallet_address: string | null
+    account_value: number | null
+    available_balance: number | null
+    positions_count: number | null
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/hyperliquid/status`)
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }))
+      throw new Error(error.detail || 'Failed to get Hyperliquid status')
+    }
+
+    return await response.json()
+  }
+
+  async disconnectHyperliquid(): Promise<{
+    status: string
+    message: string
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/hyperliquid/disconnect`, {
+      method: 'POST',
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }))
+      throw new Error(error.detail || 'Failed to disconnect Hyperliquid')
+    }
+
+    return await response.json()
+  }
+
+  async testHyperliquidTrade(): Promise<{
+    status: string
+    entry_price?: number
+    close_status?: string
+    error?: string
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/hyperliquid/test-trade`, {
+      method: 'POST',
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }))
+      throw new Error(error.detail || 'Failed to execute test trade')
+    }
+
+    return await response.json()
+  }
 }
 
 export const apiClient = new ApiClient()

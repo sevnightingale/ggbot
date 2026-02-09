@@ -22,6 +22,69 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
+## 🔥 **HIGH PRIORITY - Hyperliquid Live Trading Integration** [HYPERLIQUID_INTEGRATION.md]
+
+**Status**: 🟢 PHASE 1 COMPLETE — Backend ready, mainnet testing next
+**Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
+**Priority**: P1 — Replaces blocked Symphony integration
+**Estimated Effort**: 32-44 hours across 4 phases
+
+**Summary**: Non-custodial live trading via Hyperliquid. Users connect wallet → deposit USDC → authorize ggbots API wallet → bot trades 291 perp markets. API wallets cryptographically cannot withdraw funds (protocol-enforced). Reuses existing Web3 infra from Arena (wagmi/RainbowKit).
+
+### **Phase 1: Backend Trading Service** ✅ COMPLETE (2026-02-08)
+- [x] Create `trading/live/hyperliquid_service.py` (HyperliquidLiveTradingService)
+- [x] Add `trading_mode='hyperliquid'` routing in `ggbot.py` (5 locations: import, constructor, _run_trading_v2 close+open, config creation, agent execute-trade)
+- [x] Add Hyperliquid symbol mapping in `core/symbols/registry.py` + `standardizer.py` (100 symbols)
+- [x] Add `hyperliquid_wallet_address`, `hyperliquid_vault_id` columns to `user_profiles`
+- [x] Add Vault credential methods: `store/get/delete_hyperliquid_credential` in `vault_utils.py`
+- [x] Account allocation validation: sum of `max_margin_percent` across user's Hyperliquid bots ≤ 100%
+- [x] Install `hyperliquid-python-sdk==0.22.0`
+- [x] Add `HYPERLIQUID` to TradingMode enum in `schemas.py`
+- [x] Remove legacy "Pro subscription required" gate from config creation (all tiers can create live bots, activation is the real gate)
+
+### **Phase 1.5: Mainnet Integration Test** (~1-2 hours)
+- [ ] Deposit $10 USDC from MetaMask on Arbitrum → Hyperliquid bridge
+- [ ] Create API wallet on Hyperliquid, authorize via approve_agent
+- [ ] Store credentials via `VaultManager.store_hyperliquid_credential()`
+- [ ] Execute test trade: market open → verify SL/TP → close position
+- [ ] Verify `live_trades` row created with `provider='hyperliquid'`
+- [ ] Verify `get_open_positions()` and `get_account_metrics()` return correct data
+
+### **Phase 2: Frontend Wallet + Deposit** (~10-14 hours)
+- [ ] Add Arbitrum chain to `wagmi-config.ts` (currently only Scroll from Arena)
+- [ ] Create `HyperliquidSetupModal.tsx` (3-step: connect → deposit → authorize)
+- [ ] Implement `ApproveAgent` signing flow (generates API wallet, stores key via backend)
+- [ ] Add USDC deposit flow (transfer to Hyperliquid bridge on Arbitrum)
+- [ ] Add `hyperliquid` option to `TradeSettings.tsx` with account allocation indicator
+- [ ] Add Hyperliquid balance display + withdraw button
+
+### **Phase 3: Dashboard Integration** (~6-8 hours)
+- [ ] Create `core/monitoring/adapters/hyperliquid_adapter.py`
+- [ ] Add Hyperliquid branch to SSE `_enrich_live_positions_and_accounts()`
+- [ ] Add 'hyperliquid' source type to `PositionsTable.tsx`
+- [ ] Add Hyperliquid position/trade API methods to `frontend/lib/api.ts`
+
+### **Phase 4: Polish + Production** (~4-6 hours)
+- [ ] Error handling (insufficient balance, rate limits, network errors)
+- [ ] Telegram publishing for Hyperliquid trades
+- [ ] Agent bot support (`trading_mode='hyperliquid'` for agents)
+- [ ] Update `trading/README.md`, `ACTIVE.md` documentation
+- [ ] Mainnet smoke test with real funds (small amount)
+
+**See**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md) for complete architecture, verified SDK methods, and technical details.
+
+### **Future: Symbol & Candle Expansion**
+- [ ] Add `HyperliquidCandleAdapter` to unlock equities + commodities (currently candles are Binance-only, ~100 crypto symbols)
+- [ ] Extend symbol registry + paper trading to support Hyperliquid's full 291+ markets
+
+### **Future: Strategy Marketplace (Copy Trading)**
+- [ ] Design marketplace tables (strategy_listings, strategy_subscriptions, strategy_trades)
+- [ ] Trade fan-out service: creator's bot signal → replicate to all subscriber Hyperliquid accounts
+- [ ] Stripe Connect for creator revenue share
+- [ ] Legal review for copy-trading regulatory requirements
+
+---
+
 ## 🚨 **CRITICAL - CVE-2025-66478 Secret Rotation**
 
 **Status**: 🔴 URGENT - Application was vulnerable for ~11 hours (Dec 4-5, 2025)

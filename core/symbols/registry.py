@@ -24,6 +24,8 @@ SYMBOL_REGISTRY = {
         "symphony": "1INCH",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "1INCH",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "aave": {
@@ -37,6 +39,8 @@ SYMBOL_REGISTRY = {
         "symphony": "AAVE",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "AAVE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ach": {
@@ -50,6 +54,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "ada": {
@@ -63,6 +69,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ADA",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ADA",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "algo": {
@@ -76,6 +84,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ALGO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ALGO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "alice": {
@@ -89,6 +99,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ALICE",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ALICE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "alpha": {
@@ -102,6 +114,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "alt": {
@@ -115,6 +129,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ALT",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ALT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ankr": {
@@ -128,6 +144,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ANKR",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ANKR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ape": {
@@ -141,6 +159,8 @@ SYMBOL_REGISTRY = {
         "symphony": "APE",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "APE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "api3": {
@@ -154,6 +174,8 @@ SYMBOL_REGISTRY = {
         "symphony": "API3",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "API3",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "apt": {
@@ -167,6 +189,8 @@ SYMBOL_REGISTRY = {
         "symphony": "APT",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "APT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "arb": {
@@ -180,6 +204,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ARB",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ARB",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "arkm": {
@@ -193,6 +219,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ARKM",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ARKM",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ar": {
@@ -206,6 +234,8 @@ SYMBOL_REGISTRY = {
         "symphony": "AR",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "AR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "astr": {
@@ -219,6 +249,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ASTR",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ASTR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "atom": {
@@ -232,6 +264,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ATOM",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ATOM",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "auction": {
@@ -245,6 +279,8 @@ SYMBOL_REGISTRY = {
         "symphony": "AUCTION",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "AUCTION",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "avax": {
@@ -258,6 +294,8 @@ SYMBOL_REGISTRY = {
         "symphony": "AVAX",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "AVAX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "axs": {
@@ -271,6 +309,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "bake": {
@@ -284,6 +324,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "bal": {
@@ -297,6 +339,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "band": {
@@ -310,6 +354,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "bat": {
@@ -323,6 +369,8 @@ SYMBOL_REGISTRY = {
         "symphony": "BAT",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "BAT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "bch": {
@@ -336,6 +384,8 @@ SYMBOL_REGISTRY = {
         "symphony": "BCH",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "BCH",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "bel": {
@@ -349,6 +399,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "bigtime": {
@@ -362,6 +414,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "bnb": {
@@ -375,6 +429,8 @@ SYMBOL_REGISTRY = {
         "symphony": "BNB",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "BNB",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "bnt": {
@@ -388,6 +444,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "bome": {
@@ -401,6 +459,8 @@ SYMBOL_REGISTRY = {
         "symphony": "BOME",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "BOME",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "btc": {
@@ -414,6 +474,8 @@ SYMBOL_REGISTRY = {
         "symphony": "BTC",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "BTC",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "cake": {
@@ -427,6 +489,8 @@ SYMBOL_REGISTRY = {
         "symphony": "CAKE",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "CAKE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "celr": {
@@ -440,6 +504,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "cetus": {
@@ -453,6 +519,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "cfx": {
@@ -466,6 +534,8 @@ SYMBOL_REGISTRY = {
         "symphony": "CFX",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "CFX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "chr": {
@@ -479,6 +549,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "chz": {
@@ -492,6 +564,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "comp": {
@@ -505,6 +579,8 @@ SYMBOL_REGISTRY = {
         "symphony": "COMP",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "COMP",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "coti": {
@@ -518,6 +594,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "crv": {
@@ -531,6 +609,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": True,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "cyber": {
@@ -544,6 +624,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "dash": {
@@ -557,6 +639,8 @@ SYMBOL_REGISTRY = {
         "symphony": "DASH",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "DASH",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "doge": {
@@ -570,6 +654,8 @@ SYMBOL_REGISTRY = {
         "symphony": "DOGE",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "DOGE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "dot": {
@@ -583,6 +669,8 @@ SYMBOL_REGISTRY = {
         "symphony": "DOT",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "DOT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "dydx": {
@@ -596,6 +684,8 @@ SYMBOL_REGISTRY = {
         "symphony": "DYDX",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "DYDX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "egld": {
@@ -609,6 +699,8 @@ SYMBOL_REGISTRY = {
         "symphony": "EGLD",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "EGLD",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ena": {
@@ -622,6 +714,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ENA",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ENA",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ens": {
@@ -635,6 +729,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ENS",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ENS",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "etc": {
@@ -648,6 +744,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ETC",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ETC",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "eth": {
@@ -661,6 +759,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ETH",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ETH",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ethfi": {
@@ -674,6 +774,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ETHFI",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ETHFI",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "fet": {
@@ -687,6 +789,8 @@ SYMBOL_REGISTRY = {
         "symphony": "FET",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "FET",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "fil": {
@@ -700,6 +804,8 @@ SYMBOL_REGISTRY = {
         "symphony": "FIL",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "FIL",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "flm": {
@@ -713,6 +819,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "flow": {
@@ -726,6 +834,8 @@ SYMBOL_REGISTRY = {
         "symphony": "FLOW",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "FLOW",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "gala": {
@@ -739,6 +849,8 @@ SYMBOL_REGISTRY = {
         "symphony": "GALA",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "GALA",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "gmt": {
@@ -752,6 +864,8 @@ SYMBOL_REGISTRY = {
         "symphony": "GMT",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "GMT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "gmx": {
@@ -765,6 +879,8 @@ SYMBOL_REGISTRY = {
         "symphony": "GMX",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "GMX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "grt": {
@@ -778,6 +894,8 @@ SYMBOL_REGISTRY = {
         "symphony": "GRT",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "GRT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "gtc": {
@@ -791,6 +909,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "hbar": {
@@ -804,6 +924,8 @@ SYMBOL_REGISTRY = {
         "symphony": "HBAR",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "HBAR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "high": {
@@ -817,6 +939,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "hook": {
@@ -830,6 +954,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "icp": {
@@ -843,6 +969,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ICP",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ICP",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "icx": {
@@ -856,6 +984,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "id": {
@@ -869,6 +999,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "inj": {
@@ -882,6 +1014,8 @@ SYMBOL_REGISTRY = {
         "symphony": "INJ",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "INJ",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "iost": {
@@ -895,6 +1029,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "iotx": {
@@ -908,6 +1044,8 @@ SYMBOL_REGISTRY = {
         "symphony": "IOTX",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "IOTX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "jasmy": {
@@ -921,6 +1059,8 @@ SYMBOL_REGISTRY = {
         "symphony": "JASMY",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "JASMY",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "jto": {
@@ -934,6 +1074,8 @@ SYMBOL_REGISTRY = {
         "symphony": "JTO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "JTO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "jup": {
@@ -947,6 +1089,8 @@ SYMBOL_REGISTRY = {
         "symphony": "JUP",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "JUP",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "kava": {
@@ -960,6 +1104,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "knc": {
@@ -973,6 +1119,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "ksm": {
@@ -986,6 +1134,8 @@ SYMBOL_REGISTRY = {
         "symphony": "KSM",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "KSM",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ldo": {
@@ -999,6 +1149,8 @@ SYMBOL_REGISTRY = {
         "symphony": "LDO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "LDO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "lever": {
@@ -1012,6 +1164,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "link": {
@@ -1025,6 +1179,8 @@ SYMBOL_REGISTRY = {
         "symphony": "LINK",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "LINK",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "lpt": {
@@ -1038,6 +1194,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "lqty": {
@@ -1051,6 +1209,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "lrc": {
@@ -1064,6 +1224,8 @@ SYMBOL_REGISTRY = {
         "symphony": "LRC",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "LRC",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ltc": {
@@ -1077,6 +1239,8 @@ SYMBOL_REGISTRY = {
         "symphony": "LTC",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "LTC",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "magic": {
@@ -1090,6 +1254,8 @@ SYMBOL_REGISTRY = {
         "symphony": "MAGIC",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "MAGIC",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "mana": {
@@ -1103,6 +1269,8 @@ SYMBOL_REGISTRY = {
         "symphony": "MANA",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "MANA",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "mask": {
@@ -1116,6 +1284,8 @@ SYMBOL_REGISTRY = {
         "symphony": "MASK",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "MASK",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "matic": {
@@ -1129,6 +1299,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "mkr": {
@@ -1142,6 +1314,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "near": {
@@ -1155,6 +1329,8 @@ SYMBOL_REGISTRY = {
         "symphony": "NEAR",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "NEAR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "neo": {
@@ -1168,6 +1344,8 @@ SYMBOL_REGISTRY = {
         "symphony": "NEO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "NEO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "nkn": {
@@ -1181,6 +1359,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "nmr": {
@@ -1194,6 +1374,8 @@ SYMBOL_REGISTRY = {
         "symphony": "NMR",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "NMR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "not": {
@@ -1207,6 +1389,8 @@ SYMBOL_REGISTRY = {
         "symphony": "NOT",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "NOT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ntrn": {
@@ -1220,6 +1404,8 @@ SYMBOL_REGISTRY = {
         "symphony": "NTRN",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "NTRN",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ogn": {
@@ -1233,6 +1419,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "ondo": {
@@ -1246,6 +1434,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ONDO",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "ONDO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "one": {
@@ -1259,6 +1449,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "ont": {
@@ -1272,6 +1464,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "op": {
@@ -1285,6 +1479,8 @@ SYMBOL_REGISTRY = {
         "symphony": "OP",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "OP",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "ordi": {
@@ -1298,6 +1494,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ORDI",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ORDI",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "pendle": {
@@ -1311,6 +1509,8 @@ SYMBOL_REGISTRY = {
         "symphony": "PENDLE",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "PENDLE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "people": {
@@ -1324,6 +1524,8 @@ SYMBOL_REGISTRY = {
         "symphony": "PEOPLE",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "PEOPLE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "pyth": {
@@ -1337,6 +1539,8 @@ SYMBOL_REGISTRY = {
         "symphony": "PYTH",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "PYTH",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "qtum": {
@@ -1350,6 +1554,8 @@ SYMBOL_REGISTRY = {
         "symphony": "QTUM",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "QTUM",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "rare": {
@@ -1363,6 +1569,8 @@ SYMBOL_REGISTRY = {
         "symphony": "RARE",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "RARE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "render": {
@@ -1376,6 +1584,8 @@ SYMBOL_REGISTRY = {
         "symphony": "RENDER",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "RENDER",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "rlc": {
@@ -1389,6 +1599,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "rose": {
@@ -1402,6 +1614,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ROSE",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ROSE",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "rsr": {
@@ -1415,6 +1629,8 @@ SYMBOL_REGISTRY = {
         "symphony": "RSR",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "RSR",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "rune": {
@@ -1428,6 +1644,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "rvn": {
@@ -1441,6 +1659,8 @@ SYMBOL_REGISTRY = {
         "symphony": "RVN",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "RVN",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "sand": {
@@ -1454,6 +1674,8 @@ SYMBOL_REGISTRY = {
         "symphony": "SAND",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "SAND",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "sei": {
@@ -1467,6 +1689,8 @@ SYMBOL_REGISTRY = {
         "symphony": "SEI",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "SEI",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "sfp": {
@@ -1480,6 +1704,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "sklus": {
@@ -1493,6 +1719,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "skl": {
@@ -1506,6 +1734,8 @@ SYMBOL_REGISTRY = {
         "symphony": "SKL",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "SKL",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "snx": {
@@ -1519,6 +1749,8 @@ SYMBOL_REGISTRY = {
         "symphony": "SNX",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "SNX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "sol": {
@@ -1532,6 +1764,8 @@ SYMBOL_REGISTRY = {
         "symphony": "SOL",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "SOL",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "storj": {
@@ -1545,6 +1779,8 @@ SYMBOL_REGISTRY = {
         "symphony": "STORJ",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "STORJ",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "strk": {
@@ -1558,6 +1794,8 @@ SYMBOL_REGISTRY = {
         "symphony": "STRK",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "STRK",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "stx": {
@@ -1571,6 +1809,8 @@ SYMBOL_REGISTRY = {
         "symphony": "STX",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "STX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "sui": {
@@ -1584,6 +1824,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": True,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "s": {
@@ -1597,6 +1839,8 @@ SYMBOL_REGISTRY = {
         "symphony": "S",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "S",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "sushi": {
@@ -1610,6 +1854,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "sxp": {
@@ -1623,6 +1869,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "tao": {
@@ -1636,6 +1884,8 @@ SYMBOL_REGISTRY = {
         "symphony": "TAO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "TAO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "theta": {
@@ -1649,6 +1899,8 @@ SYMBOL_REGISTRY = {
         "symphony": "THETA",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "THETA",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "tia": {
@@ -1662,6 +1914,8 @@ SYMBOL_REGISTRY = {
         "symphony": "TIA",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "TIA",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "trb": {
@@ -1675,6 +1929,8 @@ SYMBOL_REGISTRY = {
         "symphony": "TRB",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "TRB",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "trx": {
@@ -1688,6 +1944,8 @@ SYMBOL_REGISTRY = {
         "symphony": "TRX",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "TRX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "turbo": {
@@ -1701,6 +1959,8 @@ SYMBOL_REGISTRY = {
         "symphony": "TURBO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "TURBO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "twt": {
@@ -1714,6 +1974,8 @@ SYMBOL_REGISTRY = {
         "symphony": "TWT",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "TWT",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "vanry": {
@@ -1727,6 +1989,8 @@ SYMBOL_REGISTRY = {
         "symphony": None,
         "symphony_compatible": False,
         "aster_compatible": False,
+        "hyperliquid": None,
+        "hyperliquid_compatible": False,
         "websocket_cached": False
     },
     "vet": {
@@ -1740,6 +2004,8 @@ SYMBOL_REGISTRY = {
         "symphony": "VET",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "VET",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "wif": {
@@ -1753,6 +2019,8 @@ SYMBOL_REGISTRY = {
         "symphony": "WIF",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "WIF",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "wld": {
@@ -1766,6 +2034,8 @@ SYMBOL_REGISTRY = {
         "symphony": "WLD",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "WLD",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "woo": {
@@ -1779,6 +2049,8 @@ SYMBOL_REGISTRY = {
         "symphony": "WOO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "WOO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "w": {
@@ -1792,6 +2064,8 @@ SYMBOL_REGISTRY = {
         "symphony": "W",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "W",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "xrp": {
@@ -1805,6 +2079,8 @@ SYMBOL_REGISTRY = {
         "symphony": "XRP",
         "symphony_compatible": True,
         "aster_compatible": True,
+        "hyperliquid": "XRP",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "yfi": {
@@ -1818,6 +2094,8 @@ SYMBOL_REGISTRY = {
         "symphony": "YFI",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "YFI",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "zil": {
@@ -1831,6 +2109,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ZIL",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ZIL",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "zro": {
@@ -1844,6 +2124,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ZRO",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ZRO",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     },
     "zrx": {
@@ -1857,6 +2139,8 @@ SYMBOL_REGISTRY = {
         "symphony": "ZRX",
         "symphony_compatible": True,
         "aster_compatible": False,
+        "hyperliquid": "ZRX",
+        "hyperliquid_compatible": True,
         "websocket_cached": True
     }
 }

@@ -82,6 +82,7 @@ httpx==0.28.1
 httpx-sse==0.4.0
 # Editable install with no version control (hummingbot-api-client==1.0.1)
 -e /home/sev/ggbot/hummingbot_client
+hyperliquid-python-sdk==0.22.0
 hyperframe==6.1.0
 idna==3.10
 importlib_metadata==8.7.0

@@ -111,6 +111,21 @@ class UniversalSymbolStandardizer:
         """Convert AsterDEX format (BTCUSDT) to platform format (BTC-USDT)"""
         return self.normalize(aster_symbol, "ggshot", "platform")
 
+    def to_hyperliquid(self, symbol: str, source_format: str = "platform") -> Optional[str]:
+        """Convert any format to Hyperliquid format (bare base name, e.g. "BTC")"""
+        return self.normalize(symbol, source_format, "hyperliquid")
+
+    def from_hyperliquid(self, hyperliquid_symbol: str) -> Optional[str]:
+        """Convert Hyperliquid format ("BTC") to platform format ("BTC-USDT")"""
+        return self.normalize(hyperliquid_symbol, "hyperliquid", "platform")
+
+    def is_hyperliquid_compatible(self, symbol: str, format_type: str = "platform") -> bool:
+        """Check if symbol is compatible with Hyperliquid live trading"""
+        symbol_data = self.get_all_formats(symbol, format_type)
+        if not symbol_data:
+            return False
+        return symbol_data.get("hyperliquid_compatible", False)
+
     def is_supported(self, symbol: str, format_type: str = "platform") -> bool:
         """Check if symbol is supported in given format"""
         symbol_key = find_symbol_by_format(symbol, format_type)
@@ -173,7 +188,9 @@ class UniversalSymbolStandardizer:
             "platform_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("platform")]),
             "symphony_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony")]),
             "symphony_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony_compatible")]),
-            "aster_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("aster_compatible")])
+            "aster_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("aster_compatible")]),
+            "hyperliquid_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("hyperliquid")]),
+            "hyperliquid_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("hyperliquid_compatible")])
         }
     
     def validate_symbol(self, symbol: str, format_type: str = "platform", strict: bool = True) -> Dict[str, Union[bool, str, None]]:

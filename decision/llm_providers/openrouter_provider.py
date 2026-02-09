@@ -141,15 +141,10 @@ class OpenRouterProvider(LLMProvider):
 
         self.timeout = kwargs.get('timeout', 200)
         self.max_retries = kwargs.get('max_retries', 3)
+        self._api_key = api_key  # Store for client recreation on connection errors
 
         # Initialize OpenAI client with OpenRouter base URL
-        # Configure proper timeout and retry settings at client level
-        self.client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-            timeout=self.timeout,
-            max_retries=2,  # Client-level retries before our manual retry loop
-        )
+        self.client = self._create_client()
 
         # Get reasoning tier (economy, standard, premium)
         # Support both new reasoning_tier and legacy thinking_mode
@@ -172,6 +167,15 @@ class OpenRouterProvider(LLMProvider):
 
         logger.bind(module="decision.openrouter").info(
             f"Initialized OpenRouter provider - model: {self.model}, tier: {self.reasoning_tier} → {self.openrouter_model}"
+        )
+
+    def _create_client(self) -> AsyncOpenAI:
+        """Create a fresh AsyncOpenAI client with a new connection pool."""
+        return AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self._api_key,
+            timeout=self.timeout,
+            max_retries=0,  # We handle retries ourselves with client recreation
         )
 
     async def generate_response(self,
@@ -326,8 +330,9 @@ class OpenRouterProvider(LLMProvider):
 
             except Exception as e:
                 error_msg = str(e)
+                error_type = type(e).__name__
                 logger.bind(module="decision.openrouter").error(
-                    f"Error on attempt {attempt + 1}/{self.max_retries}: {error_msg}"
+                    f"Error on attempt {attempt + 1}/{self.max_retries} ({error_type}): {error_msg}"
                 )
 
                 # Check if it's a rate limit error
@@ -336,9 +341,24 @@ class OpenRouterProvider(LLMProvider):
                     logger.bind(module="decision.openrouter").warning(
                         f"Rate limited, waiting {wait_time}s before retry"
                     )
-                    await self.client._client.aclose()  # Close connection
+                    try:
+                        await self.client.close()
+                    except Exception:
+                        pass
+                    self.client = self._create_client()
                     await asyncio.sleep(wait_time)
                     continue
+
+                # Connection error: stale pool — recreate client with fresh connections
+                if 'connection error' in error_msg.lower() or 'connect' in error_type.lower():
+                    logger.bind(module="decision.openrouter").warning(
+                        f"Connection error detected, recreating HTTP client for retry"
+                    )
+                    try:
+                        await self.client.close()
+                    except Exception:
+                        pass
+                    self.client = self._create_client()
 
                 # Retry on other errors
                 if attempt < self.max_retries - 1:

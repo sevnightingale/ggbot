@@ -103,6 +103,7 @@ from decision.engine_v2 import DecisionEngineV2
 from trading.paper.supabase_service import SupabasePaperTradingService
 from trading.live.symphony_service import SymphonyLiveTradingService
 from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+from trading.live.hyperliquid_service import HyperliquidLiveTradingService
 from signals.publishing_service import publish_signal_to_telegram
 from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
 class ConfigCreateRequest(BaseModel):
@@ -325,6 +326,7 @@ class GGBotOrchestrator:
         self.paper_trading = SupabasePaperTradingService()
         self.symphony_trading = SymphonyLiveTradingService()
         self.aster_trading = AsterDEXV3LiveTradingService()
+        self.hyperliquid_trading = HyperliquidLiveTradingService()
         self._log = logger.bind(component="orchestrator")
 
         # Use OrderedDict for LRU eviction (oldest first)
@@ -1195,19 +1197,20 @@ class GGBotOrchestrator:
                 "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
             }
             
-            # Determine trading mode (paper vs symphony vs aster)
+            # Determine trading mode (paper vs symphony vs aster vs hyperliquid)
             trading_mode = getattr(config, 'trading_mode', 'paper')
             is_live = trading_mode == 'symphony'
             is_aster = trading_mode == 'aster'
+            is_hyperliquid = trading_mode == 'hyperliquid'
 
             if trading_action == "close":
                 try:
                     from core.common.db import get_db_connection
                     open_positions = []
 
-                    if is_live or is_aster:
-                        # Live/Aster trading: Query live_trades for batch_id
-                        provider = 'aster' if is_aster else 'symphony'
+                    if is_live or is_aster or is_hyperliquid:
+                        # Live trading: Query live_trades for batch_id
+                        provider = 'hyperliquid' if is_hyperliquid else ('aster' if is_aster else 'symphony')
                         with get_db_connection() as conn:
                             with conn.cursor() as cur:
                                 cur.execute("""
@@ -1245,7 +1248,12 @@ class GGBotOrchestrator:
                     position = open_positions[0]
 
                     # Route to appropriate service
-                    if is_aster:
+                    if is_hyperliquid:
+                        trade_result = await self.hyperliquid_trading.close_position(
+                            position['batch_id'],
+                            user_id
+                        )
+                    elif is_aster:
                         trade_result = await self.aster_trading.close_position(
                             position['batch_id'],
                             user_id
@@ -1272,7 +1280,10 @@ class GGBotOrchestrator:
                     }
             else:
                 # Route based on trading mode
-                if is_aster:
+                if is_hyperliquid:
+                    trade_result = await self.hyperliquid_trading.execute_trade_intent(trading_intent)
+                    self._log.info(f"V2 Hyperliquid live trade completed: {trade_result.get('status')} for {symbol}")
+                elif is_aster:
                     trade_result = await self.aster_trading.execute_trade_intent(trading_intent)
                     self._log.info(f"V2 AsterDEX live trade completed: {trade_result.get('status')} for {symbol}")
                 elif is_live:
@@ -1644,17 +1655,12 @@ async def create_config(
     symphony_agent_id = request.symphony_agent_id
 
     # Validate trading mode
-    if trading_mode not in ["paper", "symphony", "aster"]:
-        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper', 'symphony', or 'aster'")
+    if trading_mode not in ["paper", "symphony", "aster", "hyperliquid"]:
+        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper', 'symphony', 'aster', or 'hyperliquid'")
 
-    # Check Pro subscription for live trading modes
-    if trading_mode in ["symphony", "aster"]:
-        profile = await user_service.get_profile(current_user.user_id)
-        if not profile.can_use_live_trading:
-            raise HTTPException(
-                status_code=403,
-                detail="Pro subscription required for live trading. Please upgrade to continue."
-            )
+    # NOTE: No subscription check here — users can CREATE live trading bots on any tier.
+    # The real gate is bot ACTIVATION (start_bot endpoint) which checks can_activate_bots.
+    # Free users get test runs per bot regardless of trading mode.
 
     # Symphony-specific validations
     if trading_mode == "symphony":
@@ -1693,6 +1699,45 @@ async def create_config(
                 detail="AsterDEX account not connected. Please connect in Settings first."
             )
 
+    # Hyperliquid-specific validations
+    if trading_mode == "hyperliquid":
+        from core.auth.vault_utils import VaultManager
+        credentials = await VaultManager.get_hyperliquid_credential(current_user.user_id)
+        if not credentials:
+            raise HTTPException(
+                status_code=400,
+                detail="Hyperliquid account not connected. Please connect in Settings first."
+            )
+
+        # Account allocation validation: sum of all hyperliquid bots' max_margin_percent must be <= 100%
+        new_max_margin = request_data.get("trading", {}).get("position_sizing", {}).get("max_margin_percent", 20.0)
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT config_id,
+                               config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin
+                        FROM configurations
+                        WHERE user_id = %s AND trading_mode = 'hyperliquid' AND state != 'archived'
+                    """, (current_user.user_id,))
+                    existing_allocations = cur.fetchall()
+
+            total_existing = sum(float(row[1] or 0) for row in existing_allocations)
+            total_with_new = total_existing + float(new_max_margin)
+
+            if total_with_new > 100:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Total account allocation across your Hyperliquid bots would be {total_with_new:.1f}%. "
+                        f"Maximum is 100%. Reduce max margin % on this bot or your other live bots."
+                    )
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Could not validate Hyperliquid allocation: {e}")
+
     # Validate symbol has real-time price data (WebSocket cached)
     selected_pair = request_data.get("selected_pair")
     if selected_pair:
@@ -1726,6 +1771,15 @@ async def create_config(
                 raise HTTPException(
                     status_code=400,
                     detail=f"Symbol {selected_pair} is not compatible with AsterDEX trading."
+                )
+
+        if trading_mode == "hyperliquid":
+            from core.symbols import UniversalSymbolStandardizer
+            standardizer = UniversalSymbolStandardizer()
+            if not standardizer.is_hyperliquid_compatible(selected_pair, "ccxt"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Symbol {selected_pair} is not compatible with Hyperliquid trading."
                 )
 
     # Add config_type back to config_data for BotConfigV2 constructor
@@ -3104,6 +3158,269 @@ async def disconnect_aster_account(
         )
 
 
+# =============================================================================
+# Hyperliquid Live Trading Setup
+# =============================================================================
+
+@app.post("/api/v2/hyperliquid/setup")
+async def setup_hyperliquid_account(
+    request: Dict[str, str],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Store Hyperliquid API wallet credentials and verify account exists.
+
+    Request body:
+        - api_wallet_key: API wallet private key (hex, with or without 0x prefix)
+        - wallet_address: User's main Hyperliquid wallet address (0x...)
+    """
+    try:
+        api_wallet_key = request.get("api_wallet_key", "").strip()
+        wallet_address = request.get("wallet_address", "").strip()
+
+        # Validate wallet address format
+        import re
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", wallet_address):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid wallet address. Should be a valid Ethereum address (0x...)"
+            )
+
+        # Validate private key format (with or without 0x prefix)
+        if not re.match(r"^(0x)?[a-fA-F0-9]{64}$", api_wallet_key):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid API wallet key format. Should be 64 hex characters."
+            )
+
+        # Verify account exists on Hyperliquid by querying user_state
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+
+            info = Info(constants.MAINNET_API_URL, skip_ws=True)
+            user_state = info.user_state(wallet_address)
+            margin_summary = user_state.get("marginSummary", {})
+            account_value = float(margin_summary.get("accountValue", 0))
+
+            logger.bind(user_id=current_user.user_id).info(
+                f"Hyperliquid account verified: ${account_value:.2f}"
+            )
+        except Exception as verify_err:
+            logger.bind(user_id=current_user.user_id).warning(
+                f"Could not verify Hyperliquid account (proceeding anyway): {verify_err}"
+            )
+            account_value = 0
+
+        # Store credentials in Vault
+        from core.auth.vault_utils import VaultManager
+        success = await VaultManager.store_hyperliquid_credential(
+            user_id=current_user.user_id,
+            api_wallet_private_key=api_wallet_key,
+            wallet_address=wallet_address
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to store Hyperliquid credentials"
+            )
+
+        logger.bind(user_id=current_user.user_id).info("Hyperliquid account connected successfully")
+
+        return {
+            "status": "success",
+            "message": "Hyperliquid account connected successfully",
+            "account_value": account_value
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to setup Hyperliquid account: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to setup Hyperliquid account: {str(e)}"
+        )
+
+
+@app.get("/api/v2/hyperliquid/status")
+async def get_hyperliquid_status(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Check Hyperliquid connection status and live balance."""
+    try:
+        from core.auth.vault_utils import VaultManager
+
+        credentials = await VaultManager.get_hyperliquid_credential(current_user.user_id)
+
+        if not credentials:
+            return {
+                "connected": False,
+                "wallet_address": None,
+                "account_value": None,
+                "available_balance": None,
+                "positions_count": None
+            }
+
+        wallet_address = credentials.get("wallet_address")
+
+        # Query live balance from Hyperliquid
+        try:
+            from hyperliquid.info import Info
+            from hyperliquid.utils import constants
+
+            info = Info(constants.MAINNET_API_URL, skip_ws=True)
+            user_state = info.user_state(wallet_address)
+
+            margin_summary = user_state.get("marginSummary", {})
+            account_value = float(margin_summary.get("accountValue", 0))
+            total_margin_used = float(margin_summary.get("totalMarginUsed", 0))
+            available_balance = account_value - total_margin_used
+
+            # Count open positions
+            positions = user_state.get("assetPositions", [])
+            positions_count = sum(
+                1 for p in positions
+                if float(p.get("position", {}).get("szi", 0)) != 0
+            )
+
+            return {
+                "connected": True,
+                "wallet_address": wallet_address,
+                "account_value": round(account_value, 2),
+                "available_balance": round(available_balance, 2),
+                "positions_count": positions_count
+            }
+
+        except Exception as info_err:
+            logger.bind(user_id=current_user.user_id).warning(
+                f"Could not query Hyperliquid balance: {info_err}"
+            )
+            return {
+                "connected": True,
+                "wallet_address": wallet_address,
+                "account_value": None,
+                "available_balance": None,
+                "positions_count": None
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to check Hyperliquid status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check Hyperliquid status: {str(e)}"
+        )
+
+
+@app.post("/api/v2/hyperliquid/disconnect")
+async def disconnect_hyperliquid_account(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Disconnect Hyperliquid account and disable all hyperliquid trading bots.
+
+    This will:
+    - Remove Hyperliquid credentials from Vault
+    - Set all user's hyperliquid bots to paper mode
+    """
+    try:
+        from core.auth.vault_utils import VaultManager
+
+        success = await VaultManager.delete_hyperliquid_credential(current_user.user_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to disconnect Hyperliquid account"
+            )
+
+        logger.bind(user_id=current_user.user_id).info("Hyperliquid account disconnected")
+
+        return {
+            "status": "success",
+            "message": "Hyperliquid account disconnected. All hyperliquid bots have been set to paper mode."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to disconnect Hyperliquid account: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to disconnect Hyperliquid account: {str(e)}"
+        )
+
+
+@app.post("/api/v2/hyperliquid/test-trade")
+async def test_hyperliquid_trade(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Execute a minimal test trade on Hyperliquid to verify credentials work.
+
+    Opens a tiny ETH long (0.001 ETH), waits 2s, then closes it.
+    """
+    try:
+        import asyncio
+        from trading.live.hyperliquid_service import HyperliquidLiveTradingService
+
+        service = HyperliquidLiveTradingService()
+
+        # Get exchange instance to verify credentials
+        exchange = await service._get_exchange(current_user.user_id)
+        if not exchange:
+            raise HTTPException(
+                status_code=400,
+                detail="Hyperliquid credentials not configured. Please connect your account first."
+            )
+
+        # Open minimal ETH long
+        logger.bind(user_id=current_user.user_id).info("Executing test trade: 0.001 ETH long")
+        order_result = exchange.market_open("ETH", True, 0.001, slippage=0.05)
+
+        if order_result.get("status") != "ok":
+            logger.bind(user_id=current_user.user_id).error(f"Test trade open failed: {order_result}")
+            return {
+                "status": "failed",
+                "error": f"Market order failed: {order_result}"
+            }
+
+        # Extract fill price
+        statuses = order_result.get("response", {}).get("data", {}).get("statuses", [])
+        entry_price = 0
+        for status in statuses:
+            if "filled" in status:
+                entry_price = float(status["filled"]["avgPx"])
+                break
+
+        logger.bind(user_id=current_user.user_id).info(f"Test trade opened at ${entry_price:.2f}")
+
+        # Wait for settlement
+        await asyncio.sleep(2)
+
+        # Close the position
+        close_result = exchange.market_close("ETH")
+        close_status = close_result.get("status", "unknown") if close_result else "failed"
+
+        logger.bind(user_id=current_user.user_id).info(f"Test trade closed: {close_status}")
+
+        return {
+            "status": "success",
+            "entry_price": entry_price,
+            "close_status": close_status
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to execute test trade: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute test trade: {str(e)}"
+        )
+
+
 @app.get("/api/v2/positions/live/{config_id}")
 async def get_live_positions(
     config_id: str,
@@ -3789,8 +4106,19 @@ async def agent_execute_trade(
         trading_mode = getattr(config, 'trading_mode', 'paper')
         is_live = trading_mode == 'symphony'
         is_aster = trading_mode == 'aster'
+        is_hyperliquid = trading_mode == 'hyperliquid'
 
-        if is_aster:
+        if is_hyperliquid:
+            result = await orchestrator.hyperliquid_trading.execute_trade_intent(intent)
+            return {
+                "status": "success",
+                "message": "Trade executed on Hyperliquid",
+                "trade": {
+                    "batch_id": result.get("batch_id"),
+                    "status": result.get("status")
+                }
+            }
+        elif is_aster:
             result = await orchestrator.aster_trading.execute_trade_intent(intent)
             return {
                 "status": "success",
