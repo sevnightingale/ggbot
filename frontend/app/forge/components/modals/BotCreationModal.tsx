@@ -104,7 +104,7 @@ export function BotCreationModal({
   const [error, setError] = useState<string | null>(null)
 
   // Get user profile for connection status
-  const { userProfile } = usePermissions()
+  const { userProfile, refreshProfile } = usePermissions()
 
   // Generate default bot name
   const generateDefaultName = useCallback(() => {
@@ -158,7 +158,7 @@ export function BotCreationModal({
       Icon: Rocket,
       label: 'Live Trading',
       description: userProfile?.hyperliquid_connected
-        ? 'Real trades on 291 perpetual markets'
+        ? 'Real trades with USDC on Arbitrum'
         : 'Set up required — connect wallet in Settings',
       color: 'var(--signal)',
       available: !!userProfile?.hyperliquid_connected,
@@ -751,7 +751,8 @@ export function BotCreationModal({
         open={liveTradingSetupOpen}
         onOpenChange={setLiveTradingSetupOpen}
         onComplete={() => {
-          // User completed setup — they can now select Live Trading mode
+          // User completed setup — refresh profile so hyperliquid_connected updates
+          refreshProfile()
           setLiveTradingSetupOpen(false)
         }}
       />

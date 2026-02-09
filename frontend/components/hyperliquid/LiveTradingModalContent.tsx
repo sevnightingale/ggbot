@@ -672,7 +672,7 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
       )}
 
       <p className="text-xs text-center text-[var(--text-muted)]">
-        Powered by Hyperliquid &middot; 291 perpetual markets &middot; Non-custodial
+        Powered by Hyperliquid &middot; USDC on Arbitrum &middot; Non-custodial
       </p>
     </div>
   )

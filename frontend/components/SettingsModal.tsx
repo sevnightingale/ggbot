@@ -19,7 +19,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const { userProfile } = usePermissions()
+  const { userProfile, refreshProfile } = usePermissions()
   const isPro = userProfile?.subscription_tier === 'pro'
   const isUsageBased = userProfile?.subscription_tier === 'usage_based'
   const isPrepaid = userProfile?.subscription_tier === 'prepaid'
@@ -231,6 +231,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         onOpenChange={setLiveTradingSetupOpen}
         onComplete={() => {
           fetchHlStatus()
+          refreshProfile()
         }}
       />
 

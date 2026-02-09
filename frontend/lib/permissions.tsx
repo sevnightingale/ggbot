@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { apiClient } from '@/lib/api'
 
 interface UserProfile {
@@ -28,6 +28,7 @@ interface PermissionContextType {
   canAccess: (feature: string) => boolean
   hasSubscription: (tier: 'usage_based' | 'pro') => boolean
   hasPaidDataPoint: (dataPoint: string) => boolean
+  refreshProfile: () => Promise<void>
 }
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined)
@@ -42,6 +43,7 @@ export function usePermissions() {
       canAccess: () => false,
       hasSubscription: () => false,
       hasPaidDataPoint: () => false,
+      refreshProfile: async () => {},
     }
   }
   return context
@@ -61,41 +63,41 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     setMounted(true)
   }, [])
 
+  // Reusable profile loader — called on mount and via refreshProfile()
+  const loadUserProfile = useCallback(async () => {
+    try {
+      setLoading(true)
+      const profile = await apiClient.getUserProfile()
+      setUserProfile(profile)
+    } catch (error) {
+      console.error('Failed to load user profile:', error)
+      // Fallback to free tier on error - user_id will be set by calling component
+      setUserProfile({
+        user_id: '', // Will be updated by ForgeApp
+        subscription_tier: 'free',
+        subscription_status: 'cancelled',
+        can_use_premium_features: false,
+        requires_own_llm_keys: true,
+        can_publish_telegram_signals: false,
+        can_use_signal_validation: false,
+        can_use_live_trading: false,
+        can_activate_bots: false,
+        can_use_agents: false,
+        paid_data_points: [],
+        credit_balance_usd: null,
+        has_available_credits: false,
+        hyperliquid_connected: false
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   // Load user profile when mounted
   useEffect(() => {
     if (!mounted) return
-
-    const loadUserProfile = async () => {
-      try {
-        setLoading(true)
-        const profile = await apiClient.getUserProfile()
-        setUserProfile(profile)
-      } catch (error) {
-        console.error('Failed to load user profile:', error)
-        // Fallback to free tier on error - user_id will be set by calling component
-        setUserProfile({
-          user_id: '', // Will be updated by ForgeApp
-          subscription_tier: 'free',
-          subscription_status: 'cancelled',
-          can_use_premium_features: false,
-          requires_own_llm_keys: true,
-          can_publish_telegram_signals: false,
-          can_use_signal_validation: false,
-          can_use_live_trading: false,
-          can_activate_bots: false,
-          can_use_agents: false,
-          paid_data_points: [],
-          credit_balance_usd: null,
-          has_available_credits: false,
-          hyperliquid_connected: false
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadUserProfile()
-  }, [mounted])
+  }, [mounted, loadUserProfile])
 
   // Permission checking functions
   const canAccess = (feature: string): boolean => {
@@ -152,6 +154,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     canAccess,
     hasSubscription,
     hasPaidDataPoint,
+    refreshProfile: loadUserProfile,
   }
 
   return (
