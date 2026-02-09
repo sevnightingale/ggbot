@@ -5,17 +5,21 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, ConnectButton, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
-import { useAccount, useReadContract, useSignTypedData } from 'wagmi'
+import { useAccount, useReadContract, useSignTypedData, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { parseUnits } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { Loader2, CheckCircle2, ExternalLink, AlertCircle, Wallet, Zap, X } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, Wallet, Zap, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 
 import {
   hyperliquidWagmiConfig,
   ARBITRUM_USDC_ADDRESS,
+  HYPERLIQUID_BRIDGE_ADDRESS,
   ERC20_ABI,
   HYPERLIQUID_API_URL,
   HYPERLIQUID_EIP712_DOMAIN,
   HYPERLIQUID_APPROVE_AGENT_TYPES,
+  HYPERLIQUID_WITHDRAW_TYPES,
+  HYPERLIQUID_SIGNATURE_CHAIN_ID_HEX,
 } from '@/lib/hyperliquid-config'
 import { apiClient } from '@/lib/api'
 
@@ -61,8 +65,17 @@ function HyperliquidContent() {
   // Disconnect state
   const [disconnecting, setDisconnecting] = useState(false)
 
+  // Deposit state
+  const [depositAmount, setDepositAmount] = useState('')
+  const [depositTxHash, setDepositTxHash] = useState<`0x${string}` | undefined>()
+
+  // Withdraw state
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawLoading, setWithdrawLoading] = useState(false)
+  const [withdrawResult, setWithdrawResult] = useState<{ status: string; message?: string } | null>(null)
+
   // Read Arbitrum USDC balance
-  const { data: usdcBalance } = useReadContract({
+  const { data: usdcBalance, refetch: refetchUsdcBalance } = useReadContract({
     address: ARBITRUM_USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
@@ -73,6 +86,31 @@ function HyperliquidContent() {
   const formattedUsdcBalance = usdcBalance
     ? (Number(usdcBalance) / 1e6).toFixed(2)
     : '0.00'
+
+  // Deposit: ERC-20 transfer to bridge
+  const { writeContract: writeDeposit, isPending: isDepositPending, data: depositData } = useWriteContract()
+
+  // Track deposit tx confirmation
+  const { isLoading: isDepositConfirming, isSuccess: isDepositConfirmed } = useWaitForTransactionReceipt({
+    hash: depositTxHash,
+  })
+
+  // When deposit tx hash comes back, save it
+  useEffect(() => {
+    if (depositData) {
+      setDepositTxHash(depositData)
+    }
+  }, [depositData])
+
+  // When deposit confirms, refresh balances
+  useEffect(() => {
+    if (isDepositConfirmed) {
+      setDepositAmount('')
+      refetchUsdcBalance()
+      // Give Hyperliquid a moment to process the deposit
+      setTimeout(() => fetchStatus(), 5000)
+    }
+  }, [isDepositConfirmed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch Hyperliquid status from backend
   const fetchStatus = useCallback(async () => {
@@ -133,7 +171,7 @@ function HyperliquidContent() {
         action: {
           type: 'approveAgent',
           hyperliquidChain: 'Mainnet',
-          signatureChainId: '0xa4b1',
+          signatureChainId: HYPERLIQUID_SIGNATURE_CHAIN_ID_HEX,
           agentAddress: agentAddress,
           agentName: 'ggbots',
           nonce: nonce,
@@ -172,13 +210,112 @@ function HyperliquidContent() {
       console.error('Hyperliquid setup error:', err)
       const message = err instanceof Error ? err.message : 'Setup failed'
 
-      // User rejected in MetaMask
       if (message.includes('User rejected') || message.includes('user rejected')) {
         setSetupError('Signature rejected. Please try again.')
       } else {
         setSetupError(message)
       }
       setSetupStep('idle')
+    }
+  }
+
+  // Deposit USDC to Hyperliquid (on-chain ERC-20 transfer to bridge)
+  const handleDeposit = () => {
+    if (!depositAmount || !address) return
+
+    const amountFloat = parseFloat(depositAmount)
+    if (isNaN(amountFloat) || amountFloat < 5) return
+
+    // USDC has 6 decimals
+    const amountWei = parseUnits(depositAmount, 6)
+
+    writeDeposit({
+      address: ARBITRUM_USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'transfer',
+      args: [HYPERLIQUID_BRIDGE_ADDRESS, amountWei],
+    })
+  }
+
+  // Withdraw USDC from Hyperliquid (EIP-712 signed message, no gas)
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !address) return
+
+    const amountFloat = parseFloat(withdrawAmount)
+    if (isNaN(amountFloat) || amountFloat <= 0) return
+
+    try {
+      setWithdrawLoading(true)
+      setWithdrawResult(null)
+
+      const timestamp = Date.now()
+
+      // Sign EIP-712 withdraw message
+      const signature = await signTypedDataAsync({
+        domain: HYPERLIQUID_EIP712_DOMAIN,
+        types: HYPERLIQUID_WITHDRAW_TYPES,
+        primaryType: 'HyperliquidTransaction:Withdraw',
+        message: {
+          hyperliquidChain: 'Mainnet',
+          destination: address,
+          amount: withdrawAmount,
+          time: BigInt(timestamp),
+        },
+      })
+
+      // Parse signature
+      const r = signature.slice(0, 66) as `0x${string}`
+      const s = `0x${signature.slice(66, 130)}` as `0x${string}`
+      const v = parseInt(signature.slice(130, 132), 16)
+
+      // POST to Hyperliquid API
+      const hlPayload = {
+        action: {
+          type: 'withdraw3',
+          hyperliquidChain: 'Mainnet',
+          signatureChainId: HYPERLIQUID_SIGNATURE_CHAIN_ID_HEX,
+          destination: address,
+          amount: withdrawAmount,
+          time: timestamp,
+        },
+        nonce: timestamp,
+        signature: { r, s, v },
+      }
+
+      const hlResponse = await fetch(`${HYPERLIQUID_API_URL}/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hlPayload),
+      })
+
+      if (!hlResponse.ok) {
+        const hlError = await hlResponse.text()
+        throw new Error(`Withdrawal failed: ${hlError}`)
+      }
+
+      const hlResult = await hlResponse.json()
+      if (hlResult.status !== 'ok') {
+        throw new Error(`Withdrawal rejected: ${JSON.stringify(hlResult)}`)
+      }
+
+      setWithdrawResult({ status: 'success', message: `Withdrawal of $${withdrawAmount} initiated. Funds will arrive on Arbitrum shortly.` })
+      setWithdrawAmount('')
+
+      // Refresh balances after a delay
+      setTimeout(() => {
+        fetchStatus()
+        refetchUsdcBalance()
+      }, 5000)
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Withdrawal failed'
+      if (message.includes('User rejected') || message.includes('user rejected')) {
+        setWithdrawResult({ status: 'failed', message: 'Signature rejected.' })
+      } else {
+        setWithdrawResult({ status: 'failed', message })
+      }
+    } finally {
+      setWithdrawLoading(false)
     }
   }
 
@@ -189,7 +326,6 @@ function HyperliquidContent() {
       setTestTradeResult(null)
       const result = await apiClient.testHyperliquidTrade()
       setTestTradeResult(result)
-      // Refresh status to show updated balance
       await fetchStatus()
     } catch (err) {
       setTestTradeResult({
@@ -226,6 +362,10 @@ function HyperliquidContent() {
 
   const truncateAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
+
+  const depositAmountFloat = parseFloat(depositAmount) || 0
+  const hasEnoughUsdc = usdcBalance ? depositAmountFloat <= Number(usdcBalance) / 1e6 : false
+  const isValidDeposit = depositAmountFloat >= 5 && hasEnoughUsdc
 
   // Loading state
   if (statusLoading) {
@@ -278,6 +418,97 @@ function HyperliquidContent() {
             </div>
           </div>
         </div>
+
+        {/* Deposit & Withdraw — only shown when wallet is connected via RainbowKit */}
+        {isConnected && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Deposit */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ArrowDownToLine className="h-5 w-5 text-[var(--accent)]" />
+                <h3 className="text-base font-display text-[var(--text-primary)]">Deposit</h3>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mb-3">
+                Send USDC from Arbitrum to Hyperliquid. Minimum $5. Costs gas.
+              </p>
+              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-3">
+                <Wallet className="h-3 w-3" />
+                <span>Arbitrum balance: {formattedUsdcBalance} USDC</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="5"
+                  step="1"
+                  placeholder="Amount (min $5)"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={handleDeposit}
+                  disabled={!isValidDeposit || isDepositPending || isDepositConfirming}
+                  className="px-4 py-2 rounded-lg font-medium text-sm transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDepositPending ? 'Confirm...' : isDepositConfirming ? 'Sending...' : 'Deposit'}
+                </button>
+              </div>
+              {depositAmountFloat > 0 && depositAmountFloat < 5 && (
+                <p className="text-xs text-[var(--loss-color)] mt-2">Minimum deposit is $5</p>
+              )}
+              {isDepositConfirmed && (
+                <p className="text-xs text-[var(--profit-color)] mt-2">Deposit sent! Balance will update in ~30 seconds.</p>
+              )}
+            </div>
+
+            {/* Withdraw */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ArrowUpFromLine className="h-5 w-5 text-[var(--accent)]" />
+                <h3 className="text-base font-display text-[var(--text-primary)]">Withdraw</h3>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mb-3">
+                Withdraw USDC from Hyperliquid to Arbitrum. No gas fees. Signed by your wallet.
+              </p>
+              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-3">
+                <Wallet className="h-3 w-3" />
+                <span>Hyperliquid balance: ${hlStatus.available_balance?.toFixed(2) ?? '...'}</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="Amount"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={handleWithdraw}
+                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || withdrawLoading}
+                  className="px-4 py-2 rounded-lg font-medium text-sm transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {withdrawLoading ? 'Signing...' : 'Withdraw'}
+                </button>
+              </div>
+              {withdrawResult && (
+                <p className={`text-xs mt-2 ${withdrawResult.status === 'success' ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'}`}>
+                  {withdrawResult.message}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!isConnected && (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+            <p className="text-sm text-[var(--text-secondary)] mb-3">
+              Connect your wallet to deposit or withdraw USDC.
+            </p>
+            <ConnectButton />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3">
@@ -381,23 +612,54 @@ function HyperliquidContent() {
             </div>
           )}
         </div>
-
-        {isConnected && (
-          <div className="mt-3">
-            <a
-              href="https://app.hyperliquid.xyz/portfolio"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Deposit USDC on Hyperliquid
-            </a>
-          </div>
-        )}
       </div>
 
-      {/* Step 2: Authorize API Wallet */}
+      {/* Step 2: Deposit USDC (optional, shown when wallet connected) */}
+      {isConnected && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center">
+              <ArrowDownToLine className="h-4 w-4 text-[var(--accent)]" />
+            </div>
+            <h2 className="text-lg font-display text-[var(--text-primary)]">Deposit USDC to Hyperliquid</h2>
+            <span className="text-xs text-[var(--text-muted)] px-2 py-0.5 rounded bg-[var(--bg-primary)] border border-[var(--border)]">Optional</span>
+          </div>
+
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            Send USDC from your Arbitrum wallet to Hyperliquid. Minimum $5. This is an on-chain transaction (costs gas).
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="5"
+              step="1"
+              placeholder="Amount (min $5)"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              className="flex-1 px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+            />
+            <button
+              onClick={handleDeposit}
+              disabled={!isValidDeposit || isDepositPending || isDepositConfirming}
+              className="px-5 py-2.5 rounded-lg font-medium text-sm transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDepositPending ? 'Confirm in wallet...' : isDepositConfirming ? 'Sending...' : 'Deposit'}
+            </button>
+          </div>
+          {depositAmountFloat > 0 && depositAmountFloat < 5 && (
+            <p className="text-xs text-[var(--loss-color)] mt-2">Minimum deposit is $5</p>
+          )}
+          {depositAmountFloat > 0 && !hasEnoughUsdc && (
+            <p className="text-xs text-[var(--loss-color)] mt-2">Insufficient USDC balance on Arbitrum</p>
+          )}
+          {isDepositConfirmed && (
+            <p className="text-xs text-[var(--profit-color)] mt-2">Deposit sent! Your Hyperliquid balance will update in ~30 seconds.</p>
+          )}
+        </div>
+      )}
+
+      {/* Step 3: Authorize API Wallet */}
       <div className={`rounded-2xl border bg-[var(--bg-secondary)] p-6 ${
         isConnected ? 'border-[var(--border)]' : 'border-[var(--border)]/50 opacity-50'
       }`}>
