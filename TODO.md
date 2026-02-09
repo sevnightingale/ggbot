@@ -24,7 +24,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ## 🔥 **HIGH PRIORITY - Hyperliquid Live Trading Integration** [HYPERLIQUID_INTEGRATION.md]
 
-**Status**: 🟢 PHASE 1 COMPLETE — Backend ready, mainnet testing next
+**Status**: 🟢 PHASE 2 COMPLETE — Forge integration live (Settings, Bot Creation, Activation)
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
 **Priority**: P1 — Replaces blocked Symphony integration
 **Estimated Effort**: 32-44 hours across 4 phases
@@ -42,21 +42,26 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] Add `HYPERLIQUID` to TradingMode enum in `schemas.py`
 - [x] Remove legacy "Pro subscription required" gate from config creation (all tiers can create live bots, activation is the real gate)
 
-### **Phase 1.5: Mainnet Integration Test** (~1-2 hours)
-- [ ] Deposit $10 USDC from MetaMask on Arbitrum → Hyperliquid bridge
-- [ ] Create API wallet on Hyperliquid, authorize via approve_agent
-- [ ] Store credentials via `VaultManager.store_hyperliquid_credential()`
-- [ ] Execute test trade: market open → verify SL/TP → close position
-- [ ] Verify `live_trades` row created with `provider='hyperliquid'`
-- [ ] Verify `get_open_positions()` and `get_account_metrics()` return correct data
+### **Phase 1.5: Frontend Setup Page + Mainnet Test** ✅ COMPLETE (2026-02-09)
+- [x] Created `/hyperliquid` page with dedicated Arbitrum wagmi config (separate from Arena's Scroll config)
+- [x] RainbowKit wallet connect → EIP-712 `approveAgent` signing → API wallet creation
+- [x] USDC deposit (on-chain ERC-20 transfer to bridge) + withdrawal (EIP-712 `withdraw3`, no gas)
+- [x] Backend: 4 endpoints — `POST /setup`, `GET /status`, `POST /disconnect`, `POST /test-trade`
+- [x] Account status display: wallet address, account value, available balance, open positions
+- [x] Test trade button (0.01 ETH long → close) — verified on mainnet at $2,071.90
+- [x] Credentials stored in Supabase Vault via `VaultManager.store_hyperliquid_credential()`
+- **Key learnings**: viem enforces EIP-712 domain chainId must match connected wallet (use Arbitrum 42161/0xa4b1, not SDK default 421614/0x66eee). `market_open` top-level `status: "ok"` doesn't mean filled — must check `statuses[]` for errors.
 
-### **Phase 2: Frontend Wallet + Deposit** (~10-14 hours)
-- [ ] Add Arbitrum chain to `wagmi-config.ts` (currently only Scroll from Arena)
-- [ ] Create `HyperliquidSetupModal.tsx` (3-step: connect → deposit → authorize)
-- [ ] Implement `ApproveAgent` signing flow (generates API wallet, stores key via backend)
-- [ ] Add USDC deposit flow (transfer to Hyperliquid bridge on Arbitrum)
-- [ ] Add `hyperliquid` option to `TradeSettings.tsx` with account allocation indicator
-- [ ] Add Hyperliquid balance display + withdraw button
+### **Phase 2: Forge Integration** ✅ COMPLETE (2026-02-09)
+- [x] `SettingsModal.tsx` — replaced Symphony/Aster with "Live Trading" section (connect/manage/disconnect via modal)
+- [x] `BotCreationModal.tsx` — Paper + Live Trading modes; opens setup modal if not connected
+- [x] `LiveTradingSetupModal.tsx` + `LiveTradingModalContent.tsx` — extracted Web3 setup flow into reusable modal
+- [x] `ggbot.py` — `hyperliquid_connected` in profile endpoint; credential + unique-symbol gates on `start_bot`
+- [x] `TradeSettings.tsx` — allocation indicator showing margin distribution across live bots
+- [x] `ActivationBar.tsx` — recognizes `'hyperliquid'` as live trading mode
+- [x] `UserProfile.tsx` — live trading balance in dropdown
+- [x] `permissions.tsx` — `refreshProfile()` for real-time state updates after connect/disconnect
+- [x] `RiskAcknowledgmentModal.tsx` — accepts `'hyperliquid'` trading mode
 
 ### **Phase 3: Dashboard Integration** (~6-8 hours)
 - [ ] Create `core/monitoring/adapters/hyperliquid_adapter.py`

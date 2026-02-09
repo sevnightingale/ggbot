@@ -6,6 +6,34 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-09 - Hyperliquid Phase 2: Forge Integration (Live Trading)
+
+**Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
+
+**Summary**: Replaced Symphony/Aster with "Live Trading" (powered by Hyperliquid) across Forge. Users can create live bots, manage funds, and activate with credential + unique-symbol enforcement.
+
+**Backend** (`ggbot.py`):
+- `/api/v2/user/profile` returns `hyperliquid_connected` (DB check for non-null wallet address)
+- `start_bot` endpoint: Hyperliquid credential check + unique symbol enforcement per active bot (prevents position netting conflicts)
+
+**New Components**:
+- `LiveTradingSetupModal.tsx` — modal wrapper with `next/dynamic` SSR-disabled import
+- `LiveTradingModalContent.tsx` — full Web3 flow (connect wallet, deposit, authorize, manage funds, test trade, disconnect) extracted from `HyperliquidSetup.tsx`
+
+**Modified Frontend** (10 files):
+- `SettingsModal.tsx` — replaced ~300 lines Symphony/Aster with "Live Trading" section (connected status + manage funds, or setup CTA)
+- `BotCreationModal.tsx` — 2 trading modes (Paper + Live Trading); opens setup modal for unconfigured users; removed `symphonyAgentId`
+- `page.tsx` — updated `TradingMode` to `'paper' | 'hyperliquid'`, removed symphony references
+- `TradeSettings.tsx` — allocation indicator bar showing margin distribution across live bots
+- `ActivationBar.tsx` — added `'hyperliquid'` to `isLiveTrading` check
+- `UserProfile.tsx` — live trading balance display in dropdown
+- `permissions.tsx` — added `refreshProfile()` to context for real-time state updates after connect/disconnect
+- `RiskAcknowledgmentModal.tsx` — accepts `'hyperliquid'` trading mode
+- `api.ts` — `hyperliquid_connected` on `UserProfile`, `'hyperliquid'` on `BotConfiguration.trading_mode`
+- `ConfigureLayout.tsx` — passes `allBots` through to TradeSettings for allocation calculation
+
+---
+
 ## 2026-02-03 - SSE Dashboard Query Optimization (Denormalize initial_equity)
 
 **Purpose**: Eliminate expensive `DISTINCT ON` scan of activities table in dashboard SSE query.
