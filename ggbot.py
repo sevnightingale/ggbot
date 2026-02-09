@@ -3375,9 +3375,19 @@ async def test_hyperliquid_trade(
                 detail="Hyperliquid credentials not configured. Please connect your account first."
             )
 
-        # Open minimal ETH long
-        logger.bind(user_id=current_user.user_id).info("Executing test trade: 0.001 ETH long")
-        order_result = exchange.market_open("ETH", True, 0.001, slippage=0.05)
+        # Set leverage to 3x cross before trading
+        try:
+            exchange.update_leverage(3, "ETH", is_cross=True)
+            logger.bind(user_id=current_user.user_id).info("Set ETH leverage to 3x cross")
+        except Exception as lev_err:
+            logger.bind(user_id=current_user.user_id).warning(f"Leverage set warning (may already be set): {lev_err}")
+
+        # Open minimal ETH long (0.01 ETH ~ $25 notional)
+        test_size = 0.01
+        logger.bind(user_id=current_user.user_id).info(f"Executing test trade: {test_size} ETH long")
+        order_result = exchange.market_open("ETH", True, test_size, slippage=0.05)
+
+        logger.bind(user_id=current_user.user_id).info(f"market_open response: {order_result}")
 
         if order_result.get("status") != "ok":
             logger.bind(user_id=current_user.user_id).error(f"Test trade open failed: {order_result}")
@@ -3386,13 +3396,31 @@ async def test_hyperliquid_trade(
                 "error": f"Market order failed: {order_result}"
             }
 
-        # Extract fill price
+        # Extract fill price — check for errors in statuses
         statuses = order_result.get("response", {}).get("data", {}).get("statuses", [])
         entry_price = 0
+        fill_error = None
         for status in statuses:
             if "filled" in status:
                 entry_price = float(status["filled"]["avgPx"])
                 break
+            if "error" in status:
+                fill_error = status["error"]
+                break
+
+        if fill_error:
+            logger.bind(user_id=current_user.user_id).error(f"Test trade fill error: {fill_error}")
+            return {
+                "status": "failed",
+                "error": f"Order rejected: {fill_error}"
+            }
+
+        if entry_price == 0:
+            logger.bind(user_id=current_user.user_id).error(f"No fill found in statuses: {statuses}")
+            return {
+                "status": "failed",
+                "error": f"Order not filled. Statuses: {statuses}"
+            }
 
         logger.bind(user_id=current_user.user_id).info(f"Test trade opened at ${entry_price:.2f}")
 
@@ -3401,7 +3429,17 @@ async def test_hyperliquid_trade(
 
         # Close the position
         close_result = exchange.market_close("ETH")
-        close_status = close_result.get("status", "unknown") if close_result else "failed"
+        logger.bind(user_id=current_user.user_id).info(f"market_close response: {close_result}")
+
+        close_status = "unknown"
+        if close_result:
+            close_status = close_result.get("status", "unknown")
+            # Check for close errors in statuses
+            close_statuses = close_result.get("response", {}).get("data", {}).get("statuses", [])
+            for cs in close_statuses:
+                if "error" in cs:
+                    close_status = f"error: {cs['error']}"
+                    break
 
         logger.bind(user_id=current_user.user_id).info(f"Test trade closed: {close_status}")
 
