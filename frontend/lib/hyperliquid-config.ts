@@ -17,11 +17,11 @@ export const hyperliquidWagmiConfig = getDefaultConfig({
 // Arbitrum chain ID (network the wallet connects to)
 export const ARBITRUM_CHAIN_ID = 42161
 
-// Hyperliquid signing chain ID (0x66eee = 421614, used in EIP-712 domain)
-// This is separate from the network chain — it's the EIP-712 signing context.
-// The SDK uses this for ALL user-signed actions (approve, withdraw, etc.)
-export const HYPERLIQUID_SIGNATURE_CHAIN_ID = 421614
-export const HYPERLIQUID_SIGNATURE_CHAIN_ID_HEX = '0x66eee'
+// Hyperliquid signing chain ID — must match the connected wallet's chain.
+// The SDK uses 0x66eee (421614) but viem enforces domain chainId === active chain.
+// Hyperliquid's comment: "signatureChainId can be any chain" — so we use Arbitrum.
+export const HYPERLIQUID_SIGNATURE_CHAIN_ID = ARBITRUM_CHAIN_ID
+export const HYPERLIQUID_SIGNATURE_CHAIN_ID_HEX = '0xa4b1'
 
 // USDC on Arbitrum (native, not bridged)
 export const ARBITRUM_USDC_ADDRESS = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' as const
@@ -61,7 +61,7 @@ export const ERC20_ABI = [
 export const HYPERLIQUID_API_URL = 'https://api.hyperliquid.xyz'
 
 // EIP-712 Domain for Hyperliquid transaction signing
-// chainId is the SIGNING chain (421614), not the Arbitrum network chain (42161)
+// Uses Arbitrum chainId (42161) to satisfy viem's chain validation
 export const HYPERLIQUID_EIP712_DOMAIN = {
   name: 'HyperliquidSignTransaction',
   version: '1',
