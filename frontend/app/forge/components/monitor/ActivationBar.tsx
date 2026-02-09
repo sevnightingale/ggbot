@@ -76,7 +76,7 @@ export function ActivationBar({
                              userProfile?.can_activate_bots &&
                              !userProfile?.has_available_credits
 
-  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
+  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'hyperliquid'
   const isRegisteredForArena = selectedBot.is_public_performance === true
   const isPaperTrading = selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
 

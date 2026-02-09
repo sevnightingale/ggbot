@@ -2366,6 +2366,22 @@ async def get_user_profile(
     """Get current user profile with credit info for prepaid tier."""
     profile = await current_user.load_profile()
 
+    # Check if Hyperliquid wallet is connected (fast DB check, no external API call)
+    hyperliquid_connected = False
+    try:
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT hyperliquid_wallet_address IS NOT NULL FROM user_profiles WHERE user_id = %s",
+                    (str(current_user.user_id),)
+                )
+                row = cur.fetchone()
+                if row:
+                    hyperliquid_connected = row[0]
+    except Exception as e:
+        logger.warning(f"Failed to check Hyperliquid connection status: {e}")
+
     # Get credit balance for paid users (needed for prepaid activation check)
     credit_balance_usd = None
     if profile.has_stripe_integration:
@@ -2392,7 +2408,9 @@ async def get_user_profile(
         "paid_data_points": profile.paid_data_points,
         # Credit-related fields for prepaid tier handling
         "credit_balance_usd": credit_balance_usd,
-        "has_available_credits": has_available_credits
+        "has_available_credits": has_available_credits,
+        # Live trading connection status
+        "hyperliquid_connected": hyperliquid_connected
     }
 
 
@@ -4231,6 +4249,40 @@ async def start_bot(
                 raise HTTPException(
                     status_code=402,  # Payment Required
                     detail="Insufficient credits. Please add credits to activate your bot."
+                )
+        # =====================================================================
+
+        # =====================================================================
+        # HYPERLIQUID-SPECIFIC CHECKS
+        # =====================================================================
+        config_dict = config.to_jsonb()
+        if config_dict.get('trading_mode') == 'hyperliquid':
+            # 1. Credential check — user must have completed Hyperliquid setup
+            from core.auth.vault_utils import VaultManager
+            hl_credentials = await VaultManager.get_hyperliquid_credential(current_user.user_id)
+            if not hl_credentials:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Live trading not set up. Connect your wallet in Settings first."
+                )
+
+            # 2. Unique symbol check — each active live bot must trade a unique symbol
+            selected_pair = config_dict.get('selected_pair')
+            from core.common.db import get_db_connection
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT config_id, config_name FROM configurations
+                        WHERE user_id = %s AND trading_mode = 'hyperliquid'
+                        AND state = 'active' AND config_id != %s
+                        AND config_data->>'selected_pair' = %s
+                    """, (str(current_user.user_id), config_id, selected_pair))
+                    conflict = cur.fetchone()
+            if conflict:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Another live bot ('{conflict[1]}') is already trading {selected_pair}. "
+                           f"Each live bot must trade a unique symbol."
                 )
         # =====================================================================
 

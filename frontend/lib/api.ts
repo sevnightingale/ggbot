@@ -100,7 +100,7 @@ export interface BotConfiguration {
   config_type: string
   config_data: ConfigData
   state: 'active' | 'inactive'
-  trading_mode?: 'paper' | 'symphony' | 'aster'
+  trading_mode?: 'paper' | 'symphony' | 'aster' | 'hyperliquid'
   symphony_agent_id?: string
   profile_image_url?: string | null
   is_public_performance?: boolean
@@ -150,6 +150,8 @@ export interface UserProfile {
   // Credit-related fields
   credit_balance_usd: number | null
   has_available_credits: boolean
+  // Live trading connection status
+  hyperliquid_connected: boolean
 }
 
 export class ApiClient {

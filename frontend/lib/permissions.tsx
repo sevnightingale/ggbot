@@ -18,6 +18,8 @@ interface UserProfile {
   // Credit-related fields
   credit_balance_usd: number | null  // Current credit balance (null if no Stripe integration)
   has_available_credits: boolean     // True if can start bot (non-prepaid OR prepaid with credits > 0)
+  // Live trading connection status
+  hyperliquid_connected: boolean
 }
 
 interface PermissionContextType {
@@ -84,7 +86,8 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
           can_use_agents: false,
           paid_data_points: [],
           credit_balance_usd: null,
-          has_available_credits: false
+          has_available_credits: false,
+          hyperliquid_connected: false
         })
       } finally {
         setLoading(false)

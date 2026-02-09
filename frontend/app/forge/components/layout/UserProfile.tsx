@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { User, LogOut, Crown, CreditCard, Settings, Plus, Coins, AlertTriangle } from 'lucide-react'
+import { User, LogOut, Crown, CreditCard, Settings, Plus, Coins, AlertTriangle, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/permissions'
@@ -67,6 +67,21 @@ export function UserProfile({}: UserProfileProps) {
 
     getUserData()
   }, [supabase.auth])
+
+  // Fetch Hyperliquid balance for connected users
+  const [hlBalance, setHlBalance] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (userProfile?.hyperliquid_connected) {
+      apiClient.getHyperliquidStatus()
+        .then(status => {
+          if (status?.available_balance !== null && status?.available_balance !== undefined) {
+            setHlBalance(status.available_balance)
+          }
+        })
+        .catch(err => console.error('Failed to fetch HL balance:', err))
+    }
+  }, [userProfile?.hyperliquid_connected])
 
   // Fetch usage summary for paid users (usage_based and prepaid)
   useEffect(() => {
@@ -247,6 +262,17 @@ export function UserProfile({}: UserProfileProps) {
                       <span>${usageSummary.usage_usd.toFixed(2)}</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Live Trading Balance */}
+              {userProfile?.hyperliquid_connected && hlBalance !== null && (
+                <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                  <span className="flex items-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Live Trading
+                  </span>
+                  <span>${hlBalance.toFixed(2)}</span>
                 </div>
               )}
             </div>

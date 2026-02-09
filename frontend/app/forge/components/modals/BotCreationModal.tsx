@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { Bot, Rocket, Loader2, AlertCircle, Zap, ChevronRight, ChevronLeft, Sparkles, X } from 'lucide-react'
+import { Rocket, Loader2, Zap, ChevronRight, ChevronLeft, Sparkles, X, Settings } from 'lucide-react'
 import { Modal, ModalBody, ModalFooter } from '@/components/ui/modal'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { apiClient } from '@/lib/api'
 import { getArchetypeConfig, getArchetypeSummaries } from '@/lib/archetypes'
+import { usePermissions } from '@/lib/permissions'
+import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
 
 type BotType = 'scheduled_trading' | 'signal_validation' | 'agent'
-type TradingMode = 'paper' | 'symphony' | 'aster'
+type TradingMode = 'paper' | 'hyperliquid'
 
 // LLM Model types
 interface LLMModel {
@@ -63,7 +65,7 @@ const TIMEFRAMES = [
 interface BotCreationModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (botType: BotType, tradingMode: TradingMode, symphonyAgentId?: string, botName?: string, configData?: Record<string, unknown>) => void
+  onConfirm: (botType: BotType, tradingMode: TradingMode, botName?: string, configData?: Record<string, unknown>) => void
   existingBotCount: number
   forceOpen?: boolean // When true, modal cannot be closed (for new users with 0 bots)
 }
@@ -82,7 +84,6 @@ export function BotCreationModal({
   // Form state
   const [botName, setBotName] = useState('')
   const [tradingMode, setTradingMode] = useState<TradingMode>('paper')
-  const [symphonyAgentId, setSymphonyAgentId] = useState('')
   const [symbol, setSymbol] = useState('BTC/USDT')
   const [timeframe, setTimeframe] = useState('1h')
   const [description, setDescription] = useState('')
@@ -96,13 +97,14 @@ export function BotCreationModal({
   const [llmModels, setLLMModels] = useState<LLMModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
 
-  // Connection states
-  const [symphonyConnected, setSymphonyConnected] = useState(false)
-  const [asterConnected, setAsterConnected] = useState(false)
-  const [checkingConnections, setCheckingConnections] = useState(true)
+  // Live Trading setup modal
+  const [liveTradingSetupOpen, setLiveTradingSetupOpen] = useState(false)
 
   // Error state
   const [error, setError] = useState<string | null>(null)
+
+  // Get user profile for connection status
+  const { userProfile } = usePermissions()
 
   // Generate default bot name
   const generateDefaultName = useCallback(() => {
@@ -116,7 +118,6 @@ export function BotCreationModal({
       setCurrentStep(1)
       setBotName(generateDefaultName())
       setTradingMode('paper')
-      setSymphonyAgentId('')
       setSymbol('BTC/USDT')
       setTimeframe('1h')
       setDescription('')
@@ -124,46 +125,9 @@ export function BotCreationModal({
       setLlmModel('grok')
       setReasoningTier('standard')
       setError(null)
-      checkConnectionStatus()
       fetchLLMModels()
     }
   }, [open, generateDefaultName])
-
-  const checkConnectionStatus = async () => {
-    try {
-      setCheckingConnections(true)
-      const supabase = (await import('@/lib/supabase')).createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        setCheckingConnections(false)
-        return
-      }
-
-      const [symphonyRes, asterRes] = await Promise.all([
-        fetch('/api/v2/symphony/status', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        }),
-        fetch('/api/v2/aster/status', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        })
-      ])
-
-      if (symphonyRes.ok) {
-        const data = await symphonyRes.json()
-        setSymphonyConnected(data.connected || false)
-      }
-
-      if (asterRes.ok) {
-        const data = await asterRes.json()
-        setAsterConnected(data.connected || false)
-      }
-    } catch (e) {
-      console.error('Failed to check connection status:', e)
-    } finally {
-      setCheckingConnections(false)
-    }
-  }
 
   const fetchLLMModels = async () => {
     try {
@@ -187,27 +151,18 @@ export function BotCreationModal({
       description: 'Practice with $10k virtual money',
       color: 'var(--agent-extraction)',
       available: true,
-      requiresConnection: false
+      setupRequired: false,
     },
     {
-      mode: 'symphony' as const,
+      mode: 'hyperliquid' as const,
       Icon: Rocket,
-      label: 'Symphony Live',
-      description: 'Real trades via Symphony.io',
+      label: 'Live Trading',
+      description: userProfile?.hyperliquid_connected
+        ? 'Real trades on 291 perpetual markets'
+        : 'Set up required — connect wallet in Settings',
       color: 'var(--signal)',
-      available: true,
-      requiresConnection: true,
-      connected: symphonyConnected
-    },
-    {
-      mode: 'aster' as const,
-      Icon: Bot,
-      label: 'AsterDEX',
-      description: 'Real trades on AsterDEX',
-      color: 'var(--ember)',
-      available: true,
-      requiresConnection: true,
-      connected: asterConnected
+      available: !!userProfile?.hyperliquid_connected,
+      setupRequired: !userProfile?.hyperliquid_connected,
     }
   ]
 
@@ -217,9 +172,6 @@ export function BotCreationModal({
       case 1:
         return botName.trim().length > 0
       case 2:
-        if (tradingMode === 'symphony') {
-          return symphonyAgentId.trim().length > 0
-        }
         return true
       case 3:
         return symbol && timeframe
@@ -305,7 +257,6 @@ export function BotCreationModal({
         schema_version: '2.1',
         config_type: 'scheduled_trading' as BotType,
         trading_mode: tradingMode,
-        symphony_agent_id: tradingMode === 'symphony' ? symphonyAgentId : undefined,
         selected_pair: symbol,
         extraction: extractionConfig,
         decision: {
@@ -341,7 +292,6 @@ export function BotCreationModal({
       onConfirm(
         'scheduled_trading',
         tradingMode,
-        tradingMode === 'symphony' ? symphonyAgentId.trim() : undefined,
         botName.trim(),
         configData
       )
@@ -414,87 +364,64 @@ export function BotCreationModal({
               </p>
             </div>
 
-            {checkingConnections ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-5 w-5 animate-spin text-[var(--text-secondary)]" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tradingModes.map(({ mode, Icon, label, description, color, available, requiresConnection, connected }) => {
-                  const isDisabled = !available || (requiresConnection && !connected)
-                  const showWarning = requiresConnection && !connected
+            <div className="space-y-3">
+              {tradingModes.map(({ mode, Icon, label, description, color, available, setupRequired }) => {
+                const isDisabled = !available && !setupRequired
 
-                  return (
-                    <button
-                      key={mode}
-                      onClick={() => setTradingMode(mode)}
-                      disabled={isDisabled}
-                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                        tradingMode === mode
-                          ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                          : 'border-[var(--border)] hover:border-[var(--border-hover)]'
-                      } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
-                          style={{ backgroundColor: !isDisabled ? `${color}20` : 'var(--bg-tertiary)' }}
-                        >
-                          <Icon className="h-6 w-6" style={{ color: !isDisabled ? color : 'var(--text-muted)' }} />
-                        </div>
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      if (setupRequired) {
+                        setLiveTradingSetupOpen(true)
+                      } else {
+                        setTradingMode(mode)
+                      }
+                    }}
+                    disabled={isDisabled}
+                    className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                      tradingMode === mode
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                        : 'border-[var(--border)] hover:border-[var(--border-hover)]'
+                    } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: !isDisabled ? `${color}20` : 'var(--bg-tertiary)' }}
+                      >
+                        <Icon className="h-6 w-6" style={{ color: !isDisabled ? color : 'var(--text-muted)' }} />
+                      </div>
 
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-[var(--text-primary)]">{label}</span>
-                            {showWarning && (
-                              <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                Not connected
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-[var(--text-secondary)]">{description}</p>
-                        </div>
-
-                        <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 ${
-                          tradingMode === mode
-                            ? 'border-[var(--accent)] bg-[var(--accent)]'
-                            : 'border-[var(--border)]'
-                        }`}>
-                          {tradingMode === mode && (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="w-2 h-2 rounded-full bg-white"></div>
-                            </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-[var(--text-primary)]">{label}</span>
+                          {setupRequired && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <Settings className="h-3 w-3" />
+                              Setup required
+                            </span>
                           )}
                         </div>
+                        <p className="text-sm text-[var(--text-secondary)]">{description}</p>
                       </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
 
-            {/* Symphony Agent ID Input */}
-            {tradingMode === 'symphony' && (
-              <div className="mt-4 p-4 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)]">
-                <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
-                  Symphony Agent ID *
-                </label>
-                <input
-                  type="text"
-                  value={symphonyAgentId}
-                  onChange={(e) => setSymphonyAgentId(e.target.value)}
-                  placeholder="00000000-0000-0000-0000-000000000000"
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] font-mono text-sm"
-                />
-                <p className="text-xs text-[var(--text-muted)] mt-2">
-                  Find your Agent ID in the{' '}
-                  <a href="https://agent-portal.symphony.io" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">
-                    Symphony portal
-                  </a>
-                </p>
-              </div>
-            )}
+                      <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 ${
+                        tradingMode === mode
+                          ? 'border-[var(--accent)] bg-[var(--accent)]'
+                          : 'border-[var(--border)]'
+                      }`}>
+                        {tradingMode === mode && (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )
 
@@ -711,7 +638,7 @@ export function BotCreationModal({
               <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">Summary</h4>
               <div className="text-sm text-[var(--text-muted)] space-y-1">
                 <p><span className="text-[var(--text-secondary)]">Name:</span> {botName}</p>
-                <p><span className="text-[var(--text-secondary)]">Mode:</span> {tradingMode === 'paper' ? 'Paper Trading' : tradingMode === 'symphony' ? 'Symphony Live' : 'AsterDEX'}</p>
+                <p><span className="text-[var(--text-secondary)]">Mode:</span> {tradingMode === 'paper' ? 'Paper Trading' : 'Live Trading'}</p>
                 <p><span className="text-[var(--text-secondary)]">Trading:</span> {symbol} every {TIMEFRAMES.find(t => t.value === timeframe)?.label}</p>
                 <p><span className="text-[var(--text-secondary)]">Strategy:</span> {selectedArchetype ? ARCHETYPES.find(a => a.id === selectedArchetype)?.name : 'Custom'}</p>
               </div>
@@ -725,97 +652,109 @@ export function BotCreationModal({
   }
 
   return (
-    <Modal open={open} onOpenChange={handleOpenChange} size="xl" preventClose={forceOpen}>
-      {/* Custom Header with progress bar */}
-      <div className="p-4 sm:p-6 pb-0 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-sm font-medium text-[var(--text-muted)]">Create New Bot</h1>
-          {forceOpen ? (
-            <div
-              className="p-1 rounded text-[var(--text-muted)] cursor-not-allowed opacity-50"
-              title="Create your first bot to continue"
-            >
-              <X className="h-4 w-4" />
-            </div>
-          ) : (
-            <button
-              onClick={() => onOpenChange(false)}
-              className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        <ProgressBar />
-      </div>
-
-      {/* Step Content */}
-      <ModalBody className="min-h-[400px]">
-        {renderStep()}
-
-        {/* Error display */}
-        {error && (
-          <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
-            {error}
+    <>
+      <Modal open={open} onOpenChange={handleOpenChange} size="xl" preventClose={forceOpen}>
+        {/* Custom Header with progress bar */}
+        <div className="p-4 sm:p-6 pb-0 flex-shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-sm font-medium text-[var(--text-muted)]">Create New Bot</h1>
+            {forceOpen ? (
+              <div
+                className="p-1 rounded text-[var(--text-muted)] cursor-not-allowed opacity-50"
+                title="Create your first bot to continue"
+              >
+                <X className="h-4 w-4" />
+              </div>
+            ) : (
+              <button
+                onClick={() => onOpenChange(false)}
+                className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-        )}
-      </ModalBody>
 
-      {/* Navigation */}
-      <ModalFooter>
-        <div className="flex justify-between items-center w-full">
-          <button
-            onClick={handleBack}
-            disabled={currentStep === 1}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              currentStep === 1
-                ? 'text-[var(--text-muted)] cursor-not-allowed'
-                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-            }`}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </button>
-
-          {currentStep < totalSteps ? (
-            <button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
-                canProceed()
-                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
-                  : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
-              }`}
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              onClick={handleCreate}
-              disabled={isCreating || !canProceed()}
-              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
-                isCreating || !canProceed()
-                  ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
-                  : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
-              }`}
-            >
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {isGenerating ? 'Generating Strategy...' : 'Creating...'}
-                </>
-              ) : (
-                <>
-                  {existingBotCount === 0 ? 'Create & Test Run' : 'Create'}
-                  <Sparkles className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          )}
+          <ProgressBar />
         </div>
-      </ModalFooter>
-    </Modal>
+
+        {/* Step Content */}
+        <ModalBody className="min-h-[400px]">
+          {renderStep()}
+
+          {/* Error display */}
+          {error && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
+              {error}
+            </div>
+          )}
+        </ModalBody>
+
+        {/* Navigation */}
+        <ModalFooter>
+          <div className="flex justify-between items-center w-full">
+            <button
+              onClick={handleBack}
+              disabled={currentStep === 1}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                currentStep === 1
+                  ? 'text-[var(--text-muted)] cursor-not-allowed'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+              }`}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </button>
+
+            {currentStep < totalSteps ? (
+              <button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
+                  canProceed()
+                    ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+                    : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
+                }`}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleCreate}
+                disabled={isCreating || !canProceed()}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
+                  isCreating || !canProceed()
+                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
+                    : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+                }`}
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {isGenerating ? 'Generating Strategy...' : 'Creating...'}
+                  </>
+                ) : (
+                  <>
+                    {existingBotCount === 0 ? 'Create & Test Run' : 'Create'}
+                    <Sparkles className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </ModalFooter>
+      </Modal>
+
+      {/* Live Trading Setup Modal (opened when user clicks Live Trading without connection) */}
+      <LiveTradingSetupModal
+        open={liveTradingSetupOpen}
+        onOpenChange={setLiveTradingSetupOpen}
+        onComplete={() => {
+          // User completed setup — they can now select Live Trading mode
+          setLiveTradingSetupOpen(false)
+        }}
+      />
+    </>
   )
 }

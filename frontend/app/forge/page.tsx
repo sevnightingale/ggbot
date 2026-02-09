@@ -212,12 +212,11 @@ function ForgeApp() {
     prevConfigIdForEditingRef.current = selectedBot.config_id
 
     // Load bot config into editing state
-    // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
+    // IMPORTANT: Merge trading_mode from top level into config_data
     const configDataWithTradingMode = selectedBot.config_data
       ? {
           ...JSON.parse(JSON.stringify(selectedBot.config_data)),
           trading_mode: selectedBot.trading_mode,
-          symphony_agent_id: selectedBot.symphony_agent_id
         }
       : null
 
@@ -274,15 +273,13 @@ function ForgeApp() {
   // Create default bot with RSI strategy using proper API client
   const createDefaultBot = async (
     botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading',
-    tradingMode: 'paper' | 'symphony' | 'aster' = 'paper',
-    symphonyAgentId?: string
+    tradingMode: 'paper' | 'hyperliquid' = 'paper',
   ): Promise<BotConfiguration> => {
     // Base config for all types
     const baseConfig = {
       schema_version: '2.1',
       config_type: botType,
       trading_mode: tradingMode,
-      symphony_agent_id: symphonyAgentId,
       trading: {
         leverage: 5,
         position_sizing: {
@@ -792,8 +789,7 @@ function ForgeApp() {
   // Handler function for creating new bot
   const handleCreateNewBot = async (
     botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading',
-    tradingMode: 'paper' | 'symphony' | 'aster' = 'paper',
-    symphonyAgentId?: string,
+    tradingMode: 'paper' | 'hyperliquid' = 'paper',
     botName?: string,
     configData?: Record<string, unknown>  // Full config from new typeform modal
   ) => {
@@ -808,7 +804,7 @@ function ForgeApp() {
           signal_validation: 'signal validator',
           agent: 'agent'
         }
-        const modeLabel = tradingMode === 'symphony' ? ' (Symphony)' : tradingMode === 'aster' ? ' (Aster)' : ''
+        const modeLabel = tradingMode === 'hyperliquid' ? ' (Live)' : ''
         return `${typeNames[botType]} ${botCount}${modeLabel}`
       })()
 
@@ -818,11 +814,10 @@ function ForgeApp() {
         newBot = await apiClient.createConfig(finalBotName, configData as Partial<ConfigData>, {
           config_type: botType,
           trading_mode: tradingMode,
-          symphony_agent_id: symphonyAgentId
         })
       } else {
         // Legacy flow: use createDefaultBot
-        newBot = await createDefaultBot(botType, tradingMode, symphonyAgentId)
+        newBot = await createDefaultBot(botType, tradingMode)
         // Update name for legacy flow
         newBot = await apiClient.updateConfig(newBot.config_id, {}, finalBotName)
       }
@@ -1281,6 +1276,7 @@ function ForgeApp() {
                     dataSources={dataSources}
                     onUpdateConfig={handleConfigChange}
                     onConfigUpdate={handleConfigUpdate}
+                    allBots={allBots}
                   />
                 )
               ) : (
