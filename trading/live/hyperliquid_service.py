@@ -600,6 +600,10 @@ class HyperliquidLiveTradingService:
                             "tpsl": "sl"
                         }
                     }
+                    self._log.info(
+                        f"Placing SL trigger: {hl_symbol} {'SELL' if is_buy else 'BUY'} "
+                        f"{filled_sz} @ trigger=${stop_loss:.2f}"
+                    )
                     sl_result = exchange.order(
                         hl_symbol,
                         not is_buy,  # Opposite side to close
@@ -611,14 +615,17 @@ class HyperliquidLiveTradingService:
                     if sl_result.get("status") == "ok":
                         sl_statuses = sl_result.get("response", {}).get("data", {}).get("statuses", [])
                         for s in sl_statuses:
-                            if "resting" in s:
+                            if isinstance(s, dict) and "resting" in s:
                                 sl_order_id = str(s["resting"]["oid"])
                                 break
-                        self._log.info(f"Stop-loss placed: {sl_order_id} @ ${stop_loss:.2f}")
+                        if sl_order_id:
+                            self._log.info(f"Stop-loss placed: oid={sl_order_id} @ ${stop_loss:.2f}")
+                        else:
+                            self._log.warning(f"SL order accepted but no resting oid. Statuses: {sl_statuses}")
                     else:
                         self._log.warning(f"Stop-loss order failed: {sl_result}")
                 except Exception as e:
-                    self._log.warning(f"Failed to place stop-loss: {e}")
+                    self._log.warning(f"Failed to place stop-loss: {e}", exc_info=True)
 
             if take_profit:
                 try:
@@ -629,6 +636,10 @@ class HyperliquidLiveTradingService:
                             "tpsl": "tp"
                         }
                     }
+                    self._log.info(
+                        f"Placing TP trigger: {hl_symbol} {'SELL' if is_buy else 'BUY'} "
+                        f"{filled_sz} @ trigger=${take_profit:.2f}"
+                    )
                     tp_result = exchange.order(
                         hl_symbol,
                         not is_buy,  # Opposite side to close
@@ -640,20 +651,28 @@ class HyperliquidLiveTradingService:
                     if tp_result.get("status") == "ok":
                         tp_statuses = tp_result.get("response", {}).get("data", {}).get("statuses", [])
                         for s in tp_statuses:
-                            if "resting" in s:
+                            if isinstance(s, dict) and "resting" in s:
                                 tp_order_id = str(s["resting"]["oid"])
                                 break
-                        self._log.info(f"Take-profit placed: {tp_order_id} @ ${take_profit:.2f}")
+                        if tp_order_id:
+                            self._log.info(f"Take-profit placed: oid={tp_order_id} @ ${take_profit:.2f}")
+                        else:
+                            self._log.warning(f"TP order accepted but no resting oid. Statuses: {tp_statuses}")
                     else:
                         self._log.warning(f"Take-profit order failed: {tp_result}")
                 except Exception as e:
-                    self._log.warning(f"Failed to place take-profit: {e}")
+                    self._log.warning(f"Failed to place take-profit: {e}", exc_info=True)
 
             # Step 11: Wait for settlement
             self._log.info(f"Waiting {self.settlement_wait}s for trade to settle...")
             await asyncio.sleep(self.settlement_wait)
 
-            # Step 12: Save audit trail
+            # Step 12: Close any existing open live_trades for this config+symbol
+            # On Hyperliquid, opening opposite direction auto-flips the position.
+            # Our DB needs to reflect that the old trade is closed.
+            await self._close_stale_trades(config_id, platform_symbol)
+
+            # Step 13: Save audit trail
             await self._save_trade_record(
                 batch_id=batch_id,
                 config_id=config_id,
@@ -663,7 +682,7 @@ class HyperliquidLiveTradingService:
                 tp_order_id=tp_order_id
             )
 
-            # Step 13: Log activity
+            # Step 14: Log activity
             notional_value = filled_sz * entry_price
             try:
                 activity_type = f"trade_entry_{action.lower()}"
@@ -686,6 +705,7 @@ class HyperliquidLiveTradingService:
                         'take_profit_order_id': tp_order_id,
                         'confidence': confidence
                     },
+                    trade_id=batch_id,
                     trade_type='hyperliquid',
                     related_symbol=platform_symbol,
                     importance=9
@@ -1042,6 +1062,33 @@ class HyperliquidLiveTradingService:
         except Exception as e:
             self._log.error(f"Error getting trade record: {e}")
             return None
+
+    async def _close_stale_trades(self, config_id: str, symbol: str) -> None:
+        """Close any existing open live_trades for this config+symbol.
+
+        On Hyperliquid, opening a position when one already exists either
+        adds to it (same direction) or flips it (opposite direction).
+        Either way, the previous trade record should be closed so we
+        only have one open record per config+symbol at a time.
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE live_trades
+                        SET closed_at = NOW()
+                        WHERE config_id = %s AND provider = 'hyperliquid'
+                          AND symbol = %s AND closed_at IS NULL
+                    """, (config_id, symbol))
+                    closed_count = cur.rowcount
+                    conn.commit()
+                    if closed_count > 0:
+                        self._log.info(
+                            f"Closed {closed_count} stale live_trade(s) for {symbol} "
+                            f"(config={config_id})"
+                        )
+        except Exception as e:
+            self._log.warning(f"Failed to close stale trades (non-critical): {e}")
 
     async def _mark_trade_closed(self, batch_id: str) -> None:
         """Update live_trades record with closed_at timestamp."""

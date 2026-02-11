@@ -560,19 +560,61 @@ async def _enrich_live_positions_and_accounts(
                                 if not (p.get('config_id') == config_id and p.get('source') == 'hyperliquid')
                             ]
 
+                            # Look up live_trade metadata (opened_at, SL/TP) for this config
+                            trade_metadata = {}
+                            try:
+                                with get_db_connection() as conn:
+                                    with conn.cursor() as cur:
+                                        cur.execute("""
+                                            SELECT batch_id, symbol, created_at,
+                                                   stop_loss_order_id, take_profit_order_id
+                                            FROM live_trades
+                                            WHERE config_id = %s AND provider = 'hyperliquid'
+                                              AND closed_at IS NULL
+                                            ORDER BY created_at DESC
+                                        """, (config_id,))
+                                        for row in cur.fetchall():
+                                            trade_metadata[row[1]] = {
+                                                'batch_id': row[0],
+                                                'opened_at': row[2].isoformat() if row[2] else None,
+                                                'sl_order_id': row[3],
+                                                'tp_order_id': row[4],
+                                            }
+                            except Exception as meta_err:
+                                logger.warning(f"Failed to fetch live_trade metadata: {meta_err}")
+
+                            # Get current prices from Redis/price service
+                            try:
+                                from trading.paper.live_price_service import LivePriceService
+                                price_service = LivePriceService()
+                            except Exception:
+                                price_service = None
+
                             # Add enriched Hyperliquid positions
                             for pos in positions_result:
+                                pos_symbol = pos.get('symbol', '')
+                                meta = trade_metadata.get(pos_symbol, {})
+
+                                # Fetch current price
+                                current_price = None
+                                if price_service:
+                                    try:
+                                        mp = await price_service.get_current_price(pos_symbol)
+                                        current_price = mp.mid
+                                    except Exception:
+                                        pass
+
                                 enriched_positions.append({
                                     'config_id': config_id,
-                                    'position_id': pos.get('batch_id'),
-                                    'symbol': pos.get('symbol'),
+                                    'position_id': meta.get('batch_id') or pos.get('batch_id'),
+                                    'symbol': pos_symbol,
                                     'side': pos.get('side'),
                                     'size_usd': float(pos.get('size', 0)) * float(pos.get('entry_price', 0)),
                                     'entry_price': pos.get('entry_price'),
-                                    'current_price': None,  # Computed client-side from all_mids or price service
+                                    'current_price': current_price,
                                     'unrealized_pnl': pos.get('unrealized_pnl'),
-                                    'opened_at': None,
-                                    'stop_loss': None,
+                                    'opened_at': meta.get('opened_at'),
+                                    'stop_loss': None,  # HL uses trigger orders, not price on record
                                     'take_profit': None,
                                     'liquidation_price': pos.get('liquidation_price'),
                                     'leverage': pos.get('leverage'),
