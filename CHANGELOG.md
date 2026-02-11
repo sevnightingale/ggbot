@@ -6,6 +6,37 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-11 - Hyperliquid Phase 4 + 4.5: Polish, Error Handling, Position Tracking Fixes
+
+**Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
+
+**Error Handling** (`trading/live/hyperliquid_service.py`):
+- Error classifier: `_classify_error()` categorizes insufficient_balance, rate_limit, credentials_expired
+- Retry logic: 2 retries with exponential backoff (1s → 2s) for rate limits + network errors
+- Fill error extraction: checks `statuses[]` for errors (top-level "ok" ≠ filled)
+- Zero-balance detection: `_calculate_position_size()` returns 0.0, caller rejects with clear message
+
+**Telegram Publishing** (`signals/publishing_service.py`, `ggbot.py`):
+- Exit notifications added to `close_position()` — same pattern as Symphony
+- `live_tag` field threads through orchestrator → publishing service for "Live on Hyperliquid" badge
+- Entry messages already worked (mode-agnostic), just needed `live_tag` enrichment
+
+**Position Tracking Fixes** (`hyperliquid_service.py`, `dashboard_data.py`):
+- `_close_stale_trades()` — closes old `live_trades` before new insert (position flip handling)
+- Dashboard enrichment: `current_price` from LivePriceService (was None), `opened_at` from `live_trades.created_at` (was None)
+- `trade_id=batch_id` in `log_activity_safe()` — activity timeline can now link entries to trades
+- SL/TP trigger order logging: detailed params + response statuses for debugging
+
+**DB Constraints**:
+- `valid_trading_mode` on `configurations`: added 'hyperliquid'
+- `account_snapshots_trading_mode_check`: added 'hyperliquid'
+
+**Documentation** (`trading/README.md`, `ACTIVE.md`):
+- Full Hyperliquid section in trading/README.md (architecture, trust model, error table, endpoints)
+- ACTIVE.md: Hyperliquid in trading modes, bot stats, capabilities, API endpoints, user_profiles schema
+
+---
+
 ## 2026-02-09 - Hyperliquid Phase 3: Dashboard Monitoring + Account Adapter
 
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
@@ -535,7 +566,7 @@ After:  "RSI=73.2, overbought (7p). ⚠️ BEARISH DIVERGENCE. Momentum decelera
 - `/help` - command reference
 
 **Publishing Service** (`signals/publishing_service.py`):
-- Fixed tier check: all paid tiers (usage_based, ggbase, pro) not just ggbase
+- Fixed tier check: all paid tiers (usage_based, prepaid, pro) not just one
 - Entry notifications: bot name, action (📈 LONG / 📉 SHORT), confidence, reasoning
 - Exit notifications: P&L display (✅ +$X / ❌ -$X), duration, close reason icons
 - `publish_exit_to_telegram()` - new function for trade exits
@@ -626,10 +657,10 @@ After:  "RSI=73.2, overbought (7p). ⚠️ BEARISH DIVERGENCE. Momentum decelera
 
 **Problem**: Credit pack buyers on `usage_based` tier with metered billing → confusion. Users expect prepaid behavior (bot stops when empty), actual behavior was metered billing with credits as discounts (potential overage charges).
 
-**Solution**: Separate `prepaid` tier using existing `ggbase` enum value (0 users, no migration needed).
+**Solution**: Separate `prepaid` tier with dedicated enum value.
 
 **Domain Model** (`core/domain/user_profile.py`):
-- `PREPAID = "ggbase"` enum value, `is_prepaid_tier`, `requires_credit_check` properties
+- `PREPAID = "prepaid"` enum value, `is_prepaid_tier`, `requires_credit_check` properties
 - `can_activate_bots` now includes PREPAID tier
 
 **Pre-LLM Credit Check** (`decision/engine_v2.py:161-247`):
@@ -642,7 +673,7 @@ After:  "RSI=73.2, overbought (7p). ⚠️ BEARISH DIVERGENCE. Momentum decelera
 - Prepaid users: `stripe_reported=True` immediately (never enters meter queue)
 
 **Meter Reporter** (`billing/stripe_meter_reporter.py:33-65`):
-- JOIN filter excludes `ggbase` tier from unreported usage query
+- JOIN filter excludes `prepaid` tier from unreported usage query
 - Defense in depth: even if activity logged incorrectly, won't be metered
 
 **Usage Monitor** (`core/monitoring/usage_monitor.py:118-155`):
@@ -651,13 +682,13 @@ After:  "RSI=73.2, overbought (7p). ⚠️ BEARISH DIVERGENCE. Momentum decelera
 
 **Checkout Flows** (`ggbot.py:4377-4414, 4569-4627, 4822-4849`):
 - Stripe credit purchase: payment mode only (no subscription)
-- Crypto credit purchase: sets `ggbase` tier for free users
+- Crypto credit purchase: sets `prepaid` tier for free users
 - Webhook: free→prepaid on credit purchase, existing paid users keep tier
 
 **Frontend** (`frontend/lib/permissions.tsx:8`):
-- Added `ggbase` to `subscription_tier` type union
+- Added `prepaid` to `subscription_tier` type union
 
-**Migration**: 6 existing credit pack users migrated from `usage_based` to `ggbase`, Stripe subscriptions cancelled.
+**Migration**: 6 existing credit pack users migrated from `usage_based` to `prepaid`, Stripe subscriptions cancelled.
 
 ---
 

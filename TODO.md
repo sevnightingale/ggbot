@@ -24,7 +24,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ## 🔥 **HIGH PRIORITY - Hyperliquid Live Trading Integration** [HYPERLIQUID_INTEGRATION.md]
 
-**Status**: 🟢 PHASE 3 COMPLETE — Dashboard monitoring + account adapter live
+**Status**: 🟢 PHASE 4.5 COMPLETE — Error handling, Telegram, position tracking fixes live
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
 **Priority**: P1 — Replaces blocked Symphony integration
 
@@ -73,12 +73,19 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] Info API exploration test (`scripts/tests/test_hyperliquid_info_api.py` — 12 endpoints)
 - **Key design**: Shared account problem solved — per-bot cumulative P&L (realized+unrealized), not shared balance. Same pattern as Symphony.
 
-### **Phase 4: Polish + Production** (~4-6 hours)
-- [ ] Error handling (insufficient balance, rate limits, network errors)
-- [ ] Telegram publishing for Hyperliquid trades
-- [ ] Agent bot support (`trading_mode='hyperliquid'` for agents)
-- [ ] Update `trading/README.md`, `ACTIVE.md` documentation
-- [ ] Mainnet smoke test with real funds (small amount)
+### **Phase 4: Polish + Production** ✅ COMPLETE (2026-02-11)
+- [x] Error handling: retry logic (2 attempts, exponential backoff), error classification, clear user messages
+- [x] Telegram publishing: entry + exit notifications with "Live on Hyperliquid" tag
+- [x] Documentation: `trading/README.md`, `ACTIVE.md` updated with Hyperliquid sections
+- [x] Mainnet smoke test: first live bot running on 4h candle since 2026-02-09
+- [ ] Agent bot support (`trading_mode='hyperliquid'` for agents) — deferred, not needed yet
+
+### **Phase 4.5: Position Tracking Fixes** ✅ COMPLETE (2026-02-11)
+- [x] Position flip tracking: `_close_stale_trades()` prevents unclosed `live_trades` accumulation
+- [x] Dashboard enrichment: current_price from LivePriceService, opened_at from live_trades
+- [x] Activity logging: `trade_id=batch_id` (was None, broke timeline linking)
+- [x] DB constraint: added 'hyperliquid' to `valid_trading_mode` + `account_snapshots_trading_mode_check`
+- [x] SL/TP debug logging: detailed trigger order params + response statuses
 
 **See**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md) for complete architecture, verified SDK methods, and technical details.
 
