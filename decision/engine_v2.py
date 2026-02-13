@@ -10,6 +10,7 @@ import asyncio
 import os
 import redis
 import stripe
+import traceback
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
@@ -81,7 +82,7 @@ class DecisionEngineV2:
         self.config = None
         self.llm_provider = None  # Will be initialized dynamically based on config
 
-        logger.bind(config_id=config_id).info("DecisionEngineV2 initialized")
+        logger.bind(config_id=config_id).debug("DecisionEngineV2 initialized")
     
     async def initialize(self) -> None:
         """Load configuration and validate setup."""
@@ -95,9 +96,9 @@ class DecisionEngineV2:
 
             # Now using BotConfigV2 which has config_type
             config_type = self.config.config_type
-            logger.bind(config_id=self.config_id, mode=config_type).info("Configuration and LLM provider loaded")
+            self._log_bind(mode=config_type).info("Configuration and LLM provider loaded")
         except Exception as e:
-            logger.bind(config_id=self.config_id).error(f"Failed to load config: {e}")
+            self._log_bind().error(f"Failed to load config: {e}")
             raise ConfigurationError(f"Failed to load config {self.config_id}: {e}")
 
     async def _initialize_llm_provider(self) -> None:
@@ -246,10 +247,19 @@ class DecisionEngineV2:
             logger.bind(user_id=self.user_id).error(f"Unexpected error during credit check: {e}")
             raise InsufficientCreditsError(f"Credit verification failed: {e}")
 
+    def _log_bind(self, **extra):
+        """Create a bound logger with config_id and optional run_id."""
+        base = {"config_id": self.config_id}
+        if hasattr(self, '_run_id') and self._run_id:
+            base["run_id"] = self._run_id
+        base.update(extra)
+        return logger.bind(**base)
+
     async def make_decision(self, symbol: Optional[str] = None,
                           signal_data: Optional[Dict] = None,
                           ggshot_signals: Optional[Dict] = None,
-                          market_intelligence: Optional[Dict] = None) -> Dict[str, Any]:
+                          market_intelligence: Optional[Dict] = None,
+                          run_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Main entry point for decision making.
 
@@ -260,10 +270,13 @@ class DecisionEngineV2:
             signal_data: External signal data (for signal validation mode)
             ggshot_signals: ggShot signals from extraction (optional market context)
             market_intelligence: Market intelligence data from orchestrator (funding rates, macro, etc.)
+            run_id: 6-char hex correlation ID for log tracing
 
         Returns:
             Decision intent ready for trading module
         """
+        self._run_id = run_id
+
         # Store ggshot signals and market intelligence for use in prompt building
         self.ggshot_signals = ggshot_signals or {}
         self.market_intelligence = market_intelligence or {}
@@ -278,29 +291,29 @@ class DecisionEngineV2:
             # Route based on config type and signal data presence
             config_type = self.config.config_type
 
-            logger.bind(config_id=self.config_id).info(
-                f"🔍 DECISION DEBUG: config_type='{config_type}', signal_data present={signal_data is not None}, signal_data type={type(signal_data)}"
+            self._log_bind().debug(
+                f"config_type='{config_type}', signal_data present={signal_data is not None}"
             )
 
             if config_type == "signal_validation" and signal_data:
                 # Signal validation mode: Always evaluate signals independently
                 # Bypasses position management to allow multiple concurrent positions
-                logger.bind(config_id=self.config_id, symbol=symbol).info(
-                    "🔍 DECISION DEBUG: Signal validation mode: Evaluating signal independently (bypassing position management)"
+                self._log_bind(symbol=symbol).debug(
+                    "Signal validation mode: Evaluating signal independently"
                 )
                 return await self._handle_signal_validation(symbol, signal_data)
             else:
                 # Autonomous trading mode: Check for existing positions first
-                logger.bind(config_id=self.config_id, symbol=symbol).info(
-                    f"🔍 DECISION DEBUG: Autonomous trading mode: Checking for existing positions (config_type={config_type}, signal_data={signal_data is not None})"
+                self._log_bind(symbol=symbol).debug(
+                    f"Autonomous trading mode: Checking positions (config_type={config_type})"
                 )
                 return await self._handle_autonomous_trading(symbol)
-                
+
         except (DecisionError, MarketDataError, ConfigurationError, LLMError):
             # Re-raise domain-specific errors (they're already logged)
             raise
         except Exception as e:
-            logger.bind(config_id=self.config_id).error(f"Unexpected decision error: {e}")
+            self._log_bind().error(f"Unexpected decision error: {e}\n{traceback.format_exc()}")
             raise DecisionError(f"Decision making failed: {e}")
     
     async def _handle_signal_validation(self, symbol: str, signal_data: Dict) -> Dict[str, Any]:
@@ -349,7 +362,14 @@ class DecisionEngineV2:
         llm_response, metadata = await self._call_llm(prompt)
 
         # Parse response with validation
-        decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
+        try:
+            decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
+        except Exception as e:
+            logger.bind(config_id=self.config_id).error(
+                f"Failed to parse LLM response: {e}\n{traceback.format_exc()}\n"
+                f"Response (first 500 chars): {llm_response[:500]}"
+            )
+            raise
 
         # Save signal validation decision to database
         decision_id = await self._save_signal_decision_to_db(
@@ -381,14 +401,14 @@ class DecisionEngineV2:
         
         if active_position:
             # Route to position management
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+            self._log_bind().info(
                 f"Routing to position management for existing {active_position['side']} position in {trading_symbol}"
             )
             return await self._handle_position_management(trading_symbol, active_position)
         else:
             # Route to opportunity analysis
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                f"No active position found, routing to opportunity analysis for {trading_symbol}"
+            self._log_bind().info(
+                f"No active position, routing to opportunity analysis for {trading_symbol}"
             )
             return await self._handle_opportunity_analysis(trading_symbol)
     
@@ -436,11 +456,18 @@ class DecisionEngineV2:
         llm_response, metadata = await self._call_llm(prompt)
 
         # Step 5: Parse response with validation
-        decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
+        try:
+            decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
+        except Exception as e:
+            logger.bind(config_id=self.config_id).error(
+                f"Failed to parse LLM response: {e}\n{traceback.format_exc()}\n"
+                f"Response (first 500 chars): {llm_response[:500]}"
+            )
+            raise
 
         # Step 6: Save decision to database
         decision_id = await self._save_decision_to_db(symbol, decision_data, market_data, current_price, prompt, llm_response, metadata)
-        
+
         # Step 7: Return intent
         return self._create_trading_intent_simple(decision_id, symbol, decision_data)
     
@@ -695,7 +722,14 @@ class DecisionEngineV2:
         llm_response, metadata = await self._call_llm(prompt)
 
         # Step 5: Parse response with validation
-        decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
+        try:
+            decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
+        except Exception as e:
+            logger.bind(config_id=self.config_id).error(
+                f"Failed to parse LLM response: {e}\n{traceback.format_exc()}\n"
+                f"Response (first 500 chars): {llm_response[:500]}"
+            )
+            raise
 
         # Step 6: Save decision to database (with parent decision link)
         decision_id = await self._save_position_decision_to_db(
@@ -1460,17 +1494,14 @@ Take Profit: {take_profit_text}
             )
 
             # Log the response from the LLM
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info("🤖 Response received from Decision LLM")
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"LLM RESPONSE:\n{response_text}")
+            self._log_bind().info("Response received from Decision LLM")
+            self._log_bind().debug(f"LLM RESPONSE:\n{response_text}")
 
             # Log metadata for debugging
-            logger.bind(
-                config_id=self.config_id,
-                user_id=self.user_id,
-                model=metadata.get('model'),
-                latency=metadata.get('latency'),
-                tokens=metadata.get('usage', {}).get('total_tokens', 'unknown')
-            ).info("LLM call completed with metadata")
+            model = metadata.get('model', 'unknown')
+            latency = metadata.get('latency', '?')
+            tokens = metadata.get('usage', {}).get('total_tokens', 'unknown')
+            self._log_bind().info(f"LLM call completed: model={model}, latency={latency}, tokens={tokens}")
 
             return response_text, metadata
 

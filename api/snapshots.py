@@ -106,7 +106,7 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
         # Mode is always "equity" - total account value
         mode = "equity"
 
-        logger.bind(config_id=config_id).info(
+        logger.bind(config_id=config_id).debug(
             f"AI consciousness timeline: {len(activities)} moments of awareness"
         )
 
@@ -199,7 +199,7 @@ async def get_performance_series(config_id: str) -> Dict[str, Any]:
         current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
         initial_equity = timeline[0]['total_equity'] if timeline else 10000.0
 
-        logger.bind(config_id=config_id).info(
+        logger.bind(config_id=config_id).debug(
             f"Performance timeline: {len(snapshots)} snapshots (5-min intervals)"
         )
 

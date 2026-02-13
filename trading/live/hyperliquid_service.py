@@ -969,7 +969,7 @@ class HyperliquidLiveTradingService:
                     "batch_id": batch_id
                 })
 
-            self._log.info(f"Found {len(open_positions)} open positions on Hyperliquid")
+            self._log.debug(f"Found {len(open_positions)} open positions on Hyperliquid")
             return open_positions
 
         except Exception as e:

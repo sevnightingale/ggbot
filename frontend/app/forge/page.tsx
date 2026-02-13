@@ -1127,10 +1127,10 @@ function ForgeApp() {
         <div className="bg-[var(--accent)]/10 border-b border-[var(--accent)]/20">
           <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
             <p className="text-sm text-[var(--text-primary)]">
-              <span className="font-semibold">ggArena Season 1</span>
-              <span className="text-[var(--text-secondary)]"> — $2,500 prize pool, starts Jan 21st! </span>
+              <span className="font-semibold">ggArena Season 1 Complete</span>
+              <span className="text-[var(--text-secondary)]"> — </span>
               <Link href="/arena" className="text-[var(--accent)] hover:underline">
-                Learn more →
+                See the results →
               </Link>
             </p>
             <button

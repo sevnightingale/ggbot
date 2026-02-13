@@ -182,4 +182,4 @@ class CacheManager:
             await self._redis.close()
             self._redis = None
 
-        self._log.info("Cache manager closed")
+        self._log.debug("Cache manager closed")

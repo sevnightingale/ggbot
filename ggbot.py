@@ -353,22 +353,25 @@ class GGBotOrchestrator:
         config_id: str,
         user_id: str,
         signal_data: Optional[Dict] = None,
-        override_symbol: Optional[str] = None
+        override_symbol: Optional[str] = None,
+        run_id: Optional[str] = None
     ) -> OrchestrationResult:
         """
         Run a complete trading cycle (autonomous or signal validation).
-        
+
         Args:
             config_id: Bot configuration ID
             user_id: User ID for access validation
             signal_data: Signal data for validation mode
             override_symbol: Dynamic symbol override for signals
-            
+            run_id: 6-char hex correlation ID for log tracing
+
         Returns:
             OrchestrationResult with execution details
         """
         start_time = datetime.now(timezone.utc)
-        self._log.info(f"Starting V2 autonomous cycle for config {config_id}")
+        log = self._log.bind(config_id=config_id, run_id=run_id) if run_id else self._log.bind(config_id=config_id)
+        log.info(f"Starting V2 autonomous cycle")
         
         try:
             config = await self.config_service.get_config(config_id, user_id)
@@ -383,22 +386,22 @@ class GGBotOrchestrator:
             if not user_profile.can_activate_bots:
                 # Check if this is their free first run (creation auto-run)
                 if not config.first_run_used:
-                    self._log.info(
-                        f"Allowing free first run for config {config_id} - "
-                        f"user {user_id} is on {user_profile.subscription_tier.value} tier"
+                    log.info(
+                        f"Allowing free first run - "
+                        f"user on {user_profile.subscription_tier.value} tier"
                     )
                     is_first_run_allowed = True
                 # Check if they have free manual runs remaining
                 elif config.free_runs_remaining > 0:
-                    self._log.info(
-                        f"Allowing free manual run for config {config_id} - "
+                    log.info(
+                        f"Allowing free manual run - "
                         f"{config.free_runs_remaining} free runs remaining"
                     )
                     is_free_manual_run = True
                 else:
-                    self._log.warning(
-                        f"Blocking bot execution for config {config_id} - "
-                        f"user {user_id} lost activation permission (tier: {user_profile.subscription_tier.value}), "
+                    log.warning(
+                        f"Blocking bot execution - "
+                        f"lost activation permission (tier: {user_profile.subscription_tier.value}), "
                         f"no free runs remaining"
                     )
                     # Auto-deactivate bot if user lost permission
@@ -407,51 +410,51 @@ class GGBotOrchestrator:
                     timeframe = extract_timeframe_from_config(config_dict)
                     if timeframe and timeframe != "signal_driven":
                         remove_bot_job(user_id, config_id, timeframe)
-                        self._log.info(f"Removed scheduler job for deactivated bot {config_id}")
+                        log.info(f"Removed scheduler job for deactivated bot")
                     await self.config_service.set_bot_state(config_id, user_id, "inactive")
                     raise HTTPException(
                         status_code=403,
                         detail="No free test runs remaining. Subscribe to run your bot again."
                     )
 
-            self._log.info(f"🔍 DEBUG: config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
+            log.debug(f"config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
 
             # Execute the appropriate cycle
             if config.config_type == "signal_validation":
                 if signal_data:
                     result = await self._run_signal_validation_cycle(
-                        config, signal_data, override_symbol
+                        config, signal_data, override_symbol, run_id=run_id
                     )
                 else:
                     latest_signal = await self._fetch_latest_ggshot_signal()
                     signal_dict = self._signal_data_to_dict(latest_signal)
                     result = await self._run_signal_validation_cycle(
-                        config, signal_dict, override_symbol
+                        config, signal_dict, override_symbol, run_id=run_id
                     )
             else:
-                result = await self._run_autonomous_trading_cycle(config)
+                result = await self._run_autonomous_trading_cycle(config, run_id=run_id)
 
             # Handle free run tracking after successful execution
             if result.status != "error":
                 if is_first_run_allowed:
                     # Mark creation auto-run as used
                     await self.config_service.mark_first_run_used(config_id)
-                    self._log.info(f"Marked first run used for config {config_id}")
+                    log.info(f"Marked first run used")
                 elif is_free_manual_run:
                     # Decrement free manual runs
                     remaining = await self.config_service.decrement_free_runs(config_id)
-                    self._log.info(f"Decremented free runs for config {config_id}, {remaining} remaining")
+                    log.info(f"Decremented free runs, {remaining} remaining")
 
             return result
-            
+
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            
-            self._log.error(f"V2 orchestration failed: {e}")
+
+            log.error(f"V2 orchestration failed: {e}")
             raise HTTPException(status_code=500, detail=f"Orchestration failed: {str(e)}")
             
-    async def _run_autonomous_trading_cycle(self, config: BotConfigV2) -> OrchestrationResult:
+    async def _run_autonomous_trading_cycle(self, config: BotConfigV2, run_id: Optional[str] = None) -> OrchestrationResult:
         """Run traditional autonomous trading cycle."""
         start_time = datetime.now(timezone.utc)
         user_id = config.user_id
@@ -468,13 +471,13 @@ class GGBotOrchestrator:
             await set_execution_phase(config_id, "extracting", f"Gathering market data for {config.selected_pair}...")
 
             extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id, requested_indicators, timeframes
+                extraction_engine, config, user_id, requested_indicators, timeframes, run_id=run_id
             )
 
             await set_execution_phase(config_id, "deciding", "Analyzing market conditions for trading opportunities...")
 
             decision_result = await self._run_decision_v2(
-                config_id, config, extraction_result
+                config_id, config, extraction_result, run_id=run_id
             )
 
             action = decision_result.get('action', 'wait')
@@ -492,7 +495,7 @@ class GGBotOrchestrator:
             await set_execution_phase(config_id, "trading", message)
 
             trading_result = await self._run_trading_v2(
-                config, user_id, decision_result
+                config, user_id, decision_result, run_id=run_id
             )
 
             if self._should_publish_signal(config, decision_result):
@@ -537,7 +540,8 @@ class GGBotOrchestrator:
         self,
         config: BotConfigV2,
         signal_data: Dict,
-        override_symbol: Optional[str] = None
+        override_symbol: Optional[str] = None,
+        run_id: Optional[str] = None
     ) -> OrchestrationResult:
         """Run signal validation cycle for external signals."""
         start_time = datetime.now(timezone.utc)
@@ -564,13 +568,13 @@ class GGBotOrchestrator:
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id,
                 signal_indicators, timeframes,
-                override_symbol=symbol
+                override_symbol=symbol, run_id=run_id
             )
 
             await set_execution_phase(config_id, "deciding", "Analyzing signal against current market conditions...")
 
             decision_result = await self._run_decision_v2(
-                config_id, config, extraction_result, signal_data
+                config_id, config, extraction_result, signal_data, run_id=run_id
             )
 
             action = decision_result.get('action', 'wait')
@@ -582,7 +586,7 @@ class GGBotOrchestrator:
             await set_execution_phase(config_id, "trading", message)
 
             trading_result = await self._run_trading_v2(
-                config, user_id, decision_result
+                config, user_id, decision_result, run_id=run_id
             )
 
             if self._should_publish_signal(config, decision_result):
@@ -881,14 +885,15 @@ class GGBotOrchestrator:
         user_id: str,
         indicators: List[str],
         timeframes: List[str] = ["1h"],
-        override_symbol: Optional[str] = None
+        override_symbol: Optional[str] = None,
+        run_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run V2 extraction engine for multiple timeframes with proper integration."""
         try:
             symbol = override_symbol or config.selected_pair or "BTC/USDT"
 
             # Extract all timeframes in parallel for speed
-            self._log.info(f"Extracting {len(indicators)} indicators for {symbol} across {len(timeframes)} timeframes in parallel")
+            self._log.debug(f"Extracting {len(indicators)} indicators for {symbol} across {len(timeframes)} timeframes in parallel")
 
             tasks = [
                 extraction_engine.extract_for_symbol(
@@ -913,7 +918,7 @@ class GGBotOrchestrator:
 
                 if result.get("status") == "success":
                     successful_extractions += 1
-                    self._log.info(f"✅ V2 Extraction completed for {symbol} ({timeframe})")
+                    self._log.debug(f"V2 Extraction completed for {symbol} ({timeframe})")
                 else:
                     self._log.error(f"❌ V2 Extraction failed for {symbol} ({timeframe}): {result.get('error')}")
             
@@ -990,7 +995,8 @@ class GGBotOrchestrator:
                 market_intel = await fetch_market_intelligence(
                     config=config,
                     user_id=user_id,
-                    symbol=symbol
+                    symbol=symbol,
+                    run_id=run_id
                 )
 
                 if market_intel:
@@ -1046,7 +1052,8 @@ class GGBotOrchestrator:
         config_id: str,
         config: BotConfigV2,
         extraction_result: Dict[str, Any],
-        signal_data: Optional[Dict] = None
+        signal_data: Optional[Dict] = None,
+        run_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run V2 decision engine with full context management."""
         try:
@@ -1104,7 +1111,8 @@ class GGBotOrchestrator:
                 symbol=symbol,
                 signal_data=signal_data,
                 ggshot_signals=ggshot_signals,
-                market_intelligence=market_intelligence
+                market_intelligence=market_intelligence,
+                run_id=run_id
             )
 
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
@@ -1123,7 +1131,8 @@ class GGBotOrchestrator:
         self,
         config: BotConfigV2,
         user_id: str,
-        decision_result: Dict[str, Any]
+        decision_result: Dict[str, Any],
+        run_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run V2 trading execution with full paper trading integration."""
         try:
@@ -1347,10 +1356,13 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
             next_fire = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
             
             try:
-                result = await orchestrator.run_autonomous_cycle(config_id, user_id)
+                run_id = uuid.uuid4().hex[:6]
+                result = await orchestrator.run_autonomous_cycle(config_id, user_id, run_id=run_id)
 
                 await redis_client.set(key, "completed", ex=ttl)
-                logger.info(f"Completed execution for {user_id}:{config_id}:{timeframe}:{close_ts} in {result.execution_time_ms}ms")
+                logger.bind(run_id=run_id, config_id=config_id).info(
+                    f"Completed execution for {timeframe}:{close_ts} in {result.execution_time_ms}ms"
+                )
                 
             except Exception as e:
                 logger.error(f"Execution failed for {user_id}:{config_id}:{timeframe}:{close_ts}: {e}")
@@ -5058,6 +5070,23 @@ async def create_checkout_session(
     try:
         # Get or create Stripe customer
         customer_id = await get_or_create_stripe_customer(current_user.user_id, current_user.email)
+
+        # CRITICAL: Check if customer already has an active subscription
+        # Prevents duplicate subscriptions from double-clicks or page refreshes
+        existing_subs = stripe.Subscription.list(
+            customer=customer_id,
+            status='active',
+            limit=1
+        )
+        if existing_subs.data:
+            existing_sub = existing_subs.data[0]
+            logger.bind(user_id=str(current_user.user_id)).warning(
+                f"User already has active subscription {existing_sub.id}, blocking duplicate creation"
+            )
+            raise HTTPException(
+                400,
+                "You already have an active subscription. Manage it from your billing portal."
+            )
 
         # Build line items - metered billing doesn't use quantity
         if request.plan == 'usage':

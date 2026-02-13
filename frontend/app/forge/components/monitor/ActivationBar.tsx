@@ -237,8 +237,8 @@ export function ActivationBar({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-              {/* Enter Arena Button - Only for paper trading bots */}
-              {isPaperTrading && (
+              {/* Enter Arena Button — Season 1 complete, re-enable for Season 2 */}
+              {false && isPaperTrading && (
                 isRegisteredForArena ? (
                   <div className="inline-flex items-center gap-1.5 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm text-green-500">
                     <CheckCircle className="h-4 w-4" />

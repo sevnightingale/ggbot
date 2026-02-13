@@ -72,7 +72,7 @@ class DataCatalog:
                 self._log.error(f"Failed to load catalog file {yaml_file}: {e}")
                 raise CatalogError(f"Invalid catalog file {yaml_file}: {e}")
 
-        self._log.info(f"Loaded {loaded_count} catalog entries from {self.catalog_dir}")
+        self._log.debug(f"Loaded {loaded_count} catalog entries from {self.catalog_dir}")
 
     def _load_catalog_file(self, yaml_file: Path) -> CatalogEntry:
         """Load and parse a single catalog YAML file."""

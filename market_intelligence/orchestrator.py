@@ -23,7 +23,8 @@ async def fetch_market_intelligence(
     config,  # BotConfigV2
     user_id: str,
     symbol: str,
-    data_points_override: Optional[Dict[str, List[str]]] = None
+    data_points_override: Optional[Dict[str, List[str]]] = None,
+    run_id: Optional[str] = None
 ) -> Dict[str, Dict[str, Any]]:
     """
     Fetch all enabled market intelligence for a bot configuration.
@@ -68,7 +69,10 @@ async def fetch_market_intelligence(
             data_points_override={'macro_economics': ['vix', 'dxy']}
         )
     """
-    _log = logger.bind(component="intelligence_orchestrator", user_id=user_id)
+    _bind_extra = {"component": "intelligence_orchestrator", "user_id": user_id}
+    if run_id:
+        _bind_extra["run_id"] = run_id
+    _log = logger.bind(**_bind_extra)
 
     # Normalize symbol format to CCXT standard (BTC/USDT)
     # Handles multiple input formats: BTCUSDT (ggshot), BTC-USDT (platform), BTC/USDT (ccxt)
@@ -137,10 +141,12 @@ async def fetch_market_intelligence(
                 params = mapping['params_template'].copy()
                 params = _replace_param_templates(params, symbol=symbol)
 
-                # Always include symbol in params for cache key generation
-                # (even for non-symbol-specific queries like VIX, DXY, CPI, NFP)
+                # Include symbol in params for cache key generation
+                # Global data (VIX, DXY, CPI, NFP, btc_tvl, lunar_phase, mercury_status)
+                # uses 'global' to share cache across all bots instead of duplicating per-symbol
+                is_global = mapping.get('global', False)
                 if 'symbol' not in params:
-                    params['symbol'] = symbol
+                    params['symbol'] = 'global' if is_global else symbol
 
                 # Get cache TTL override if specified
                 cache_ttl_override = mapping.get('cache_ttl')
@@ -180,7 +186,7 @@ async def fetch_market_intelligence(
             # Handle errors gracefully
             if isinstance(result, Exception):
                 if isinstance(result, DataSourceError):
-                    _log.warning(f"Failed to fetch {source_name}.{point_name}: {result}")
+                    _log.debug(f"Failed to fetch {source_name}.{point_name}: {result}")
                 else:
                     _log.error(f"Unexpected error fetching {source_name}.{point_name}: {result}")
                 continue
@@ -189,8 +195,8 @@ async def fetch_market_intelligence(
             results[source_name][point_name] = result.data
             total_points += 1
 
-            _log.info(
-                f"✅ {source_name}.{point_name}: fetched from {result.source} "
+            _log.debug(
+                f"{source_name}.{point_name}: fetched from {result.source} "
                 f"({result.latency_ms:.0f}ms, cached={result.from_cache})"
             )
 

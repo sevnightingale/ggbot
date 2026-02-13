@@ -1,65 +1,61 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-02-08 21:07:00 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-02-11 15:46:05 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
 - **Total Users**: 315
-- **Prepaid Users**: 18 (18 active subscriptions)
+- **Prepaid Users**: 19 (19 active subscriptions)
 - **Free Users**: 289
 - **Users with Bots**: 305 (96.8%)
 
 ### Bot Statistics
-- **Total Bots**: 477+
-- **Active Bots**: 38+ (8.0%)
-  - Paper: 38
+- **Total Bots**: 472
+- **Active Bots**: 33 (7.0%)
+  - Paper: 32
   - Symphony (Live): 0
   - Aster (DEX): 0
-  - Hyperliquid (Live): 1+
 - **Inactive Bots**: 439
-- **Avg Bots per User**: 1.6
+- **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 6,934
-  - Wins: 2,230
-  - Losses: 4,704
-  - Platform Win Rate: 32.16%
-  - Total P&L: $28,832.69
+- **Total Trades (All Time)**: 7,108
+  - Wins: 2,325
+  - Losses: 4,783
+  - Platform Win Rate: 32.71%
+  - Total P&L: $88,935.20
 - **Recent Activity**:
-  - Last 24 hours: 195 trades
-  - Last 7 days: 1208 trades
-  - Last 30 days: 1695 trades
+  - Last 24 hours: 89 trades
+  - Last 7 days: 1211 trades
+  - Last 30 days: 1922 trades
 
 ### Open Positions
-- **Open Positions**: 13
+- **Open Positions**: 10
 - **Unique Symbols**: 3
-- **Total Exposure**: $1,047,972.41
-- **Unrealized P&L**: $60,232.76
+- **Total Exposure**: $595,879.69
+- **Unrealized P&L**: $2,510.72
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,036.42
-- **Lowest Balance**: $3,905.05
-- **Highest Balance**: $46,914.82
+- **Average Balance**: $10,187.03
+- **Lowest Balance**: $74.92
+- **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 20 bots
-- **SOL/USDT**: 13 bots
+- **BTC/USDT**: 18 bots
+- **SOL/USDT**: 11 bots
 - **ETH/USDT**: 4 bots
-- **RENDER/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 1867 decisions (avg confidence: 31.3%)
-- **enter**: 193 decisions (avg confidence: 66.1%)
-- **exit**: 181 decisions (avg confidence: 86.0%)
-- **close**: 2 decisions (avg confidence: 75.0%)
-- **long**: 2 decisions (avg confidence: 73.0%)
+- **wait**: 1729 decisions (avg confidence: 44.5%)
+- **enter**: 99 decisions (avg confidence: 77.2%)
+- **exit**: 37 decisions (avg confidence: 73.2%)
 
 ### System Health
-- **Decisions (last hour)**: 58
+- **Decisions (last hour)**: 77
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -68,23 +64,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 11MB | 4d 20h | 0 |
-| error-alerts | 🟢 online | 0.1% | 22MB | 4d 20h | 0 |
-| ggbot | 🟢 online | 6% | 629MB | 1d 4h | 4 |
-| account-monitor | 🟢 online | 0.9% | 168MB | 1d 17h | 3 |
-| sebastian-chrome | 🟢 online | 0.1% | 108MB | 3d 3h | 20 |
-| sebastian-bot | 🟢 online | 0.2% | 39MB | 3d 6h | 10 |
-| market-data-ws | 🟢 online | 1% | 20MB | 4d 11h | 0 |
+| signal-listener | 🟢 online | 0% | 12MB | 2d 4h | 2 |
+| error-alerts | 🟢 online | 0% | 20MB | 2d 4h | 2 |
+| ggbot | 🟢 online | 4.1% | 349MB | 7h 43m | 10 |
+| account-monitor | 🟢 online | 0.8% | 31MB | 8h 15m | 4 |
+| sebastian-bot | 🟢 online | 0% | 45MB | 2d 4h | 2 |
+| market-data-ws | 🟢 online | 2% | 28MB | 2d 4h | 2 |
 
 ### VM Resources
 
-- **Disk**: 54G / 78G (69%)
-- **Memory**: 2.1Gi / 3.8Gi
-- **CPU Load**: 0.54 / 0.22 / 0.13 (1m/5m/15m)
+- **Disk**: 54G / 78G (70%)
+- **Memory**: 1.4Gi / 3.8Gi
+- **CPU Load**: 0.28 / 0.19 / 0.12 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 28.11M)
+- **Redis**: 🟢 connected (Memory: 24.18M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -280,8 +275,56 @@
 - **Engagement Monitoring**: Twitter community interaction
 
 ### **error-alerts Service**
-- **Error Monitoring**: Catches and reports system errors
-- **Telegram Alerts**: Real-time notifications to admin channels
+- **Error Monitoring**: Tails `logs/ggbot.log` for ERROR/CRITICAL lines via `tail -F`
+- **Telegram Alerts**: Real-time notifications to admin error channel
+- **Rate Limiting**: 60s cooldown per error pattern, deduplication via recent_errors deque
+- **Log Format Compatible**: Parses `' | '` (maxsplit=2) then `' - '` (maxsplit=1) — context tags stay in location portion
+- **File**: `core/monitoring/error_alert_service.py`
+
+### **Logging System**
+
+**File**: `core/common/logger.py` — Loguru with dynamic format functions
+
+**Log Format**:
+```
+2026-02-11 08:05:32 | INFO     | decision.engine_v2:make_decision:282 [run=a3f,cfg=b09a8d0e] - Starting decision...
+2026-02-11 08:05:32 | INFO     | ggbot:run_once:1353 - Plain log line (no context)
+```
+
+- Context tag `[run=...,cfg=...,uid=...]` only appears when fields are bound
+- `config_id`/`user_id` truncated to 8 chars; `run_id` is 6 hex chars
+- **run_id** generated in `run_once()`, threads through entire bot cycle for grep correlation
+
+**Log Levels**:
+| Level | Purpose | Examples |
+|-------|---------|---------|
+| DEBUG | Happy-path detail | Cache hits, candle fetches, storage confirmations |
+| INFO | State transitions | Cycle start/complete, LLM calls, decision results, permission checks |
+| WARNING | Recoverable issues | Non-critical fetch failures, permission blocks |
+| ERROR | Failures needing attention | Extraction/decision/trading failures, unexpected exceptions |
+
+**Consumers** (must remain compatible with format changes):
+| Consumer | File | Parsing Method |
+|----------|------|---------------|
+| error-alerts | `core/monitoring/error_alert_service.py:194` | `split(' \| ', maxsplit=2)` then `split(' - ', maxsplit=1)` |
+| admin logs/summary | `api/admin.py:326` | `split(' \| ')` → counts by level in `parts[1]` |
+
+**Debugging Commands**:
+```bash
+# Follow a single bot cycle by run_id
+grep "run=a3f" logs/ggbot.log
+
+# Find all errors for a config
+grep "\[cfg=b09a8d0e\]" logs/ggbot.log | grep ERROR
+
+# Count log volume by level
+grep -c "| INFO " logs/ggbot.log
+grep -c "| DEBUG " logs/ggbot.log
+grep -c "| ERROR " logs/ggbot.log
+
+# Tail live logs
+pm2 logs ggbot --lines 50
+```
 
 ### **Metered Billing System** (Production Live - 2025-11-16)
 - **Stripe Billing Meters**: Tracks LLM usage costs with 70% markup
@@ -363,9 +406,18 @@
 pm2 list
 pm2 monit
 
-# Logs
+# Logs — live tail
 pm2 logs ggbot
 pm2 logs market-data-ws
+
+# Logs — trace a single bot cycle (replace run_id)
+grep "run=a3f" logs/ggbot.log
+
+# Logs — errors for a specific config
+grep "\[cfg=b09a8d0e\]" logs/ggbot.log | grep ERROR
+
+# Logs — volume check
+wc -l logs/ggbot.log
 
 # Disk space monitoring
 /home/sev/ggbot/scripts/disk_monitor.sh
@@ -461,7 +513,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-02-08 21:07:01 UTC
+**Last Updated**: 2026-02-11 15:46:06 UTC
 
 ---
 
@@ -1030,7 +1082,7 @@ df -h
 | `created_at` | timestamp with time zone | ✓ | now() |
 | `updated_at` | timestamp with time zone | ✓ | now() |
 
-### `user_profiles` (18 columns)
+### `user_profiles` (20 columns)
 
 **Primary Key**: `user_id`
 
@@ -1356,7 +1408,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-02-08 21:07:01 UTC
+**Last Updated**: 2026-02-11 15:46:06 UTC
 
 ---
 

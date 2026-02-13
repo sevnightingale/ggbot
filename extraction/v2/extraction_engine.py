@@ -64,13 +64,13 @@ class ExtractionEngineV2:
             storage_parts.append("none")
         storage = " + ".join(storage_parts)
         
-        self._log.info(f"Initialized ExtractionEngineV2 with {mode} preprocessing, {storage} storage")
+        self._log.debug(f"Initialized ExtractionEngineV2 with {mode} preprocessing, {storage} storage")
 
     async def cleanup(self):
         """Cleanup resources when engine is destroyed or no longer needed."""
         if self.data_client:
             await self.data_client.disconnect()
-            self._log.info("ExtractionEngineV2 cleanup completed")
+            self._log.debug("ExtractionEngineV2 cleanup completed")
 
     async def extract_for_symbol(
         self,
@@ -101,10 +101,10 @@ class ExtractionEngineV2:
         smart_limit = get_batch_limit(indicators, timeframe)
         if smart_limit != 200:  # Only log if different from default
             efficiency = get_efficiency_report(indicators, timeframe)
-            self._log.info(f"Smart limits: using {smart_limit} candles (vs 200 static), saving {efficiency['percent_reduction']}%")
+            self._log.debug(f"Smart limits: using {smart_limit} candles (vs 200 static), saving {efficiency['percent_reduction']}%")
 
         actual_limit = limit if limit != 200 else smart_limit
-        self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe}) with {actual_limit} candles")
+        self._log.debug(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe}) with {actual_limit} candles")
 
         try:
             # Step 1: Fetch OHLCV data from Hummingbot with multi-exchange fallback
@@ -115,7 +115,7 @@ class ExtractionEngineV2:
             if df.empty:
                 raise ValueError(f"No data received for {symbol}")
             
-            self._log.info(f"✅ Fetched {len(df)} candles for {symbol}")
+            self._log.debug(f"Fetched {len(df)} candles for {symbol}")
             
             # Step 2: Calculate technical indicators
             indicator_results = self.indicators.calculate_multiple(df, indicators, **indicator_params)
@@ -171,7 +171,7 @@ class ExtractionEngineV2:
             
             extraction_result["storage"] = storage_results
             
-            self._log.info(f"✅ Extraction complete for {symbol} (stored to {len(storage_results)} systems)")
+            self._log.debug(f"Extraction complete for {symbol} (stored to {len(storage_results)} systems)")
             return {
                 "status": "success",
                 "result": extraction_result

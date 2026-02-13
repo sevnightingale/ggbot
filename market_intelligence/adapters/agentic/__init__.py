@@ -1,6 +1,5 @@
-"""Agentic adapters using autonomous AI agents (Grok, OpenRouter, etc.)"""
+"""Agentic adapters using autonomous AI agents (Grok)."""
 
 from .grok_agentic import GrokAgenticAdapter
-from .openrouter_adapter import OpenRouterMarketAdapter
 
-__all__ = ['GrokAgenticAdapter', 'OpenRouterMarketAdapter']
+__all__ = ['GrokAgenticAdapter']

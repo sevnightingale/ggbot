@@ -21,6 +21,7 @@ MISFIRE_GRACE_TIMES: Dict[str, int] = {
     "1h": 300,   # 5 minutes
     "4h": 600,   # 10 minutes
     "1d": 900,   # 15 minutes
+    "1w": 3600,  # 1 hour
 }
 
 # Timeframe to seconds mapping for close_ts calculation
@@ -31,6 +32,7 @@ TIMEFRAME_SECONDS: Dict[str, int] = {
     "1h": 3600,   # 1 hour
     "4h": 14400,  # 4 hours
     "1d": 86400,  # 1 day
+    "1w": 604800, # 1 week
 }
 
 
@@ -61,6 +63,8 @@ def cron_for(timeframe: str) -> CronTrigger:
         return CronTrigger(hour="0,4,8,12,16,20", minute=0, second=30, timezone=UTC)
     elif timeframe == "1d":
         return CronTrigger(hour=0, minute=0, second=30, timezone=UTC)
+    elif timeframe == "1w":
+        return CronTrigger(day_of_week="mon", hour=0, minute=0, second=30, timezone=UTC)
     else:
         raise ValueError(f"Unsupported timeframe: {timeframe}. Supported: {list(TIMEFRAME_SECONDS.keys())}")
 

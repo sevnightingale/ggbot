@@ -138,7 +138,7 @@ class SupabaseStorage:
             
             if result.data:
                 record_id = result.data[0]['id']
-                self._log.info(f"✅ Stored market data for {symbol} ({timeframe}) - Record ID: {record_id}")
+                self._log.debug(f"Stored market data for {symbol} ({timeframe}) - Record ID: {record_id}")
                 
                 return {
                     "status": "success",

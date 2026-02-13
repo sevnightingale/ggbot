@@ -89,9 +89,31 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 **See**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md) for complete architecture, verified SDK methods, and technical details.
 
-### **Future: Symbol & Candle Expansion**
-- [ ] Add `HyperliquidCandleAdapter` to unlock equities + commodities (currently candles are Binance-only, ~100 crypto symbols)
-- [ ] Extend symbol registry + paper trading to support Hyperliquid's full 291+ markets
+### **Phase 5: HIP-3 — Equities, Commodities, Indices** (PLANNED)
+
+**Status**: ⏸️ PLANNED — research + API verification complete, ready to implement when prioritized
+**Planning Doc**: [DOCS/todo/HIP3_EQUITIES_COMMODITIES.md](DOCS/todo/HIP3_EQUITIES_COMMODITIES.md)
+
+**Summary**: Hyperliquid's HIP-3 protocol enables builder-deployed perp dexes (XYZ, Felix, Kinetiq, etc.) hosting equities (NVDA, TSLA, AAPL), commodities (GOLD, SILVER, COPPER), indices (US500, USTECH, MAG7), forex (EUR, JPY), and pre-IPO (SPACEX, OPENAI). XYZ dex alone does **$809M/day volume** with **$635M OI** across 44 assets. Candle format is byte-for-byte identical to standard perps — our 21 indicators work unchanged.
+
+**POC scope**: One asset (xyz:NVDA) end-to-end — 1 new file, 5 edits:
+
+- [ ] `HyperliquidCandleAdapter` — new adapter in MarketIntelligence pipeline (Priority 3 after Redis WS + Binance REST). Fast-rejects non-HIP-3 symbols via `:` check (<1ms). Fetches candles from HL Info API (~200-400ms).
+- [ ] `ohlcv.yaml` — wire adapter as Priority 3 source
+- [ ] `registry.py` — add `nvda_xyz` entry with `hip3: True`, `sz_decimals: 3`, `max_leverage: 10`, `asset_class: "equity"`. Add `is_hip3_symbol()` helper.
+- [ ] `ggbot.py` — skip `is_websocket_cached` gate for HIP-3 symbols (they're not in Binance WS but are tradeable)
+- [ ] `hybrid_price_service.py` — add Hyperliquid `allMids` fallback for HIP-3 price lookups (position sizing + dashboard)
+- [ ] `hyperliquid_service.py` — HIP-3 assets are **isolated-margin-only** (`is_cross=False`); dynamic `sz_decimals`/rounding; $10 min notional floor
+
+**Key findings from API verification (2026-02-11)**:
+- All 7 timeframes (1m→1d) return clean OHLCV data, 100-500ms latency
+- 5,014 1m candles / 2,017 5m candles in 7-day lookback (sufficient for all bot frequencies)
+- 30-day depth: 181 4h candles, 721 1h candles. 90-day: 52 1d candles for GOLD
+- All HIP-3 assets `onlyIsolated: true` — must use `is_cross=False` (our current code uses `is_cross=True`)
+- NVDA: szDecimals=3, maxLeverage=10, $26M/day volume, $58M OI, $100M OI cap
+- Adapter cascade cost: Redis miss 5ms + Binance fail 76ms + HL success ~300ms = ~380ms total (only on MI cache miss)
+
+**After POC**: Expand to curated set of high-volume assets, add frontend symbol picker with asset class categories, dynamic HIP-3 asset discovery from `perpDexs` API.
 
 ### **Future: Strategy Marketplace (Copy Trading)**
 - [ ] Design marketplace tables (strategy_listings, strategy_subscriptions, strategy_trades)

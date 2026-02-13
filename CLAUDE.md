@@ -87,12 +87,37 @@ pm2 restart ggbot       # Restart after code changes
 - See CHANGELOG.md header and GO.md "When Work is Completed" section for complete guidelines
 
 ### Logging Pattern
+
+**File**: `core/common/logger.py` — Loguru with dynamic format functions
+
+**Format**: `{timestamp} | {level} | {module}:{function}:{line} [{context}] - {message}`
+- Context tag `[run=...,cfg=...,uid=...]` appears only when fields are bound
+- `config_id` and `user_id` truncated to first 8 chars; `run_id` is 6 hex chars
+- No context = no brackets (clean output for non-bot log lines)
+
+**Log levels** (what goes where):
+- **DEBUG**: Happy-path detail (cache hits, candle fetches, storage confirmations, per-timeframe results)
+- **INFO**: Meaningful state transitions (cycle start/complete, permission checks, LLM calls, decision results, free run tracking)
+- **WARNING**: Recoverable issues (non-critical fetch failures, permission blocks)
+- **ERROR**: Failures requiring attention (extraction/decision/trading failures, unexpected exceptions)
+
+**Binding context** (bot cycle correlation):
 ```python
 from core.common.logger import logger
 
-logger.bind(user_id="user_id").info("message")
-logger.bind(user_id="user_id").error("error details")
+# Simple binding — config_id/user_id appear in context tag
+logger.bind(config_id=config_id).info("Decision completed")
+
+# In bot cycle — run_id threads from run_once() through entire chain
+# All log lines in one cycle share the same run_id for grep correlation
+logger.bind(config_id=config_id, run_id=run_id).info("Starting cycle")
+
+# In DecisionEngineV2 — use _log_bind() helper (auto-includes config_id + run_id)
+self._log_bind().info("Routing to opportunity analysis")
+self._log_bind(symbol=symbol).error("Market data fetch failed")
 ```
+
+**Key rule**: Demote to DEBUG unless the log represents a **state transition** or **error**. If a log line fires every cycle for every bot and says "doing X" rather than "X changed/failed", it's DEBUG.
 
 ### Database Access
 

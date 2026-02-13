@@ -759,7 +759,7 @@ class TechnicalIndicators:
                     continue
 
                 else:
-                    self._log.warning(f"Indicator '{indicator}' not implemented yet")
+                    self._log.debug(f"Indicator '{indicator}' not implemented yet")
                     
             except Exception as e:
                 self._log.error(f"Error calculating {indicator}: {str(e)}")

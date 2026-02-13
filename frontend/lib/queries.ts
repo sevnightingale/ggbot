@@ -31,6 +31,7 @@ export interface ArenaBot {
   stop_loss: string
   take_profit: string
   max_margin: string
+  manual_closes: number
 }
 
 export interface ArenaPerformanceResponse {

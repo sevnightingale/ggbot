@@ -10,6 +10,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '2G',
+      kill_timeout: 5000,
       env: {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',

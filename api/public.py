@@ -105,6 +105,7 @@ async def get_arena_performance(
             # Solution: Fetch bot metadata once (30 bots), then fetch snapshots separately
 
             # Query 1: Get bot metadata with config_data (extracted only ~30 times)
+            # Season 1 complete — show all participants (not just active)
             cur.execute("""
                 SELECT
                     c.config_id,
@@ -118,10 +119,17 @@ async def get_arena_performance(
                     c.config_data->'extraction'->'selected_data_sources' as data_sources,
                     c.config_data->'trading'->'risk_management'->>'default_stop_loss_percent' as stop_loss,
                     c.config_data->'trading'->'risk_management'->>'default_take_profit_percent' as take_profit,
-                    c.config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin
+                    c.config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin,
+                    COALESCE((
+                        SELECT COUNT(*)
+                        FROM paper_trades pt
+                        WHERE pt.config_id = c.config_id
+                          AND pt.close_reason = 'manual'
+                          AND pt.status = 'closed'
+                    ), 0) as manual_closes
                 FROM configurations c
                 LEFT JOIN paper_accounts pa ON c.config_id = pa.config_id
-                WHERE c.is_public_performance = true AND c.state = 'active'
+                WHERE c.is_public_performance = true
             """)
             bot_metadata = {row[0]: row for row in cur.fetchall()}
 
@@ -138,7 +146,7 @@ async def get_arena_performance(
                     s.current_balance,
                     s.unrealized_pnl
                 FROM account_snapshots s
-                WHERE s.config_id IN (SELECT config_id FROM configurations WHERE is_public_performance = true AND state = 'active')
+                WHERE s.config_id IN (SELECT config_id FROM configurations WHERE is_public_performance = true)
                 AND s.timestamp >= %s
                 ORDER BY s.config_id, date_trunc('hour', s.timestamp), s.timestamp DESC
             """, (cutoff_time,))
@@ -189,7 +197,8 @@ async def get_arena_performance(
                         "data_sources": meta[8],
                         "stop_loss": meta[9],
                         "take_profit": meta[10],
-                        "max_margin": meta[11]
+                        "max_margin": meta[11],
+                        "manual_closes": int(meta[12] or 0)
                     }
 
                 # Add data point
@@ -252,13 +261,12 @@ async def get_arena_balance_series(config_id: str) -> Dict[str, Any]:
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Verify this is a public arena bot
+            # Verify this is a public arena bot (Season 1 complete — include inactive bots)
             cur.execute("""
                 SELECT config_id, created_at
                 FROM configurations
                 WHERE config_id = %s
                   AND is_public_performance = true
-                  AND state = 'active'
             """, (config_id,))
             config = cur.fetchone()
 
@@ -346,13 +354,12 @@ async def get_arena_activities(
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Verify this is a public arena bot
+            # Verify this is a public arena bot (Season 1 complete — include inactive bots)
             cur.execute("""
                 SELECT config_id
                 FROM configurations
                 WHERE config_id = %s
                   AND is_public_performance = true
-                  AND state = 'active'
             """, (config_id,))
             config = cur.fetchone()
 
@@ -422,14 +429,13 @@ async def get_arena_metadata(config_id: str) -> Dict[str, Any]:
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Verify this is a public arena bot and get config info
+            # Verify this is a public arena bot and get config info (Season 1 complete — include inactive bots)
             cur.execute("""
                 SELECT c.config_id, c.config_name, c.created_at, pa.initial_balance
                 FROM configurations c
                 LEFT JOIN paper_accounts pa ON c.config_id = pa.config_id
                 WHERE c.config_id = %s
                   AND c.is_public_performance = true
-                  AND c.state = 'active'
             """, (config_id,))
             config = cur.fetchone()
 

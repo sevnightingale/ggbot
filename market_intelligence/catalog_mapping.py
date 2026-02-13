@@ -57,25 +57,29 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('macro_economics', 'vix'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'vix_index'},
-        'cache_ttl': 14400  # 4 hours - VIX is context, not trigger; saves $0.025/query
+        'cache_ttl': 14400,  # 4 hours - VIX is context, not trigger; saves $0.025/query
+        'global': True,  # Not symbol-specific — share cache across all bots
     },
 
     ('macro_economics', 'dxy'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'dxy_index'},
-        'cache_ttl': 14400  # 4 hours - DXY moves slowly relative to crypto volatility
+        'cache_ttl': 14400,  # 4 hours - DXY moves slowly relative to crypto volatility
+        'global': True,
     },
 
     ('macro_economics', 'cpi'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'cpi_inflation'},
-        'cache_ttl': 86400  # 24 hours - CPI released monthly
+        'cache_ttl': 86400,  # 24 hours - CPI released monthly
+        'global': True,
     },
 
     ('macro_economics', 'nfp'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'nfp_jobs'},
-        'cache_ttl': 86400  # 24 hours - NFP released monthly
+        'cache_ttl': 86400,  # 24 hours - NFP released monthly
+        'global': True,
     },
 
     # ========================================================================
@@ -84,7 +88,8 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('onchain_analytics', 'btc_tvl'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'btc_tvl'},
-        'cache_ttl': 21600  # 6 hours - TVL changes very slowly
+        'cache_ttl': 21600,  # 6 hours - TVL changes very slowly
+        'global': True,  # BTC TVL is not per-symbol
     },
 
     ('onchain_analytics', 'whale_activity'): {
@@ -112,13 +117,15 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('sentiment_social', 'lunar_phase'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'lunar_phase'},
-        'cache_ttl': 43200  # 12 hours - moon phase changes slowly
+        'cache_ttl': 43200,  # 12 hours - moon phase changes slowly
+        'global': True,
     },
 
     ('sentiment_social', 'mercury_status'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'mercury_status'},
-        'cache_ttl': 86400  # 24 hours - retrograde status changes very slowly
+        'cache_ttl': 86400,  # 24 hours - retrograde status changes very slowly
+        'global': True,
     },
 
     # ========================================================================
@@ -146,7 +153,8 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('on_chain', 'btc_tvl'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'btc_tvl'},
-        'cache_ttl': 21600
+        'cache_ttl': 21600,
+        'global': True,
     },
     ('on_chain', 'Whale Activity'): {  # Display name variant
         'data_type': 'grok_agentic',

@@ -123,7 +123,7 @@ class MarketIntelligence:
 
                 if len(df) < limit:
                     # Cache doesn't have enough data - treat as miss
-                    self._log.warning(
+                    self._log.debug(
                         f"Cache insufficient for {data_type}: {cache_key} "
                         f"(has {len(df)} candles, need {limit}). Falling back to REST API."
                     )
@@ -131,11 +131,11 @@ class MarketIntelligence:
                 else:
                     # Cache has enough data - use it
                     use_cache = True
-                    self._log.info(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
+                    self._log.debug(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
             else:
                 # Non-OHLCV data or already wrapped - use cache
                 use_cache = True
-                self._log.info(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
+                self._log.debug(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
 
         if use_cache and cached_data:
             # Wrap cached data in AdapterResponse if it's not already
@@ -179,7 +179,7 @@ class MarketIntelligence:
             )
 
         # Cache miss - fetch from source
-        self._log.info(f"Cache miss for {data_type}: {cache_key}")
+        self._log.debug(f"Cache miss for {data_type}: {cache_key}")
 
         # Try sources in priority order
         query_params_obj = QueryParams(validated_params)
@@ -191,7 +191,7 @@ class MarketIntelligence:
                 adapter = await self._get_adapter(source_config.adapter)
 
                 # Fetch data
-                self._log.info(f"Fetching {data_type} from {source_config.adapter}")
+                self._log.debug(f"Fetching {data_type} from {source_config.adapter}")
                 adapter_response = await adapter.fetch(query_params_obj)
 
                 # Cache the result (use cache_config which may have TTL override)
@@ -200,8 +200,8 @@ class MarketIntelligence:
                 # Calculate total latency
                 latency_ms = (time.time() - start_time) * 1000
 
-                self._log.info(
-                    f"Successfully fetched {data_type} from {source_config.adapter} "
+                self._log.debug(
+                    f"Fetched {data_type} from {source_config.adapter} "
                     f"({latency_ms:.0f}ms)"
                 )
 

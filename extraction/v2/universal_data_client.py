@@ -27,7 +27,7 @@ class UniversalDataClient:
         """Initialize Universal Data Client with MarketIntelligence gateway."""
         self.intelligence = MarketIntelligence()
         self._log = logger.bind(component="universal_data_client")
-        self._log.info("UniversalDataClient initialized with MarketIntelligence gateway")
+        self._log.debug("UniversalDataClient initialized with MarketIntelligence gateway")
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -49,7 +49,7 @@ class UniversalDataClient:
         """Close MarketIntelligence gateway and cleanup resources."""
         if self.intelligence:
             await self.intelligence.close()
-            self._log.info("UniversalDataClient disconnected")
+            self._log.debug("UniversalDataClient disconnected")
 
     async def ensure_connected(self):
         """
@@ -85,7 +85,7 @@ class UniversalDataClient:
         Raises:
             Exception: If all data sources fail
         """
-        self._log.info(f"Fetching {limit} {timeframe} candles for {symbol} via MarketIntelligence")
+        self._log.debug(f"Fetching {limit} {timeframe} candles for {symbol} via MarketIntelligence")
 
         try:
             # Shield the query from cancellation to prevent partial data corruption
@@ -108,8 +108,8 @@ class UniversalDataClient:
             # Log performance metrics
             source_info = f"from {response.source}" if response.source != "cache" else "from cache"
             cache_status = "(cached)" if response.from_cache else "(fresh)"
-            self._log.info(
-                f"✅ Retrieved {len(df)} candles for {symbol} {source_info} {cache_status} "
+            self._log.debug(
+                f"Retrieved {len(df)} candles for {symbol} {source_info} {cache_status} "
                 f"in {response.latency_ms:.0f}ms"
             )
 

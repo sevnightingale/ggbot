@@ -35,14 +35,14 @@ class RedisCache:
                 decode_responses=False  # Handle binary data (pickled objects)
             )
             await self.client.ping()
-            self._log.info("Redis cache connected")
+            self._log.debug("Redis cache connected")
 
     async def close(self):
         """Close Redis connection."""
         if self.client:
             await self.client.close()
             self.client = None
-            self._log.info("Redis cache closed")
+            self._log.debug("Redis cache closed")
 
     async def get(self, key: str) -> Optional[Any]:
         """
