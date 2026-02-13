@@ -246,10 +246,10 @@ function ArenaContent() {
   // Season 1 complete — static progress (remove dynamic calculation for Season 2)
 
   const rankedBots = useMemo(() =>
-    data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
+    data ? [...data.bots].filter(bot => bot.total_trades > 0).sort((a, b) => b.current_equity - a.current_equity) : []
   , [data])
 
-  // Autonomous bots = zero manual closes (fully AI-driven)
+  // Autonomous bots = zero manual closes (fully AI-driven), must have traded
   const autonomousBots = useMemo(() =>
     rankedBots.filter(bot => bot.manual_closes === 0).slice(0, 10)
   , [rankedBots])
