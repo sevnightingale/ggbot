@@ -767,6 +767,9 @@ class DecisionEngineV2:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
         user_strategy = user_prompt
 
+        # Format market intelligence if available (same as opportunity analysis)
+        market_intel_context = self._format_market_intelligence_for_llm() if hasattr(self, 'market_intelligence') and self.market_intelligence else None
+
         # Build prompt
         prompt = build_position_management_prompt(
             symbol=symbol,
@@ -774,14 +777,16 @@ class DecisionEngineV2:
             market_data=market_context,
             volume_analysis=volume_analysis,
             position_data=position_context,
-            user_strategy=user_strategy
+            user_strategy=user_strategy,
+            market_intelligence=market_intel_context
         )
 
         # Also return the formatted sections for activity logging
         formatted_sections = {
             "technical_analysis": market_context,
             "volume_confirmation": volume_analysis,
-            "position_context": position_context
+            "position_context": position_context,
+            "market_intelligence": market_intel_context
         }
 
         return prompt, formatted_sections

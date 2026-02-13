@@ -11,10 +11,23 @@ def build_position_management_prompt(
     market_data: str,
     volume_analysis: str,
     position_data: str,
-    user_strategy: str
+    user_strategy: str,
+    market_intelligence: str = None
 ) -> str:
     """Build position management prompt with hardcoded structure."""
-    
+
+    # Build market intelligence section if available
+    market_intel_section = ""
+    if market_intelligence and market_intelligence.strip():
+        market_intel_section = f"""
+## MARKET INTELLIGENCE
+Additional market context beyond technical indicators:
+
+{market_intelligence}
+
+NOTE: This supplemental data provides context about market conditions (funding rates, macro environment, on-chain activity, sentiment, news). Consider how these factors may impact your position management decision.
+"""
+
     return f"""You are an expert cryptocurrency trader managing an existing position. Your job is to decide whether to continue holding or close the position based on current market conditions, position performance, and your configured trading strategy.
 
 ## CURRENT POSITION STATUS
@@ -31,7 +44,7 @@ Here is comprehensive technical analysis across all 7 timeframes (5m, 15m, 30m, 
 Current volume analysis for position management:
 
 {volume_analysis}
-
+{market_intel_section}
 ## YOUR TRADING STRATEGY
 {user_strategy}
 
@@ -51,9 +64,9 @@ Your reasoning should cite specific indicator values from the market data and ho
 ACTION: [close/wait]
 CONFIDENCE: [0.000-1.000]
 REASONING:
-- KEY_SIGNAL: [Primary indicator/pattern driving this decision, max 15 words]
-- SUPPORTING: [1-2 confirming factors from the data, max 20 words each]
-- RISK: [Main concern or counter-signal to watch, max 15 words]
+- KEY_SIGNAL: [Primary indicator or pattern driving this decision]
+- SUPPORTING: [Confirming factors from the data that support your decision]
+- RISK: [Main concern or counter-signal to watch]
 - SUMMARY: [One sentence explaining the decision logic, max 25 words]
 
 Note: Stop loss and take profit levels are managed by your risk management configuration. Focus on deciding whether to close or hold the position."""

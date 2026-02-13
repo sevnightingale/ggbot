@@ -1024,11 +1024,14 @@ function ForgeApp() {
         ? {
             ...account,
             current_balance: 10000,
+            available_balance: 10000,
             total_pnl: 0,
             unrealized_pnl: 0,
             total_equity: 10000,
             win_rate: 0,
             total_trades: 0,
+            open_positions: 0,
+            performance_pct: 0,
           }
         : account
     ))

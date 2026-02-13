@@ -1,61 +1,61 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-02-11 15:46:05 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-02-13 06:36:52 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 315
+- **Total Users**: 316
 - **Prepaid Users**: 19 (19 active subscriptions)
-- **Free Users**: 289
-- **Users with Bots**: 305 (96.8%)
+- **Free Users**: 291
+- **Users with Bots**: 306 (96.8%)
 
 ### Bot Statistics
-- **Total Bots**: 472
-- **Active Bots**: 33 (7.0%)
-  - Paper: 32
+- **Total Bots**: 473
+- **Active Bots**: 24 (5.1%)
+  - Paper: 23
   - Symphony (Live): 0
   - Aster (DEX): 0
-- **Inactive Bots**: 439
+- **Inactive Bots**: 449
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,108
-  - Wins: 2,325
-  - Losses: 4,783
-  - Platform Win Rate: 32.71%
-  - Total P&L: $88,935.20
+- **Total Trades (All Time)**: 7,136
+  - Wins: 2,342
+  - Losses: 4,794
+  - Platform Win Rate: 32.82%
+  - Total P&L: $105,637.64
 - **Recent Activity**:
-  - Last 24 hours: 89 trades
-  - Last 7 days: 1211 trades
-  - Last 30 days: 1922 trades
+  - Last 24 hours: 65 trades
+  - Last 7 days: 1001 trades
+  - Last 30 days: 2031 trades
 
 ### Open Positions
 - **Open Positions**: 10
-- **Unique Symbols**: 3
-- **Total Exposure**: $595,879.69
-- **Unrealized P&L**: $2,510.72
+- **Unique Symbols**: 2
+- **Total Exposure**: $243,249.52
+- **Unrealized P&L**: $3,693.68
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,187.03
-- **Lowest Balance**: $74.92
+- **Average Balance**: $10,223.29
+- **Lowest Balance**: $831.03
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 18 bots
-- **SOL/USDT**: 11 bots
-- **ETH/USDT**: 4 bots
+- **BTC/USDT**: 17 bots
+- **SOL/USDT**: 4 bots
+- **ETH/USDT**: 3 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 1729 decisions (avg confidence: 44.5%)
-- **enter**: 99 decisions (avg confidence: 77.2%)
-- **exit**: 37 decisions (avg confidence: 73.2%)
+- **wait**: 1253 decisions (avg confidence: 41.9%)
+- **enter**: 78 decisions (avg confidence: 70.4%)
+- **exit**: 38 decisions (avg confidence: 73.8%)
 
 ### System Health
-- **Decisions (last hour)**: 77
+- **Decisions (last hour)**: 46
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -64,22 +64,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 12MB | 2d 4h | 2 |
-| error-alerts | 🟢 online | 0% | 20MB | 2d 4h | 2 |
-| ggbot | 🟢 online | 4.1% | 349MB | 7h 43m | 10 |
-| account-monitor | 🟢 online | 0.8% | 31MB | 8h 15m | 4 |
-| sebastian-bot | 🟢 online | 0% | 45MB | 2d 4h | 2 |
-| market-data-ws | 🟢 online | 2% | 28MB | 2d 4h | 2 |
+| signal-listener | 🟢 online | 0% | 11MB | 3d 19h | 2 |
+| error-alerts | 🟢 online | 0% | 19MB | 3d 19h | 2 |
+| ggbot | 🟢 online | 5.6% | 318MB | 1h 59m | 11 |
+| account-monitor | 🟢 online | 0.7% | 25MB | 1d 23h | 4 |
+| sebastian-bot | 🟢 online | 0.4% | 29MB | 3d 19h | 2 |
+| market-data-ws | 🟢 online | 0.9% | 20MB | 3d 19h | 2 |
 
 ### VM Resources
 
 - **Disk**: 54G / 78G (70%)
-- **Memory**: 1.4Gi / 3.8Gi
-- **CPU Load**: 0.28 / 0.19 / 0.12 (1m/5m/15m)
+- **Memory**: 1.9Gi / 3.8Gi
+- **CPU Load**: 0.28 / 0.29 / 0.30 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 24.18M)
+- **Redis**: 🟢 connected (Memory: 22.04M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -513,7 +513,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-02-11 15:46:06 UTC
+**Last Updated**: 2026-02-13 06:36:53 UTC
 
 ---
 
@@ -1408,7 +1408,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-02-11 15:46:06 UTC
+**Last Updated**: 2026-02-13 06:36:53 UTC
 
 ---
 

@@ -752,6 +752,46 @@ class SupabasePaperTradingService:
                         WHERE config_id = %s
                     """, (config_id,))
 
+                    # Insert a fresh account_snapshot so the SSE dashboard
+                    # picks up reset values immediately (it reads from
+                    # account_snapshots, not paper_accounts)
+                    import uuid
+                    cur.execute("""
+                        INSERT INTO account_snapshots (
+                            snapshot_id, config_id, user_id, trading_mode, timestamp,
+                            current_balance, available_balance, margin_used,
+                            total_pnl, realized_pnl, unrealized_pnl,
+                            total_trades, win_trades, loss_trades, win_rate,
+                            open_positions, position_value, total_exposure,
+                            avg_win, avg_loss, largest_win, largest_loss,
+                            sharpe_ratio, max_drawdown,
+                            raw_data, balance_change_pct, is_heartbeat
+                        ) VALUES (
+                            %s, %s, %s, 'paper', NOW(),
+                            10000.00, 10000.00, 0,
+                            0, 0, 0,
+                            0, 0, 0, 0,
+                            0, 0, 0,
+                            0, 0, 0, 0,
+                            0, 0,
+                            NULL, 0, false
+                        )
+                    """, (str(uuid.uuid4()), config_id, user_id))
+
+                    # Insert a synthetic activity so the performance_pct
+                    # calculation (which uses latest activity total_equity)
+                    # starts fresh from $10,000
+                    cur.execute("""
+                        INSERT INTO activities (
+                            config_id, user_id, type, priority, data,
+                            total_equity, created_at
+                        ) VALUES (
+                            %s, %s, 'account_reset', 0,
+                            '{"summary": "Account reset to $10,000"}'::jsonb,
+                            10000.00, NOW()
+                        )
+                    """, (config_id, user_id))
+
                     conn.commit()
 
                     if not result:

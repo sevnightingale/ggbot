@@ -70,9 +70,9 @@ Your reasoning should cite specific indicator values from the market data that t
 ACTION: [long/short/wait]
 CONFIDENCE: [0.000-1.000]
 REASONING:
-- KEY_SIGNAL: [Primary indicator/pattern driving this decision, max 15 words]
-- SUPPORTING: [1-2 confirming factors from the data, max 20 words each]
-- RISK: [Main concern or counter-signal to watch, max 15 words]
+- KEY_SIGNAL: [Primary indicator or pattern driving this decision]
+- SUPPORTING: [Confirming factors from the data that support your decision]
+- RISK: [Main concern or counter-signal to watch]
 - SUMMARY: [One sentence explaining the decision logic, max 25 words]
 
 Note: Stop loss and take profit levels are managed by your risk management configuration and will be applied automatically based on your settings."""

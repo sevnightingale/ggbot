@@ -98,7 +98,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'query_type': 'whale_activity',
             'symbol': '{symbol}'
         },
-        'cache_ttl': 7200  # 2 hours - whale moves take time to matter
+        'cache_ttl': 14400  # 4 hours - whale moves take time to matter; reduced from 2h to cut API costs
     },
 
     # ========================================================================
@@ -110,7 +110,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'query_type': 'twitter_sentiment',
             'symbol': '{symbol}'
         },
-        'cache_ttl': 14400  # 4 hours - sentiment doesn't flip in minutes; $0.05/query (web+X)
+        'cache_ttl': 21600  # 6 hours - sentiment doesn't flip in minutes; reduced from 4h to cut API costs
     },
 
     # Astrology / Timing Signals (2026-01-23)
@@ -137,7 +137,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'query_type': 'crypto_news',
             'symbol': '{symbol}'
         },
-        'cache_ttl': 7200  # 2 hours - breaking news is rarely actionable in 10 min
+        'cache_ttl': 14400  # 4 hours - breaking news is rarely actionable in minutes; reduced from 2h to cut API costs
     },
 
     # ========================================================================
@@ -148,7 +148,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('on_chain', 'whale_activity'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'whale_activity', 'symbol': '{symbol}'},
-        'cache_ttl': 7200
+        'cache_ttl': 14400
     },
     ('on_chain', 'btc_tvl'): {
         'data_type': 'grok_agentic',
@@ -159,36 +159,36 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('on_chain', 'Whale Activity'): {  # Display name variant
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'whale_activity', 'symbol': '{symbol}'},
-        'cache_ttl': 7200
+        'cache_ttl': 14400
     },
 
     # news_events / news -> news_regulatory
     ('news_events', 'crypto_news'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'crypto_news', 'symbol': '{symbol}'},
-        'cache_ttl': 7200
+        'cache_ttl': 14400
     },
     ('news', 'crypto_news'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'crypto_news', 'symbol': '{symbol}'},
-        'cache_ttl': 7200
+        'cache_ttl': 14400
     },
     ('news', 'Crypto News Feed'): {  # Display name variant
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'crypto_news', 'symbol': '{symbol}'},
-        'cache_ttl': 7200
+        'cache_ttl': 14400
     },
 
     # sentiment -> sentiment_social
     ('sentiment', 'twitter_sentiment'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'twitter_sentiment', 'symbol': '{symbol}'},
-        'cache_ttl': 14400
+        'cache_ttl': 21600
     },
     ('sentiment', 'Twitter Sentiment'): {  # Display name variant
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'twitter_sentiment', 'symbol': '{symbol}'},
-        'cache_ttl': 14400
+        'cache_ttl': 21600
     },
 
     # derivatives -> derivatives_leverage
