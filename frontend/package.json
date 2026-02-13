@@ -26,8 +26,8 @@
     "gray-matter": "^4.0.3",
     "lightweight-charts": "^4.2.0",
     "lucide-react": "^0.513.0",
-    "next": "^15.5.7",
-    "next-mdx-remote": "^5.0.0",
+    "next": "^15.5.11",
+    "next-mdx-remote": "^6.0.0",
     "postcss": "^8.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -49,7 +49,7 @@
     "@types/react-dom": "^19",
     "@types/rss": "^0.0.32",
     "eslint": "9.28.0",
-    "eslint-config-next": "^15.5.7",
+    "eslint-config-next": "^15.5.11",
     "typescript": "^5"
   }
 }

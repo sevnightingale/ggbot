@@ -11,6 +11,50 @@ interface BotImageUploadProps {
   className?: string
 }
 
+// Resize image to 1024x1024 (pure utility, no component state dependency)
+function resizeImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'))
+          return
+        }
+
+        // Set canvas size to 1024x1024
+        canvas.width = 1024
+        canvas.height = 1024
+
+        // Calculate crop dimensions to maintain aspect ratio
+        const size = Math.min(img.width, img.height)
+        const x = (img.width - size) / 2
+        const y = (img.height - size) / 2
+
+        // Draw cropped and resized image
+        ctx.drawImage(img, x, y, size, size, 0, 0, 1024, 1024)
+
+        // Convert to blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob)
+          } else {
+            reject(new Error('Could not create blob from canvas'))
+          }
+        }, 'image/jpeg', 0.9)
+      }
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = e.target?.result as string
+    }
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
 export function BotImageUpload({
   configId,
   currentImageUrl,
@@ -28,51 +72,7 @@ export function BotImageUpload({
     setPreview(currentImageUrl)
   }, [currentImageUrl])
 
-  // Resize image to 1024x1024
-  const resizeImage = (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-
-          if (!ctx) {
-            reject(new Error('Could not get canvas context'))
-            return
-          }
-
-          // Set canvas size to 1024x1024
-          canvas.width = 1024
-          canvas.height = 1024
-
-          // Calculate crop dimensions to maintain aspect ratio
-          const size = Math.min(img.width, img.height)
-          const x = (img.width - size) / 2
-          const y = (img.height - size) / 2
-
-          // Draw cropped and resized image
-          ctx.drawImage(img, x, y, size, size, 0, 0, 1024, 1024)
-
-          // Convert to blob
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob)
-            } else {
-              reject(new Error('Could not create blob from canvas'))
-            }
-          }, 'image/jpeg', 0.9)
-        }
-        img.onerror = () => reject(new Error('Failed to load image'))
-        img.src = e.target?.result as string
-      }
-      reader.onerror = () => reject(new Error('Failed to read file'))
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const handleUpload = async (file: File) => {
+  const handleUpload = useCallback(async (file: File) => {
     setError(null)
 
     // Validate file
@@ -153,7 +153,7 @@ export function BotImageUpload({
     } finally {
       setUploading(false)
     }
-  }
+  }, [configId, currentImageUrl, onUploadComplete])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -170,7 +170,7 @@ export function BotImageUpload({
     if (file) {
       handleUpload(file)
     }
-  }, [])
+  }, [handleUpload])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()

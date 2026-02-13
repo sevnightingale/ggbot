@@ -46,22 +46,22 @@ const FREQUENCY_TO_DECISIONS: Record<string, number> = {
   'signal_driven': 5  // estimate ~5 signals/day
 }
 
+// Human-readable frequency labels
+const FREQUENCY_LABELS: Record<string, string> = {
+  '5m': 'every 5 min',
+  '15m': 'every 15 min',
+  '30m': 'every 30 min',
+  '1h': 'every hour',
+  '4h': 'every 4 hours',
+  '1d': 'daily',
+  '1w': 'weekly',
+  'signal_driven': 'signal-driven'
+}
+
 export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('choose')
-
-  // Human-readable frequency labels
-  const FREQUENCY_LABELS: Record<string, string> = {
-    '5m': 'every 5 min',
-    '15m': 'every 15 min',
-    '30m': 'every 30 min',
-    '1h': 'every hour',
-    '4h': 'every 4 hours',
-    '1d': 'daily',
-    '1w': 'weekly',
-    'signal_driven': 'signal-driven'
-  }
 
   // Calculate estimate based on bot config (weekly, to match billing)
   const estimate = useMemo(() => {
