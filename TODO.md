@@ -4,21 +4,19 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🏆 **ggArena Season 1** - 🟢 LIVE
+## 🏆 **ggArena Season 1** - 🟢 COMPLETE
 
-**Status**: Competition running Jan 21 12:00 UTC → Feb 11 12:00 UTC
+**Status**: Season 1 finished Feb 11, 2026. Results page live at /arena.
 **Planning Doc**: [DOCS/completed/GGARENA_SEASON1_LAUNCH.md](DOCS/completed/GGARENA_SEASON1_LAUNCH.md)
 
-**Competition Details**:
+**Competition Results**:
 - **Dates**: Jan 21 12:00 UTC → Feb 11 12:00 UTC (21 days)
 - **Prize Pool**: $2,500 in USX on Scroll
-- **Top 3**: Also get funded live trading on Symphony
-- **33 bots competing** (updated 2026-01-26), all reset to $10k at launch
+- **Bots that traded**: filtered to active participants only (0-trade bots excluded from leaderboard)
 
-**Remaining Work**:
-- [ ] Update x-bot to different account
-- [ ] Inline arena bot creation modal (optional, future)
-- [ ] Add "Registered Competitors" section (optional, future)
+**Season 2 Backlog**:
+- [ ] Inline arena bot creation modal
+- [ ] Add "Registered Competitors" section
 
 ---
 

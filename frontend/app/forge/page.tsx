@@ -79,7 +79,10 @@ function ForgeApp() {
   const [isBotAction, setIsBotAction] = useState(false)
   const [isBotSwitching, setIsBotSwitching] = useState(false)  // Show skeleton during bot switch
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
-  const [showArenaBanner, setShowArenaBanner] = useState(true)
+  const [showArenaBanner, setShowArenaBanner] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('arena-banner-dismissed') !== 'true'
+  })
   const [showOnboardingTour, setShowOnboardingTour] = useState(false)
 
   // Onboarding tour steps - shown after first bot creation
@@ -1134,7 +1137,7 @@ function ForgeApp() {
               </Link>
             </p>
             <button
-              onClick={() => setShowArenaBanner(false)}
+              onClick={() => { localStorage.setItem('arena-banner-dismissed', 'true'); setShowArenaBanner(false) }}
               className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               aria-label="Dismiss banner"
             >

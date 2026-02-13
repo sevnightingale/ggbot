@@ -6,6 +6,23 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-13 - Vercel Build Fix (CVE-2026-0969) + Frontend Cleanup + Arena Filter
+
+**Vercel Deployment Blocker** (`frontend/package.json`):
+- `next-mdx-remote` 5.0.0 → 6.0.0 — fixes CVE-2026-0969 (XSS via JS in MDX). v6 adds `blockJS`/`blockDangerousJS` defaults; transparent for pure-markdown blog.
+- `next` 15.5.7 → 15.5.11, `eslint-config-next` aligned — fixes `@next/swc` version mismatch warning
+- Browserslist DB updated (1.0.30001721 → 1.0.30001769)
+- `npm audit fix` — 2 high severity → 0 vulnerabilities
+
+**React Hook Warnings** (`components/BotImageUpload.tsx`, `components/UpgradeModal.tsx`):
+- `BotImageUpload`: `resizeImage` moved to module scope (pure utility), `handleUpload` wrapped in `useCallback`, `handleDrop` deps fixed
+- `UpgradeModal`: `FREQUENCY_LABELS` moved to module scope (static lookup table, was recreating identity each render)
+
+**Arena Leaderboard** (`components/arena/ArenaWithStaking.tsx`):
+- Filter `total_trades > 0` on `rankedBots` — excludes bots that never traded (stuck at $10k). Cascades to podium, autonomous leaderboard, overall leaderboard, hero/footer count text.
+
+---
+
 ## 2026-02-11 - Hyperliquid Phase 4 + 4.5: Polish, Error Handling, Position Tracking Fixes
 
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
