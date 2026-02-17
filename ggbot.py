@@ -4437,6 +4437,7 @@ async def start_bot(
                 )
 
             # 2. Single live bot safety net — only one live bot per user
+            from core.common.db import get_db_connection
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
