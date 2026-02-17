@@ -2033,6 +2033,26 @@ async def update_config(
     if not config:
         raise HTTPException(status_code=404, detail="Configuration not found or update failed")
 
+    # Log strategy_updated activity for meaningful config changes
+    # Skip name-only or type-only changes (not strategy changes)
+    strategy_fields = {'selected_pair', 'extraction', 'decision', 'trading', 'llm_config'}
+    changed_strategy_fields = [f for f in update_data.keys() if f in strategy_fields]
+    if changed_strategy_fields:
+        from core.common.activity_logger import log_activity_safe
+        field_labels = ', '.join(changed_strategy_fields)
+        log_activity_safe(
+            config_id=config_id,
+            user_id=current_user.user_id,
+            activity_type='strategy_updated',
+            activity_source='user_action',
+            summary=f"Config updated: {field_labels}",
+            details={
+                'changed_fields': changed_strategy_fields,
+                'updates': {k: v for k, v in update_data.items() if k in strategy_fields},
+            },
+            importance=5
+        )
+
     # Invalidate cached engines so next run picks up new config
     orchestrator.invalidate_engines(config_id)
     
@@ -3255,6 +3275,20 @@ async def setup_hyperliquid_account(
                     conn.commit()
                     logger.bind(user_id=current_user.user_id).info(
                         f"Created live bot slot {live_config_id} (equity: ${account_value:.2f})"
+                    )
+                    # Log bot_created activity for timeline
+                    from core.common.activity_logger import log_activity_safe
+                    log_activity_safe(
+                        config_id=live_config_id,
+                        user_id=current_user.user_id,
+                        activity_type='bot_created',
+                        activity_source='system',
+                        summary=f"Live trading bot created (${account_value:.2f} equity)",
+                        details={
+                            'trading_mode': 'hyperliquid',
+                            'initial_equity': float(account_value),
+                        },
+                        importance=7
                     )
 
         return {
