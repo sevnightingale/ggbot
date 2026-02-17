@@ -119,7 +119,7 @@ class BotConfigV2:
             config_id=data["config_id"],
             user_id=data["user_id"],
             config_name=data.get("config_name"),  # Don't apply fallback - preserve NULL from DB
-            selected_pair=data["selected_pair"],
+            selected_pair=data.get("selected_pair", ""),
             extraction=data.get("extraction"),
             decision=data.get("decision"),
             trading=data.get("trading"),
@@ -426,6 +426,7 @@ class ConfigService:
                             flattened_config = config_data.copy()
                             flattened_config["config_id"] = config_id
                             flattened_config["user_id"] = user_id
+                            flattened_config.setdefault("selected_pair", "")
                             if config_name and "config_name" not in flattened_config:
                                 flattened_config["config_name"] = config_name
                             flattened_config["state"] = state or "inactive"

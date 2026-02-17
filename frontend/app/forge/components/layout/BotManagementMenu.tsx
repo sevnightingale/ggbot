@@ -32,6 +32,7 @@ export function BotManagementMenu({
   const [newName, setNewName] = useState(bot.config_name)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showPromoteConfirm, setShowPromoteConfirm] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -49,6 +50,7 @@ export function BotManagementMenu({
         setIsOpen(false)
         setShowDeleteConfirm(false)
         setShowResetConfirm(false)
+        setShowPromoteConfirm(false)
         if (isRenamingLocal) {
           handleRenameCancel() // Automatically discard changes
         }
@@ -99,6 +101,16 @@ export function BotManagementMenu({
   const handleResetConfirm = () => {
     onResetAccount?.(bot.config_id)
     setShowResetConfirm(false)
+  }
+
+  const handlePromoteClick = () => {
+    setShowPromoteConfirm(true)
+    setIsOpen(false)
+  }
+
+  const handlePromoteConfirm = () => {
+    onPromoteToLive?.(bot.config_id)
+    setShowPromoteConfirm(false)
   }
 
   if (isRenamingLocal) {
@@ -210,6 +222,39 @@ export function BotManagementMenu({
     )
   }
 
+  if (showPromoteConfirm) {
+    return (
+      <div ref={menuRef} data-bot-menu className="absolute right-0 top-8 z-50 min-w-56 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+        <div className="p-3">
+          <div className="text-xs text-[var(--text-primary)] mb-2">
+            Promote to Live?
+          </div>
+          <div className="text-xs text-[var(--text-muted)] mb-3">
+            This will copy &ldquo;{bot.config_name}&rdquo;&apos;s strategy to your live bot, replacing any current live strategy.
+            <div className="mt-2">
+              Your paper bot will keep running for comparison.
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePromoteConfirm}
+              disabled={isBotAction}
+              className="flex-1 px-2 py-1 text-xs bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50"
+            >
+              {isBotAction ? 'Promoting...' : 'Promote'}
+            </button>
+            <button
+              onClick={() => setShowPromoteConfirm(false)}
+              className="flex-1 px-2 py-1 text-xs border border-[var(--border)] rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -238,10 +283,7 @@ export function BotManagementMenu({
             </button>
             {!isLiveBot && onPromoteToLive && (
               <button
-                onClick={() => {
-                  onPromoteToLive(bot.config_id)
-                  setIsOpen(false)
-                }}
+                onClick={handlePromoteClick}
                 disabled={isBotAction}
                 className="w-full px-3 py-2 text-left text-xs text-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >

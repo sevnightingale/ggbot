@@ -1058,9 +1058,6 @@ function ForgeApp() {
   }
 
   const handlePromoteToLive = async (configId: string) => {
-    if (!confirm('Copy this bot\'s strategy to your live bot? This replaces the current live strategy.')) {
-      return
-    }
     setIsBotAction(true)
     try {
       const result = await apiClient.promoteToLive(configId)
@@ -1072,7 +1069,6 @@ function ForgeApp() {
       }
     } catch (error) {
       console.error('Failed to promote to live:', error)
-      alert(error instanceof Error ? error.message : 'Failed to promote to live')
     } finally {
       setIsBotAction(false)
     }
