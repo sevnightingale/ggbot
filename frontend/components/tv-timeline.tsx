@@ -599,6 +599,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             const hasMarketQuery = activitiesAtTime.some(a => a.type === 'market_query');
             const hasAgentWait = activitiesAtTime.some(a => a.type === 'agent_wait');
             const hasBotCreated = activitiesAtTime.some(a => a.type === 'bot_created');
+            const hasStrategyUpdated = activitiesAtTime.some(a => a.type === 'strategy_updated');
 
             // TRADE EVENTS (arrows, above/below line)
             if (hasTradeLong) {
@@ -663,6 +664,14 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 color: '#16a34a', // green for new creation
                 shape: 'circle',
                 size: 1.5, // slightly larger for lifecycle event
+              });
+            } else if (hasStrategyUpdated) {
+              markers.push({
+                time: timestamp as Time,
+                position: 'aboveBar',
+                color: '#3CA6E0', // signal blue — config change
+                shape: 'square',
+                size: 1,
               });
             }
           });
