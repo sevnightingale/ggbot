@@ -150,6 +150,21 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                             'total_pnl': float(fallback[1]) if fallback[1] is not None else None
                         }
 
+                # FINAL FALLBACK: Use initial_equity from configurations table
+                # This handles brand-new bots that haven't had their first snapshot yet
+                cur.execute("""
+                    SELECT initial_equity
+                    FROM configurations
+                    WHERE config_id = %s
+                    LIMIT 1
+                """, (config_id,))
+                equity_result = cur.fetchone()
+                if equity_result and equity_result[0] is not None:
+                    return {
+                        'current_balance': float(equity_result[0]),
+                        'total_pnl': 0.0
+                    }
+
                 return None
     except Exception as e:
         # Non-critical - snapshot is optional for activity logging
