@@ -6,6 +6,7 @@ import { apiClient, BotConfiguration, ConfigData } from '@/lib/api'
 import { useDataSources, useLatestActivity, useBotList } from '@/lib/queries'
 import { ThemeProvider } from '@/lib/theme'
 import { PermissionProvider, usePermissions } from '@/lib/permissions'
+import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
 import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { useBatchedConfigSave } from '@/lib/hooks/useBatchedConfigSave'
 import { Header } from './components/layout/Header'
@@ -57,7 +58,7 @@ function ForgeApp() {
   const [sseConnected, setSseConnected] = useState(false)
 
   // Permission loading - always call hook, but only use when user exists
-  const { loading: permissionsLoading } = usePermissions()
+  const { loading: permissionsLoading, userProfile, refreshProfile } = usePermissions()
 
   // Save status context - for operation feedback (optimistic updates)
   const { registerSave, completeSave, failSave } = useSaveStatus()
@@ -84,6 +85,7 @@ function ForgeApp() {
     return localStorage.getItem('arena-banner-dismissed') !== 'true'
   })
   const [showOnboardingTour, setShowOnboardingTour] = useState(false)
+  const [liveTradingSetupOpen, setLiveTradingSetupOpen] = useState(false)
 
   // Onboarding tour steps - shown after first bot creation
   // Steps auto-navigate between tabs to show key features
@@ -133,6 +135,9 @@ function ForgeApp() {
     ? allBots.find(bot => bot.config_id === selectedConfigId) || null
     : null
 
+  // Derive live bot from allBots (single live bot slot)
+  const liveBot = allBots.find(bot => bot.trading_mode === 'hyperliquid') || null
+  const hyperliquidConnected = !!userProfile?.hyperliquid_connected
 
   // Real-time status tracking
   const [nextRun, setNextRun] = useState<string | null>(null)
@@ -1052,6 +1057,27 @@ function ForgeApp() {
     }
   }
 
+  const handlePromoteToLive = async (configId: string) => {
+    if (!confirm('Copy this bot\'s strategy to your live bot? This replaces the current live strategy.')) {
+      return
+    }
+    setIsBotAction(true)
+    try {
+      const result = await apiClient.promoteToLive(configId)
+      if (result.live_config_id) {
+        // Refresh bot list to pick up the updated live bot
+        const configs = await apiClient.listConfigs()
+        setAllBots(configs)
+        setSelectedConfigId(result.live_config_id)
+      }
+    } catch (error) {
+      console.error('Failed to promote to live:', error)
+      alert(error instanceof Error ? error.message : 'Failed to promote to live')
+    } finally {
+      setIsBotAction(false)
+    }
+  }
+
   if (loading) {
     return (
       <ThemeProvider>
@@ -1186,9 +1212,13 @@ function ForgeApp() {
           {/* Bot Rail */}
           <BotRail
             bots={allBots}
+            liveBot={liveBot}
+            hyperliquidConnected={hyperliquidConnected}
             selectedId={selectedConfigId}
             onSelect={handleBotSelection}
             onCreateNew={() => setBotCreationModalOpen(true)}
+            onOpenHyperliquidSetup={() => setLiveTradingSetupOpen(true)}
+            onPromoteToLive={handlePromoteToLive}
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
@@ -1204,12 +1234,12 @@ function ForgeApp() {
             {selectedBot && (() => {
               // Calculate metrics from accounts data for selected bot
               const account = accounts.find(a => a.config_id === selectedConfigId)
-              const isLive = ['symphony', 'aster', 'hyperliquid'].includes(selectedBot?.trading_mode || '')
+              const isLegacyLive = ['symphony', 'aster'].includes(selectedBot?.trading_mode || '')
               const metrics = account ? {
-                totalEquity: isLive
-                  ? Number(account.total_pnl || 0)  // Cumulative P&L for live trading
+                totalEquity: isLegacyLive
+                  ? Number(account.total_pnl || 0)  // Cumulative P&L for legacy live modes
                   : Number(account.current_balance || 0) + Number(account.unrealized_pnl || 0),
-                availableBalance: isLive ? 0 : Number(account.available_balance || 0),
+                availableBalance: isLegacyLive ? 0 : Number(account.available_balance || 0),
                 pnl: Number(account.unrealized_pnl || 0),
                 trades: Number(account.total_trades || 0),
                 winRate: account.win_rate ? Number(account.win_rate) * 100 : 0,
@@ -1283,7 +1313,6 @@ function ForgeApp() {
                     dataSources={dataSources}
                     onUpdateConfig={handleConfigChange}
                     onConfigUpdate={handleConfigUpdate}
-                    allBots={allBots}
                   />
                 )
               ) : (
@@ -1300,9 +1329,13 @@ function ForgeApp() {
       <MobileNav
         className="md:hidden"
         bots={allBots}
+        liveBot={liveBot}
+        hyperliquidConnected={hyperliquidConnected}
         selectedId={selectedConfigId}
         onSelect={handleBotSelection}
         onCreateNew={() => setBotCreationModalOpen(true)}
+        onOpenHyperliquidSetup={() => setLiveTradingSetupOpen(true)}
+        onPromoteToLive={handlePromoteToLive}
         isCreatingNew={isCreatingNew}
         onRename={handleRenameBot}
         onDuplicate={handleDuplicateBot}
@@ -1326,6 +1359,25 @@ function ForgeApp() {
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
         forceOpen={allBots.length === 0}
+      />
+
+      {/* Live Trading Setup Modal (opened from BotRail live slot) */}
+      <LiveTradingSetupModal
+        open={liveTradingSetupOpen}
+        onOpenChange={setLiveTradingSetupOpen}
+        onComplete={async () => {
+          setLiveTradingSetupOpen(false)
+          // Refresh profile so hyperliquid_connected updates
+          await refreshProfile()
+          // Refresh bot list to pick up the auto-created live bot
+          const configs = await apiClient.listConfigs()
+          setAllBots(configs)
+          // Select the new live bot
+          const newLiveBot = configs.find(b => b.trading_mode === 'hyperliquid')
+          if (newLiveBot) {
+            setSelectedConfigId(newLiveBot.config_id)
+          }
+        }}
       />
 
       {/* Onboarding Tour - shown after first bot creation */}

@@ -92,8 +92,9 @@ class AccountSnapshot:
         Returns:
             Decimal representing total account equity, or None if insufficient data
         """
-        if self.trading_mode == 'paper':
-            # Paper trading: use centralized calculator
+        if self.trading_mode in ('paper', 'hyperliquid'):
+            # Paper and Hyperliquid: real balance + unrealized P&L
+            # Hyperliquid single live bot model means account balance = bot balance
             if self.current_balance is None:
                 return None
 
@@ -103,9 +104,7 @@ class AccountSnapshot:
             )
 
         else:
-            # Live modes (symphony/aster/hyperliquid): total_pnl = per-bot cumulative P&L
-            # For shared accounts (Hyperliquid), this is realized + unrealized for
-            # this bot's symbols only — not the shared account balance
+            # Legacy live modes (symphony/aster): total_pnl = per-bot cumulative P&L
             return self.total_pnl
 
     @property

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { BotConfiguration } from '@/lib/api'
-import { Edit2, Copy, RefreshCw, Check, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Edit2, Copy, RefreshCw, Check, MoreHorizontal, Trash2, Rocket } from 'lucide-react'
 
 interface BotManagementMenuProps {
   bot: BotConfiguration
@@ -10,8 +10,10 @@ interface BotManagementMenuProps {
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
   onResetAccount?: (configId: string) => void
+  onPromoteToLive?: (configId: string) => void
   isBotAction: boolean
   hasUnsavedChanges?: boolean
+  isLiveBot?: boolean
 }
 
 export function BotManagementMenu({
@@ -20,8 +22,10 @@ export function BotManagementMenu({
   onDuplicate,
   onDelete,
   onResetAccount,
+  onPromoteToLive,
   isBotAction,
-  hasUnsavedChanges = false
+  hasUnsavedChanges = false,
+  isLiveBot = false
 }: BotManagementMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isRenamingLocal, setIsRenamingLocal] = useState(false)
@@ -232,17 +236,32 @@ export function BotManagementMenu({
               <Edit2 className="h-3.5 w-3.5" />
               Rename
             </button>
-            <button
-              onClick={() => {
-                onDuplicate(bot.config_id)
-                setIsOpen(false)
-              }}
-              disabled={isBotAction}
-              className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Duplicate
-            </button>
+            {!isLiveBot && onPromoteToLive && (
+              <button
+                onClick={() => {
+                  onPromoteToLive(bot.config_id)
+                  setIsOpen(false)
+                }}
+                disabled={isBotAction}
+                className="w-full px-3 py-2 text-left text-xs text-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Rocket className="h-3.5 w-3.5" />
+                Promote to Live
+              </button>
+            )}
+            {!isLiveBot && (
+              <button
+                onClick={() => {
+                  onDuplicate(bot.config_id)
+                  setIsOpen(false)
+                }}
+                disabled={isBotAction}
+                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Duplicate
+              </button>
+            )}
             {onResetAccount && (
               <button
                 onClick={handleResetClick}
@@ -250,18 +269,22 @@ export function BotManagementMenu({
                 className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Reset Account
+                {isLiveBot ? 'Reset Stats' : 'Reset Account'}
               </button>
             )}
-            <hr className="my-1 border-[var(--border)]" />
-            <button
-              onClick={handleDeleteClick}
-              disabled={isBotAction}
-              className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </button>
+            {!isLiveBot && (
+              <>
+                <hr className="my-1 border-[var(--border)]" />
+                <button
+                  onClick={handleDeleteClick}
+                  disabled={isBotAction}
+                  className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

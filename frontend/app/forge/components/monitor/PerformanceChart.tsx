@@ -76,7 +76,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
     const loadData = async () => {
       setLoading(true)
       try {
-        const isLive = account?.source === 'live' || account?.source === 'hyperliquid'
+        const isLive = account?.source === 'live'
 
         // Load trade history from appropriate endpoint
         let trades: Trade[]
@@ -191,7 +191,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
 
   // Empty state
   if (!loading && trades.length === 0) {
-    const isLive = account?.source === 'live' || account?.source === 'hyperliquid'
+    const isLive = account?.source === 'live'
     return (
       <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Performance Chart</h3>
@@ -226,7 +226,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
     )
   }
 
-  const isLive = account?.source === 'live' || account?.source === 'hyperliquid'
+  const isLive = account?.source === 'live'
   const currentBalance = isLive ? null : (account?.current_balance ?? 10000)
   const portfolioReturnPct = isLive ? null : (account?.portfolio_return_pct ?? 0)
   const totalTrades = account?.total_trades ?? 0

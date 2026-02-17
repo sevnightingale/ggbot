@@ -719,13 +719,15 @@ class VaultManager:
                         logger.bind(user_id=user_id).warning("User profile not found")
                         return False
 
-                    # Disable hyperliquid trading on all user's bots
+                    # Deactivate hyperliquid bots but keep the slot
+                    # (don't convert to paper — preserves strategy for reconnection)
                     cur.execute("""
                         UPDATE configurations
-                        SET trading_mode = 'paper',
+                        SET state = 'inactive',
                             updated_at = NOW()
                         WHERE user_id = %s
                         AND trading_mode = 'hyperliquid'
+                        AND state = 'active'
                     """, (user_id,))
 
                     disabled_bots = cur.rowcount
@@ -733,7 +735,7 @@ class VaultManager:
                     conn.commit()
 
                     logger.bind(user_id=user_id).info(
-                        f"Deleted Hyperliquid credentials and disabled {disabled_bots} hyperliquid bot(s)"
+                        f"Deleted Hyperliquid credentials and deactivated {disabled_bots} live bot(s)"
                     )
                     return True
 

@@ -80,7 +80,7 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                 #   Formula: total_equity = current_balance + unrealized_pnl
                 #   Note: current_balance already includes margin_used
                 # For live modes: Use total_pnl (already includes unrealized)
-                if trading_mode == 'paper':
+                if trading_mode in ('paper', 'hyperliquid'):
                     balance_field = "COALESCE(current_balance + unrealized_pnl, current_balance)"
                 else:
                     balance_field = "current_balance"

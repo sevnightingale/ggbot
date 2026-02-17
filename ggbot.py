@@ -1714,44 +1714,12 @@ async def create_config(
                 detail="AsterDEX account not connected. Please connect in Settings first."
             )
 
-    # Hyperliquid-specific validations
+    # Hyperliquid: block direct creation — use "Promote to Live" instead
     if trading_mode == "hyperliquid":
-        from core.auth.vault_utils import VaultManager
-        credentials = await VaultManager.get_hyperliquid_credential(current_user.user_id)
-        if not credentials:
-            raise HTTPException(
-                status_code=400,
-                detail="Hyperliquid account not connected. Please connect in Settings first."
-            )
-
-        # Account allocation validation: sum of all hyperliquid bots' max_margin_percent must be <= 100%
-        new_max_margin = request_data.get("trading", {}).get("position_sizing", {}).get("max_margin_percent", 20.0)
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT config_id,
-                               config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin
-                        FROM configurations
-                        WHERE user_id = %s AND trading_mode = 'hyperliquid' AND state != 'archived'
-                    """, (current_user.user_id,))
-                    existing_allocations = cur.fetchall()
-
-            total_existing = sum(float(row[1] or 0) for row in existing_allocations)
-            total_with_new = total_existing + float(new_max_margin)
-
-            if total_with_new > 100:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Total account allocation across your Hyperliquid bots would be {total_with_new:.1f}%. "
-                        f"Maximum is 100%. Reduce max margin % on this bot or your other live bots."
-                    )
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.warning(f"Could not validate Hyperliquid allocation: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Use 'Promote to Live' to set up live trading. Create a paper bot first, then promote it."
+        )
 
     # Validate symbol has real-time price data (WebSocket cached)
     selected_pair = request_data.get("selected_pair")
@@ -3261,10 +3229,39 @@ async def setup_hyperliquid_account(
 
         logger.bind(user_id=current_user.user_id).info("Hyperliquid account connected successfully")
 
+        # Auto-create live bot slot if none exists (idempotent for reconnections)
+        live_config_id = None
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT config_id FROM configurations
+                    WHERE user_id = %s AND trading_mode = 'hyperliquid' LIMIT 1
+                """, (current_user.user_id,))
+                existing = cur.fetchone()
+
+                if existing:
+                    live_config_id = str(existing[0])
+                else:
+                    live_config_id = str(uuid.uuid4())
+                    cur.execute("""
+                        INSERT INTO configurations
+                        (config_id, user_id, config_type, config_name, config_data,
+                         trading_mode, initial_equity, state, created_at, updated_at)
+                        VALUES (%s, %s, 'scheduled_trading', %s, %s,
+                                'hyperliquid', %s, 'inactive', NOW(), NOW())
+                    """, (live_config_id, current_user.user_id,
+                          'Your Live ggbot', json.dumps({}), account_value))
+                    conn.commit()
+                    logger.bind(user_id=current_user.user_id).info(
+                        f"Created live bot slot {live_config_id} (equity: ${account_value:.2f})"
+                    )
+
         return {
             "status": "success",
             "message": "Hyperliquid account connected successfully",
-            "account_value": account_value
+            "account_value": account_value,
+            "live_config_id": live_config_id
         }
 
     except HTTPException:
@@ -4429,8 +4426,7 @@ async def start_bot(
         # =====================================================================
         # HYPERLIQUID-SPECIFIC CHECKS
         # =====================================================================
-        config_dict = config.to_jsonb()
-        if config_dict.get('trading_mode') == 'hyperliquid':
+        if config.trading_mode == 'hyperliquid':
             # 1. Credential check — user must have completed Hyperliquid setup
             from core.auth.vault_utils import VaultManager
             hl_credentials = await VaultManager.get_hyperliquid_credential(current_user.user_id)
@@ -4440,23 +4436,19 @@ async def start_bot(
                     detail="Live trading not set up. Connect your wallet in Settings first."
                 )
 
-            # 2. Unique symbol check — each active live bot must trade a unique symbol
-            selected_pair = config_dict.get('selected_pair')
-            from core.common.db import get_db_connection
+            # 2. Single live bot safety net — only one live bot per user
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_id, config_name FROM configurations
+                        SELECT config_id FROM configurations
                         WHERE user_id = %s AND trading_mode = 'hyperliquid'
                         AND state = 'active' AND config_id != %s
-                        AND config_data->>'selected_pair' = %s
-                    """, (str(current_user.user_id), config_id, selected_pair))
+                    """, (str(current_user.user_id), config_id))
                     conflict = cur.fetchone()
             if conflict:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Another live bot ('{conflict[1]}') is already trading {selected_pair}. "
-                           f"Each live bot must trade a unique symbol."
+                    detail="You already have an active live bot. Stop it before starting another."
                 )
         # =====================================================================
 
@@ -4566,6 +4558,111 @@ async def stop_bot(
     except Exception as e:
         logger.error(f"Failed to stop bot {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to stop bot: {str(e)}")
+
+
+@app.post("/api/v2/bot/{config_id}/promote-to-live")
+async def promote_to_live(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Promote a paper bot's strategy to the user's single live trading bot."""
+    try:
+        # 1. Get source config and validate
+        source = await config_service.get_config(config_id, current_user.user_id)
+        if not source:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        if source.trading_mode == 'hyperliquid':
+            raise HTTPException(status_code=400, detail="This bot is already live")
+
+        # 2. Permission check — subscription required
+        profile = await user_service.get_profile(current_user.user_id)
+        if not profile.can_activate_bots:
+            raise HTTPException(
+                status_code=403,
+                detail="Subscription required to use live trading."
+            )
+
+        # 3. Find the user's live bot (created during Hyperliquid setup)
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT config_id FROM configurations
+                    WHERE user_id = %s AND trading_mode = 'hyperliquid' LIMIT 1
+                """, (current_user.user_id,))
+                existing = cur.fetchone()
+
+        if not existing:
+            raise HTTPException(
+                status_code=400,
+                detail="No live trading bot found. Connect Hyperliquid in Settings first."
+            )
+
+        live_config_id = str(existing[0])
+
+        # 4. Build config_data from source — copy strategy fields only
+        live_config_data = {
+            "schema_version": source.schema_version,
+            "selected_pair": source.selected_pair,
+            "extraction": source.extraction,
+            "decision": source.decision,
+            "trading": source.trading,
+            "llm_config": source.llm_config,
+            "telegram_integration": {},
+        }
+
+        # 5. Update the live bot's strategy
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations
+                    SET config_data = %s, updated_at = NOW()
+                    WHERE config_id = %s AND user_id = %s
+                """, (json.dumps(live_config_data), live_config_id, current_user.user_id))
+                conn.commit()
+
+        # 6. Log strategy_updated activity with version number
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) FROM activities
+                    WHERE config_id = %s AND activity_type = 'strategy_updated'
+                """, (live_config_id,))
+                version = cur.fetchone()[0] + 1
+
+        from core.common.activity_logger import log_activity_safe
+        log_activity_safe(
+            config_id=live_config_id,
+            user_id=current_user.user_id,
+            activity_type='strategy_updated',
+            activity_source='user_action',
+            summary=f"Strategy promoted from '{source.config_name}'",
+            details={
+                'version': version,
+                'source_config_id': config_id,
+                'source_config_name': source.config_name,
+                'config_snapshot': live_config_data,
+                'changed_fields': ['selected_pair', 'extraction', 'decision', 'llm_config', 'trading'],
+            },
+            importance=8
+        )
+
+        logger.info(f"Promoted bot {config_id} to live {live_config_id} (v{version})")
+
+        return {
+            "status": "promoted",
+            "live_config_id": live_config_id,
+            "version": version,
+            "source_config_id": config_id,
+            "message": f"Strategy v{version} promoted from '{source.config_name}'"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to promote bot {config_id} to live: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to promote to live: {str(e)}")
 
 
 @app.post("/api/v2/bot/{config_id}/reset-account")

@@ -23,7 +23,6 @@ interface ConfigureLayoutProps {
   onUpdateConfig?: (updates: Partial<ConfigData>) => void
   onConfigUpdate?: () => void
   className?: string
-  allBots?: BotConfiguration[]
 }
 
 /**
@@ -145,8 +144,7 @@ export function ConfigureLayout({
   dataSources = [],
   onUpdateConfig,
   onConfigUpdate,
-  className = '',
-  allBots
+  className = ''
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
   const { globalStatus, globalError, globalMessage } = useSaveStatus()
@@ -249,8 +247,6 @@ export function ConfigureLayout({
                 configId={selectedBot?.config_id}
                 tradingMode={selectedBot?.trading_mode}
                 onUpdate={onUpdateConfig}
-                allBots={allBots}
-                currentConfigId={selectedBot?.config_id}
               />
             )}
           </div>

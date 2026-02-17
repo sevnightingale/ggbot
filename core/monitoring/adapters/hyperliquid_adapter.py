@@ -202,19 +202,17 @@ class HyperliquidAccountAdapter(AccountAdapter):
                 largest_loss = min(losses)
 
             # Build snapshot
-            # For per-bot tracking: current_balance is None (shared account, not per-bot).
-            # total_pnl = realized + unrealized for THIS bot's symbols only.
-            # The total_equity property returns total_pnl for live modes, which is
-            # the correct per-bot metric (cumulative P&L, same as chart shows).
-            # Account-wide balance is stored in raw_data for reference.
+            # Single live bot model: the Hyperliquid account balance IS this bot's balance.
+            # current_balance = account_value, available_balance = withdrawable.
+            # total_equity = current_balance + unrealized_pnl (same formula as paper).
             snapshot = AccountSnapshot(
                 snapshot_id=None,
                 config_id=config_id,
                 user_id=user_id,
                 trading_mode='hyperliquid',
                 timestamp=datetime.now(timezone.utc),
-                current_balance=None,  # Shared account — per-bot balance is meaningless
-                available_balance=None,  # Shared — shown at account level, not per-bot
+                current_balance=account_value,
+                available_balance=withdrawable,
                 margin_used=bot_margin_used if bot_margin_used > 0 else None,
                 total_pnl=total_pnl,
                 realized_pnl=realized_pnl,

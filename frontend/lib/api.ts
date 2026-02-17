@@ -331,6 +331,19 @@ export class ApiClient {
     return await response.json()
   }
 
+  async promoteToLive(configId: string): Promise<{ status: string; live_config_id: string; version: number; message: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/promote-to-live`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to promote to live' }))
+      throw new Error(error.detail || 'Failed to promote to live')
+    }
+
+    return await response.json()
+  }
+
   async closePosition(configId: string, tradeId: string): Promise<{ status: string; trade_id: string; close_price: number; realized_pnl: number; message: string }> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/positions/${tradeId}/close`, {
       method: 'POST'

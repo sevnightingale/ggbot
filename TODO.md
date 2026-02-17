@@ -22,7 +22,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ## 🔥 **HIGH PRIORITY - Hyperliquid Live Trading Integration** [HYPERLIQUID_INTEGRATION.md]
 
-**Status**: 🟢 PHASE 4.5 COMPLETE — Error handling, Telegram, position tracking fixes live
+**Status**: 🟡 PHASE 5 IN PROGRESS — Single live bot slot + equity tracking
 **Planning Doc**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md)
 **Priority**: P1 — Replaces blocked Symphony integration
 
@@ -87,7 +87,32 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 **See**: [DOCS/todo/HYPERLIQUID_INTEGRATION.md](DOCS/todo/HYPERLIQUID_INTEGRATION.md) for complete architecture, verified SDK methods, and technical details.
 
-### **Phase 5: HIP-3 — Equities, Commodities, Indices** (PLANNED)
+### **Phase 5: Single Live Bot Slot + Strategy Versioning + Equity Tracking**
+
+**Status**: 🟡 IN PROGRESS — Backend Phase A first, then Frontend Phase B
+**Planning Doc**: [DOCS/todo/SINGLE_LIVE_BOT_SLOT.md](DOCS/todo/SINGLE_LIVE_BOT_SLOT.md)
+
+**Summary**: Hyperliquid is cross-margin (all positions share one margin pool). Multi-live-bot model (allocation validation, unique symbol enforcement, per-bot P&L attribution) doesn't map to on-chain reality. Switch to single live bot slot with "Promote to Live" from paper bots, strategy versioning via activity log, and real equity tracking from Hyperliquid account value.
+
+#### **Phase A: Backend Foundations** (3 workstreams)
+- [ ] Remove multi-bot validation from `ggbot.py` (allocation + unique symbol checks)
+- [ ] Add `POST /api/v2/bot/{config_id}/promote-to-live` endpoint with strategy versioning
+- [ ] Add `GET /api/v2/bot/live` endpoint (fetch user's live bot)
+- [ ] Block `trading_mode='hyperliquid'` creation via `create_config` (paper-only)
+- [ ] Fix equity tracking chain: adapter (`current_balance=account_value`) → snapshot → activity_logger
+- [ ] Modify `vault_utils.py` disconnect: keep live slot inactive (don't convert to paper)
+
+#### **Phase B: Frontend** (workstreams 1+3)
+- [ ] `BotRail.tsx` — pinned live slot with gold accent, Zap icon, LIVE badge
+- [ ] `BotManagementMenu.tsx` — "Promote to Live" action for paper bots
+- [ ] `BotCreationModal.tsx` — remove live trading mode (paper-only)
+- [ ] `TradeSettings.tsx` — remove allocation bar
+- [ ] Fix equity display: `page.tsx`, `ActivationBar.tsx`, `PerformanceChart.tsx`
+- [ ] Wire up live bot state in `page.tsx` (fetch on mount, pass to BotRail)
+
+**14 files across 3 workstreams** — see planning doc for complete specification.
+
+### **Phase 6: HIP-3 — Equities, Commodities, Indices** (PLANNED)
 
 **Status**: ⏸️ PLANNED — research + API verification complete, ready to implement when prioritized
 **Planning Doc**: [DOCS/todo/HIP3_EQUITIES_COMMODITIES.md](DOCS/todo/HIP3_EQUITIES_COMMODITIES.md)

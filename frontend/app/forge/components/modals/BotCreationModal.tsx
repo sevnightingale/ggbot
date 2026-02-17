@@ -2,16 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { Rocket, Loader2, Zap, ChevronRight, ChevronLeft, Sparkles, X, Settings } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronLeft, Sparkles, X } from 'lucide-react'
 import { Modal, ModalBody, ModalFooter } from '@/components/ui/modal'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { apiClient } from '@/lib/api'
 import { getArchetypeConfig, getArchetypeSummaries } from '@/lib/archetypes'
-import { usePermissions } from '@/lib/permissions'
-import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
 
 type BotType = 'scheduled_trading' | 'signal_validation' | 'agent'
-type TradingMode = 'paper' | 'hyperliquid'
+type TradingMode = 'paper'
 
 // LLM Model types
 interface LLMModel {
@@ -79,11 +77,10 @@ export function BotCreationModal({
 }: BotCreationModalProps) {
   // Step tracking
   const [currentStep, setCurrentStep] = useState(1)
-  const totalSteps = 5
+  const totalSteps = 4
 
   // Form state
   const [botName, setBotName] = useState('')
-  const [tradingMode, setTradingMode] = useState<TradingMode>('paper')
   const [symbol, setSymbol] = useState('BTC/USDT')
   const [timeframe, setTimeframe] = useState('1h')
   const [description, setDescription] = useState('')
@@ -97,14 +94,8 @@ export function BotCreationModal({
   const [llmModels, setLLMModels] = useState<LLMModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
 
-  // Live Trading setup modal
-  const [liveTradingSetupOpen, setLiveTradingSetupOpen] = useState(false)
-
   // Error state
   const [error, setError] = useState<string | null>(null)
-
-  // Get user profile for connection status
-  const { userProfile, refreshProfile } = usePermissions()
 
   // Generate default bot name
   const generateDefaultName = useCallback(() => {
@@ -117,7 +108,6 @@ export function BotCreationModal({
     if (open) {
       setCurrentStep(1)
       setBotName(generateDefaultName())
-      setTradingMode('paper')
       setSymbol('BTC/USDT')
       setTimeframe('1h')
       setDescription('')
@@ -142,42 +132,16 @@ export function BotCreationModal({
     }
   }
 
-  // Trading mode options
-  const tradingModes = [
-    {
-      mode: 'paper' as const,
-      Icon: Zap,
-      label: 'Paper Trading',
-      description: 'Practice with $10k virtual money',
-      color: 'var(--agent-extraction)',
-      available: true,
-      setupRequired: false,
-    },
-    {
-      mode: 'hyperliquid' as const,
-      Icon: Rocket,
-      label: 'Live Trading',
-      description: userProfile?.hyperliquid_connected
-        ? 'Real trades with USDC on Arbitrum'
-        : 'Set up required — connect wallet in Settings',
-      color: 'var(--signal)',
-      available: !!userProfile?.hyperliquid_connected,
-      setupRequired: !userProfile?.hyperliquid_connected,
-    }
-  ]
-
-  // Step validation
+  // Step validation (4 steps: name → pair/timeframe → strategy → AI brain)
   const canProceed = () => {
     switch (currentStep) {
       case 1:
         return botName.trim().length > 0
       case 2:
-        return true
-      case 3:
         return symbol && timeframe
-      case 4:
+      case 3:
         return description.trim().length > 0 || selectedArchetype !== null
-      case 5:
+      case 4:
         return llmModel
       default:
         return false
@@ -187,9 +151,9 @@ export function BotCreationModal({
   // Navigation
   const handleNext = () => {
     if (currentStep < totalSteps && canProceed()) {
-      // If archetype selected on step 4, skip to final step
-      if (currentStep === 4 && selectedArchetype) {
-        setCurrentStep(5)
+      // If archetype selected on step 3, skip to final step
+      if (currentStep === 3 && selectedArchetype) {
+        setCurrentStep(4)
       } else {
         setCurrentStep(prev => prev + 1)
       }
@@ -206,7 +170,7 @@ export function BotCreationModal({
   const handleArchetypeClick = (archetypeId: string) => {
     setSelectedArchetype(archetypeId)
     setDescription('') // Clear custom description
-    setCurrentStep(5) // Jump to final step
+    setCurrentStep(4) // Jump to final step
   }
 
   // Handle modal close
@@ -256,7 +220,7 @@ export function BotCreationModal({
       const configData = {
         schema_version: '2.1',
         config_type: 'scheduled_trading' as BotType,
-        trading_mode: tradingMode,
+        trading_mode: 'paper',
         selected_pair: symbol,
         extraction: extractionConfig,
         decision: {
@@ -291,7 +255,7 @@ export function BotCreationModal({
       // Call parent onConfirm with full config
       onConfirm(
         'scheduled_trading',
-        tradingMode,
+        'paper',
         botName.trim(),
         configData
       )
@@ -354,79 +318,6 @@ export function BotCreationModal({
 
       case 2:
         return (
-          <div className="space-y-4">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
-                How will your bot trade?
-              </h2>
-              <p className="text-[var(--text-muted)]">
-                Choose between practice mode or real trading
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {tradingModes.map(({ mode, Icon, label, description, color, available, setupRequired }) => {
-                const isDisabled = !available && !setupRequired
-
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      if (setupRequired) {
-                        setLiveTradingSetupOpen(true)
-                      } else {
-                        setTradingMode(mode)
-                      }
-                    }}
-                    disabled={isDisabled}
-                    className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                      tradingMode === mode
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                        : 'border-[var(--border)] hover:border-[var(--border-hover)]'
-                    } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: !isDisabled ? `${color}20` : 'var(--bg-tertiary)' }}
-                      >
-                        <Icon className="h-6 w-6" style={{ color: !isDisabled ? color : 'var(--text-muted)' }} />
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-[var(--text-primary)]">{label}</span>
-                          {setupRequired && (
-                            <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                              <Settings className="h-3 w-3" />
-                              Setup required
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-[var(--text-secondary)]">{description}</p>
-                      </div>
-
-                      <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 ${
-                        tradingMode === mode
-                          ? 'border-[var(--accent)] bg-[var(--accent)]'
-                          : 'border-[var(--border)]'
-                      }`}>
-                        {tradingMode === mode && (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <div className="w-2 h-2 rounded-full bg-white"></div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )
-
-      case 3:
-        return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
@@ -475,7 +366,7 @@ export function BotCreationModal({
           </div>
         )
 
-      case 4:
+      case 3:
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
@@ -545,7 +436,7 @@ export function BotCreationModal({
           </div>
         )
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
@@ -638,7 +529,7 @@ export function BotCreationModal({
               <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">Summary</h4>
               <div className="text-sm text-[var(--text-muted)] space-y-1">
                 <p><span className="text-[var(--text-secondary)]">Name:</span> {botName}</p>
-                <p><span className="text-[var(--text-secondary)]">Mode:</span> {tradingMode === 'paper' ? 'Paper Trading' : 'Live Trading'}</p>
+                <p><span className="text-[var(--text-secondary)]">Mode:</span> Paper Trading</p>
                 <p><span className="text-[var(--text-secondary)]">Trading:</span> {symbol} every {TIMEFRAMES.find(t => t.value === timeframe)?.label}</p>
                 <p><span className="text-[var(--text-secondary)]">Strategy:</span> {selectedArchetype ? ARCHETYPES.find(a => a.id === selectedArchetype)?.name : 'Custom'}</p>
               </div>
@@ -746,16 +637,6 @@ export function BotCreationModal({
         </ModalFooter>
       </Modal>
 
-      {/* Live Trading Setup Modal (opened when user clicks Live Trading without connection) */}
-      <LiveTradingSetupModal
-        open={liveTradingSetupOpen}
-        onOpenChange={setLiveTradingSetupOpen}
-        onComplete={() => {
-          // User completed setup — refresh profile so hyperliquid_connected updates
-          refreshProfile()
-          setLiveTradingSetupOpen(false)
-        }}
-      />
     </>
   )
 }

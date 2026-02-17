@@ -77,6 +77,8 @@ export function ActivationBar({
                              !userProfile?.has_available_credits
 
   const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'hyperliquid'
+  // Hyperliquid single-bot model uses real account equity (like paper), not cumulative P&L
+  const usePnlOnlyKPIs = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
   const isRegisteredForArena = selectedBot.is_public_performance === true
   const isPaperTrading = selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
 
@@ -314,9 +316,9 @@ export function ActivationBar({
         {/* Row 2: KPI Metrics */}
         {metrics && (
           <>
-            {isLiveTrading ? (
+            {usePnlOnlyKPIs ? (
               <>
-                {/* Live Trading: Cumulative P&L focused */}
+                {/* Legacy live modes (Symphony/Aster): Cumulative P&L focused */}
                 <div className="grid grid-cols-3 gap-3 mb-2">
                   <KPICard
                     label="Cumulative P&L"

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { Lock } from 'lucide-react'
-import { ConfigData, createDefaultConfigData, BotConfiguration } from '@/lib/api'
+import { ConfigData, createDefaultConfigData } from '@/lib/api'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { usePermissions } from '@/lib/permissions'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -12,12 +12,10 @@ import { ValidationMessage } from '@/components/ValidationMessage'
 interface TradeSettingsProps {
   configData?: ConfigData
   configId?: string  // Needed for test signal publishing feature
-  tradingMode?: 'paper' | 'symphony' | 'aster' | 'hyperliquid'
+  tradingMode?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
   onValidationChange?: (hasErrors: boolean) => void
   className?: string
-  allBots?: BotConfiguration[]
-  currentConfigId?: string
 }
 
 /**
@@ -29,12 +27,9 @@ interface TradeSettingsProps {
 export function TradeSettings({
   configData,
   configId,
-  tradingMode,
   onUpdate,
   onValidationChange,
-  className = '',
-  allBots,
-  currentConfigId
+  className = ''
 }: TradeSettingsProps) {
   const { canAccess } = usePermissions()
   const [session, setSession] = useState<{ access_token?: string } | null>(null)
@@ -155,49 +150,6 @@ export function TradeSettings({
             </div>
           )}
 
-          {/* Live Trading Allocation Indicator */}
-          {tradingMode === 'hyperliquid' && allBots && (
-            (() => {
-              const currentMargin = (positionSizing.max_margin_percent as number) || 20
-              const otherAllocation = allBots
-                .filter(b => b.trading_mode === 'hyperliquid' && b.config_id !== currentConfigId)
-                .reduce((sum, b) => {
-                  const margin = b.config_data?.trading?.position_sizing?.max_margin_percent
-                  return sum + (typeof margin === 'number' ? margin : 20)
-                }, 0)
-              const remaining = Math.max(0, 100 - currentMargin - otherAllocation)
-
-              return (
-                <div className="mt-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
-                  <div className="text-xs font-medium text-[var(--text-secondary)] mb-1">
-                    Live Trading Allocation
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    This bot: {currentMargin}% | Other live bots: {otherAllocation}% | Remaining: {remaining}%
-                  </div>
-                  <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-tertiary)] overflow-hidden flex">
-                    <div
-                      className="h-full rounded-l-full"
-                      style={{
-                        width: `${currentMargin}%`,
-                        backgroundColor: 'var(--accent)',
-                      }}
-                    />
-                    {otherAllocation > 0 && (
-                      <div
-                        className="h-full"
-                        style={{
-                          width: `${otherAllocation}%`,
-                          backgroundColor: 'var(--text-muted)',
-                          opacity: 0.4,
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-              )
-            })()
-          )}
         </div>
       </div>
 

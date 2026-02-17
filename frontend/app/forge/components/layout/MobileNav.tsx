@@ -9,9 +9,13 @@ interface MobileNavProps {
   className?: string
   // Bot rail props that need to be passed through
   bots: BotConfiguration[]
+  liveBot: BotConfiguration | null
+  hyperliquidConnected: boolean
   selectedId: string | null
   onSelect: (configId: string) => void
   onCreateNew: () => void
+  onOpenHyperliquidSetup?: () => void
+  onPromoteToLive?: (configId: string) => void
   isCreatingNew: boolean
   onRename: (configId: string, newName: string) => void
   onDuplicate: (configId: string) => void
@@ -26,9 +30,13 @@ interface MobileNavProps {
 export function MobileNav({
   className = '',
   bots,
+  liveBot,
+  hyperliquidConnected,
   selectedId,
   onSelect,
   onCreateNew,
+  onOpenHyperliquidSetup,
+  onPromoteToLive,
   isCreatingNew,
   onRename,
   onDuplicate,
@@ -103,19 +111,23 @@ export function MobileNav({
             <div className="flex-1 overflow-y-auto p-4">
               <BotRail
                 bots={bots}
+                liveBot={liveBot}
+                hyperliquidConnected={hyperliquidConnected}
                 selectedId={selectedId}
                 onSelect={(configId) => {
                   onSelect(configId)
                   setIsDrawerOpen(false) // Close drawer after selection
                 }}
                 onCreateNew={onCreateNew}
+                onOpenHyperliquidSetup={onOpenHyperliquidSetup}
+                onPromoteToLive={onPromoteToLive}
                 isCreatingNew={isCreatingNew}
                 onRename={onRename}
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 onResetAccount={onResetAccount}
                 isBotAction={isBotAction}
-                className="w-full" // Remove grid classes for mobile
+                className="w-full"
               />
             </div>
           </div>
