@@ -93,6 +93,9 @@ export function ActivationBar({
   } | null>(null)
 
   useEffect(() => {
+    // Skip optimistic placeholder bots (temp IDs from duplication)
+    if (selectedBot.config_id.startsWith('temp-')) return
+
     const fetchConfigUsage = async () => {
       try {
         const usage = await apiClient.getConfigUsage(selectedBot.config_id)
