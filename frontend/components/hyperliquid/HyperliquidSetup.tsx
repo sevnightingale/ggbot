@@ -43,7 +43,9 @@ function HyperliquidContent() {
     connected: boolean
     wallet_address: string | null
     account_value: number | null
-    available_balance: number | null
+    margin_used: number | null
+    open_notional: number | null
+    withdrawable: number | null
     positions_count: number | null
   } | null>(null)
   const [statusLoading, setStatusLoading] = useState(true)
@@ -342,7 +344,7 @@ function HyperliquidContent() {
     try {
       setDisconnecting(true)
       await apiClient.disconnectHyperliquid()
-      setHlStatus({ connected: false, wallet_address: null, account_value: null, available_balance: null, positions_count: null })
+      setHlStatus({ connected: false, wallet_address: null, account_value: null, margin_used: null, open_notional: null, withdrawable: null, positions_count: null })
       setTestTradeResult(null)
     } catch (err) {
       setStatusError(err instanceof Error ? err.message : 'Failed to disconnect')
@@ -404,9 +406,9 @@ function HyperliquidContent() {
             </div>
 
             <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Available Balance</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Withdrawable</div>
               <div className="text-sm font-mono text-[var(--text-primary)]">
-                {hlStatus.available_balance !== null ? `$${hlStatus.available_balance.toFixed(2)}` : '...'}
+                ${hlStatus.withdrawable?.toFixed(2) ?? '0.00'}
               </div>
             </div>
 
@@ -472,7 +474,7 @@ function HyperliquidContent() {
               </p>
               <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-3">
                 <Wallet className="h-3 w-3" />
-                <span>Hyperliquid balance: ${hlStatus.available_balance?.toFixed(2) ?? '...'}</span>
+                <span>Withdrawable: ${hlStatus.withdrawable?.toFixed(2) ?? '0.00'}</span>
               </div>
               <div className="flex gap-2">
                 <input

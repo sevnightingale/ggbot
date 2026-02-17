@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Crown, CheckCircle2, Settings, Loader2, Zap, Wallet } from 'lucide-react'
+import { Crown, CheckCircle2, Settings, Loader2, Zap } from 'lucide-react'
 import {
   Modal,
   ModalHeader,
@@ -39,7 +39,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     connected: boolean
     wallet_address: string | null
     account_value: number | null
-    available_balance: number | null
+    margin_used: number | null
+    open_notional: number | null
+    withdrawable: number | null
+    positions_count: number | null
   } | null>(null)
   const [hlLoading, setHlLoading] = useState(true)
 
@@ -155,45 +158,42 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               ) : hlStatus?.connected ? (
                 /* Connected state */
                 <div className="border border-[var(--signal)]/30 rounded-lg p-4 bg-[var(--signal)]/5">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-[var(--signal)] mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium text-[var(--text-primary)] mb-2">
-                        Live Trading Connected
-                      </p>
-                      <div className="space-y-1 text-sm text-[var(--text-secondary)]">
-                        <div className="flex items-center gap-2">
-                          <Wallet className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="font-mono text-xs">
-                            {hlStatus.wallet_address ? truncateAddress(hlStatus.wallet_address) : '...'}
-                          </span>
-                        </div>
-                        {hlStatus.account_value !== null && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[var(--text-muted)]">Account:</span>
-                            <span className="font-mono font-medium text-[var(--accent)]">
-                              ${hlStatus.account_value.toFixed(2)}
-                            </span>
-                          </div>
-                        )}
-                        {hlStatus.available_balance !== null && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[var(--text-muted)]">Available:</span>
-                            <span className="font-mono">
-                              ${hlStatus.available_balance.toFixed(2)}
-                            </span>
-                          </div>
-                        )}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-[var(--signal)]" />
+                      <span className="text-sm font-medium text-[var(--text-primary)]">Connected</span>
+                      <span className="font-mono text-xs text-[var(--text-muted)]">
+                        {hlStatus.wallet_address ? truncateAddress(hlStatus.wallet_address) : '...'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setLiveTradingSetupOpen(true)}
+                      className="px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
+                      <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Equity</div>
+                      <div className="text-sm font-mono font-medium text-[var(--accent)]">
+                        {hlStatus.account_value !== null ? `$${hlStatus.account_value.toFixed(2)}` : '—'}
                       </div>
-                      <button
-                        onClick={() => setLiveTradingSetupOpen(true)}
-                        className="mt-3 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-                      >
-                        Manage Funds
-                      </button>
+                    </div>
+                    <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
+                      <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Withdrawable</div>
+                      <div className="text-sm font-mono font-medium text-[var(--text-primary)]">
+                        ${hlStatus.withdrawable?.toFixed(2) ?? '0.00'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
+                      <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Positions</div>
+                      <div className="text-sm font-mono font-medium text-[var(--text-primary)]">
+                        {hlStatus.positions_count ?? '—'}
+                      </div>
                     </div>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)] mt-3">Powered by Hyperliquid</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-2">Powered by Hyperliquid</p>
                 </div>
               ) : (
                 /* Not connected state */

@@ -301,23 +301,43 @@ class HyperliquidAccountAdapter(AccountAdapter):
 
                 pnl_display = f"{'+' if closed_pnl > 0 else ''}{closed_pnl:.2f}"
 
+                # Look up batch_id from live_trades for trade_id linkage
+                batch_id = None
+                try:
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT batch_id FROM live_trades
+                                WHERE config_id = %s AND provider = 'hyperliquid'
+                                  AND symbol = %s
+                                ORDER BY COALESCE(closed_at, created_at) DESC
+                                LIMIT 1
+                            """, (config_id, platform_symbol))
+                            result = cur.fetchone()
+                            if result:
+                                batch_id = result[0]
+                except Exception:
+                    pass
+
                 log_activity_safe(
                     config_id=config_id,
                     user_id=user_id,
                     activity_type='trade_exit',
                     activity_source='hyperliquid_monitor',
-                    summary=f"Closed {platform_symbol}: {pnl_display}",
+                    summary=f"Closed {platform_symbol}: ${pnl_display} realized",
                     details={
                         'symbol': platform_symbol,
                         'side': side,
                         'exit_price': fill_price,
                         'size': fill_size,
                         'pnl': closed_pnl,
+                        'realized_pnl': closed_pnl,
                         'close_reason': 'auto',
                         'fill_hash': fill_hash,
                         'fill_time_ms': fill_time,
                         'source': 'position_monitor'
                     },
+                    trade_id=batch_id,
                     trade_type='hyperliquid',
                     related_symbol=platform_symbol,
                     importance=9

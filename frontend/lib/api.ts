@@ -977,7 +977,9 @@ export class ApiClient {
     connected: boolean
     wallet_address: string | null
     account_value: number | null
-    available_balance: number | null
+    margin_used: number | null
+    open_notional: number | null
+    withdrawable: number | null
     positions_count: number | null
   }> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/hyperliquid/status`)

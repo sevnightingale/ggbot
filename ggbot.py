@@ -3292,7 +3292,9 @@ async def get_hyperliquid_status(
                 "connected": False,
                 "wallet_address": None,
                 "account_value": None,
-                "available_balance": None,
+                "margin_used": None,
+                "open_notional": None,
+                "withdrawable": None,
                 "positions_count": None
             }
 
@@ -3309,7 +3311,8 @@ async def get_hyperliquid_status(
             margin_summary = user_state.get("marginSummary", {})
             account_value = float(margin_summary.get("accountValue", 0))
             total_margin_used = float(margin_summary.get("totalMarginUsed", 0))
-            available_balance = account_value - total_margin_used
+            total_ntl_pos = float(margin_summary.get("totalNtlPos", 0))
+            withdrawable = float(user_state.get("withdrawable", 0))
 
             # Count open positions
             positions = user_state.get("assetPositions", [])
@@ -3322,7 +3325,9 @@ async def get_hyperliquid_status(
                 "connected": True,
                 "wallet_address": wallet_address,
                 "account_value": round(account_value, 2),
-                "available_balance": round(available_balance, 2),
+                "margin_used": round(total_margin_used, 2),
+                "open_notional": round(total_ntl_pos, 2),
+                "withdrawable": round(withdrawable, 2),
                 "positions_count": positions_count
             }
 
@@ -3334,7 +3339,9 @@ async def get_hyperliquid_status(
                 "connected": True,
                 "wallet_address": wallet_address,
                 "account_value": None,
-                "available_balance": None,
+                "margin_used": None,
+                "open_notional": None,
+                "withdrawable": None,
                 "positions_count": None
             }
 
@@ -5114,13 +5121,6 @@ async def create_checkout_session(
             'allow_promotion_codes': request.plan != 'usage',  # No promos for usage plan
         }
 
-        # Add $10 billing threshold for usage-based plans to limit bad debt exposure
-        # When usage hits $10, Stripe will automatically generate an invoice
-        if request.plan == 'usage':
-            checkout_params['subscription_data']['billing_thresholds'] = {
-                'amount_gte': 1000  # $10.00 in cents
-            }
-
         # Add trial only for monthly/annual plans (not usage-based)
         if request.plan in ['monthly', 'annual']:
             checkout_params['subscription_data']['trial_period_days'] = 14
@@ -5303,6 +5303,18 @@ async def handle_checkout_completed(session):
                     WHERE user_id = %s
                 """, (subscription_tier, customer_id, subscription_id, user_id))
                 conn.commit()
+
+        # Set $10 billing threshold for usage-based plans to limit bad debt exposure
+        # Must be set on the subscription object, not during checkout creation
+        if plan == 'usage':
+            try:
+                stripe.Subscription.modify(
+                    subscription_id,
+                    billing_thresholds={'amount_gte': 1000}  # $10.00 in cents
+                )
+                logger.bind(user_id=user_id).info("Set $10 billing threshold on usage subscription")
+            except stripe.error.StripeError as e:
+                logger.warning(f"Failed to set billing threshold (non-critical): {e}")
 
         logger.bind(user_id=user_id).info(
             f"Subscription activated: tier={subscription_tier}, plan={plan}, Customer: {customer_id}, Subscription: {subscription_id}"

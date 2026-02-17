@@ -685,7 +685,7 @@ class HyperliquidLiveTradingService:
             # Step 14: Log activity
             notional_value = filled_sz * entry_price
             try:
-                activity_type = f"trade_entry_{action.lower()}"
+                activity_type = 'trade_entry'
                 log_activity_safe(
                     config_id=config_id,
                     user_id=user_id,

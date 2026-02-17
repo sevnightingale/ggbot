@@ -134,7 +134,7 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
 
                 # For symphony/aster, fallback to most recent snapshot (even if older than 10 min)
                 # This is better than returning None, though may be slightly stale
-                elif trading_mode in ['symphony', 'aster']:
+                elif trading_mode in ['symphony', 'aster', 'hyperliquid']:
                     cur.execute("""
                         SELECT current_balance, total_pnl
                         FROM account_snapshots

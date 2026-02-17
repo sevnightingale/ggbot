@@ -1813,14 +1813,17 @@ Take Profit: {take_profit_text}
 
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    if trading_mode == 'symphony':
-                        # Check live_trades table for open positions (Symphony)
+                    if trading_mode in ('symphony', 'hyperliquid'):
+                        # Check live_trades table for open positions
                         cur.execute("""
                             SELECT
                                 lt.batch_id,
                                 lt.config_id,
                                 lt.decision_id,
                                 lt.created_at,
+                                lt.symbol,
+                                lt.stop_loss_order_id,
+                                lt.take_profit_order_id,
                                 d.reasoning as entry_reasoning,
                                 d.confidence as entry_confidence,
                                 d.decision_data as entry_decision_data
@@ -1837,49 +1840,137 @@ Take Profit: {take_profit_text}
                             return None
 
                         batch_id = row[0]
+                        trade_symbol = row[4]
+                        entry_reasoning = row[7] if row[7] else 'No reasoning available'
+                        entry_confidence = float(row[8]) if row[8] else 0.0
+                        entry_decision_data = row[9] if row[9] else {}
 
-                        # For live trades, fetch REAL position data from Symphony API
-                        try:
-                            from trading.live.symphony_service import SymphonyLiveTradingService
-                            symphony_service = SymphonyLiveTradingService()
+                        if trading_mode == 'symphony':
+                            # Fetch REAL position data from Symphony API
+                            try:
+                                from trading.live.symphony_service import SymphonyLiveTradingService
+                                symphony_service = SymphonyLiveTradingService()
 
-                            # Get all open positions for this config
-                            live_positions = await symphony_service.get_open_positions(config_id)
+                                live_positions = await symphony_service.get_open_positions(config_id)
 
-                            # Find the specific position by batch_id
-                            matching_position = None
-                            for pos in live_positions:
-                                if pos.get('batch_id') == batch_id:
-                                    matching_position = pos
-                                    break
+                                matching_position = None
+                                for pos in live_positions:
+                                    if pos.get('batch_id') == batch_id:
+                                        matching_position = pos
+                                        break
 
-                            if matching_position:
-                                # Enrich with decision context from our database
-                                matching_position['entry_reasoning'] = row[4] if row[4] else 'No reasoning available'
-                                matching_position['entry_confidence'] = float(row[5]) if row[5] else 0.0
-                                matching_position['entry_decision_data'] = row[6] if row[6] else {}
-                                matching_position['is_live'] = True
+                                if matching_position:
+                                    matching_position['entry_reasoning'] = entry_reasoning
+                                    matching_position['entry_confidence'] = entry_confidence
+                                    matching_position['entry_decision_data'] = entry_decision_data
+                                    matching_position['is_live'] = True
 
-                                logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                                    f"Found active LIVE position from Symphony: batch_id={batch_id}, "
-                                    f"entry_price=${matching_position.get('entry_price', 0):.2f}"
-                                )
+                                    logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                                        f"Found active LIVE position from Symphony: batch_id={batch_id}, "
+                                        f"entry_price=${matching_position.get('entry_price', 0):.2f}"
+                                    )
+                                    return matching_position
+                                else:
+                                    logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
+                                        f"Live position batch_id={batch_id} found in database but not in Symphony API. "
+                                        f"Position may have been closed externally."
+                                    )
+                                    return None
 
-                                return matching_position
-                            else:
-                                # Position exists in our DB but not in Symphony (possibly closed externally)
-                                logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
-                                    f"Live position batch_id={batch_id} found in database but not in Symphony API. "
-                                    f"Position may have been closed externally."
+                            except Exception as e:
+                                logger.bind(config_id=self.config_id, user_id=self.user_id).error(
+                                    f"Failed to fetch live position from Symphony: {e}"
                                 )
                                 return None
 
-                        except Exception as e:
-                            logger.bind(config_id=self.config_id, user_id=self.user_id).error(
-                                f"Failed to fetch live position from Symphony: {e}"
-                            )
-                            # Don't crash - return None and bot will analyze new opportunities instead
-                            return None
+                        else:
+                            # Hyperliquid: fetch position data from Hyperliquid Info API
+                            try:
+                                from hyperliquid.info import Info
+                                from hyperliquid.utils import constants
+                                from core.auth.vault_utils import VaultManager
+
+                                credentials = await VaultManager.get_hyperliquid_credential(self.user_id)
+                                if not credentials:
+                                    logger.bind(config_id=self.config_id).warning(
+                                        "No Hyperliquid credentials — cannot check position"
+                                    )
+                                    return None
+
+                                wallet_address = credentials['wallet_address']
+                                info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                                user_state = info.user_state(wallet_address)
+
+                                # Find the matching position by coin
+                                # trade_symbol is platform format e.g. "BTC-USDT", coin is "BTC"
+                                coin = trade_symbol.split('-')[0] if trade_symbol else symbol.split('/')[0]
+
+                                matching_pos = None
+                                for ap in user_state.get("assetPositions", []):
+                                    pos = ap.get("position", {})
+                                    if pos.get("coin") == coin and float(pos.get("szi", 0)) != 0:
+                                        matching_pos = pos
+                                        break
+
+                                if not matching_pos:
+                                    # Position in our DB but not on Hyperliquid — closed externally
+                                    logger.bind(config_id=self.config_id).warning(
+                                        f"Live trade batch_id={batch_id} in DB but no {coin} position on Hyperliquid. "
+                                        f"May have been closed externally or liquidated."
+                                    )
+                                    return None
+
+                                # Build position_data dict matching the format position management expects
+                                szi = float(matching_pos.get("szi", 0))
+                                entry_px = float(matching_pos.get("entryPx", 0))
+                                unrealized_pnl = float(matching_pos.get("unrealizedPnl", 0))
+                                margin_used = float(matching_pos.get("marginUsed", 0))
+                                leverage_info = matching_pos.get("leverage", {})
+                                leverage_val = int(leverage_info.get("value", 1)) if isinstance(leverage_info, dict) else 1
+
+                                # Get current mid price for this coin
+                                all_mids = info.all_mids()
+                                current_mid = float(all_mids.get(coin, entry_px))
+                                notional = abs(szi) * current_mid
+
+                                side = "long" if szi > 0 else "short"
+
+                                position_data = {
+                                    'trade_id': batch_id,
+                                    'batch_id': batch_id,
+                                    'symbol': trade_symbol,
+                                    'side': side,
+                                    'entry_price': entry_px,
+                                    'current_price': current_mid,
+                                    'size_usd': notional,
+                                    'unrealized_pnl': unrealized_pnl,
+                                    'opened_at': row[3],  # lt.created_at
+                                    'stop_loss': None,  # HL manages SL/TP as separate orders
+                                    'take_profit': None,
+                                    'confidence_score': entry_confidence,
+                                    'entry_reasoning': entry_reasoning,
+                                    'entry_confidence': entry_confidence,
+                                    'entry_decision_data': entry_decision_data,
+                                    'is_live': True,
+                                    'leverage': leverage_val,
+                                    'margin_used': margin_used,
+                                    'quantity': abs(szi),
+                                }
+
+                                logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                                    f"Found active Hyperliquid position: {side} {coin}, "
+                                    f"entry=${entry_px:,.2f}, size=${notional:,.2f}, "
+                                    f"P&L=${unrealized_pnl:+.2f}, leverage={leverage_val}x"
+                                )
+
+                                return position_data
+
+                            except Exception as e:
+                                logger.bind(config_id=self.config_id, user_id=self.user_id).error(
+                                    f"Failed to fetch Hyperliquid position: {e}"
+                                )
+                                return None
+
                     else:
                         # Paper trading: Query paper_trades for open position with entry decision context
                         cur.execute("""

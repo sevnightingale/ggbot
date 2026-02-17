@@ -1204,15 +1204,16 @@ function ForgeApp() {
             {selectedBot && (() => {
               // Calculate metrics from accounts data for selected bot
               const account = accounts.find(a => a.config_id === selectedConfigId)
+              const isLive = ['symphony', 'aster', 'hyperliquid'].includes(selectedBot?.trading_mode || '')
               const metrics = account ? {
-                // Total Equity = current_balance + unrealized_pnl
-                totalEquity: Number(account.current_balance || 0) +
-                             Number(account.unrealized_pnl || 0),
-                availableBalance: Number(account.available_balance || 0),
-                pnl: Number(account.unrealized_pnl || 0),  // Show unrealized P&L instead of total
+                totalEquity: isLive
+                  ? Number(account.total_pnl || 0)  // Cumulative P&L for live trading
+                  : Number(account.current_balance || 0) + Number(account.unrealized_pnl || 0),
+                availableBalance: isLive ? 0 : Number(account.available_balance || 0),
+                pnl: Number(account.unrealized_pnl || 0),
                 trades: Number(account.total_trades || 0),
-                winRate: account.win_rate ? Number(account.win_rate) * 100 : 0,  // Convert to percentage
-                performance: Number(account.performance_pct || 0)  // Performance % from activities
+                winRate: account.win_rate ? Number(account.win_rate) * 100 : 0,
+                performance: Number(account.performance_pct || 0)
               } : null
 
               return (

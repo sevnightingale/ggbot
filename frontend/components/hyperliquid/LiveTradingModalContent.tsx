@@ -47,7 +47,9 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
     connected: boolean
     wallet_address: string | null
     account_value: number | null
-    available_balance: number | null
+    margin_used: number | null
+    open_notional: number | null
+    withdrawable: number | null
     positions_count: number | null
   } | null>(null)
   const [statusLoading, setStatusLoading] = useState(true)
@@ -328,7 +330,7 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
     try {
       setDisconnecting(true)
       await apiClient.disconnectHyperliquid()
-      setHlStatus({ connected: false, wallet_address: null, account_value: null, available_balance: null, positions_count: null })
+      setHlStatus({ connected: false, wallet_address: null, account_value: null, margin_used: null, open_notional: null, withdrawable: null, positions_count: null })
       setTestTradeResult(null)
       onComplete?.()
     } catch (err) {
@@ -366,45 +368,69 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
 
   // Connected state — manage funds
   if (hlStatus?.connected) {
+    const marginPct = hlStatus.account_value && hlStatus.margin_used
+      ? Math.round((hlStatus.margin_used / hlStatus.account_value) * 100)
+      : 0
+
     return (
       <div className="space-y-4">
-        {/* Status */}
+        {/* Account Overview */}
         <div className="rounded-xl border border-[var(--signal)]/30 bg-[var(--signal)]/5 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="h-5 w-5 text-[var(--signal)]" />
-            <span className="font-medium text-[var(--text-primary)]">Live Trading Connected</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[var(--signal)]" />
+              <span className="text-sm font-medium text-[var(--text-primary)]">Connected</span>
+              <span className="font-mono text-xs text-[var(--text-muted)]">
+                {hlStatus.wallet_address ? truncateAddress(hlStatus.wallet_address) : '...'}
+              </span>
+            </div>
+            <button
+              onClick={fetchStatus}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            >
+              Refresh
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--text-muted)] mb-0.5">Wallet</div>
-              <div className="text-sm font-mono text-[var(--text-primary)]">
-                {hlStatus.wallet_address ? truncateAddress(hlStatus.wallet_address) : '...'}
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-3 text-center">
+              <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Equity</div>
+              <div className="text-base font-mono font-bold text-[var(--accent)]">
+                {hlStatus.account_value !== null ? `$${hlStatus.account_value.toFixed(2)}` : '—'}
               </div>
             </div>
-            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--text-muted)] mb-0.5">Account Value</div>
-              <div className="text-sm font-mono font-bold text-[var(--accent)]">
-                {hlStatus.account_value !== null ? `$${hlStatus.account_value.toFixed(2)}` : '...'}
+            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-3 text-center">
+              <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Withdrawable</div>
+              <div className="text-base font-mono font-medium text-[var(--text-primary)]">
+                ${hlStatus.withdrawable?.toFixed(2) ?? '0.00'}
               </div>
             </div>
-            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--text-muted)] mb-0.5">Available</div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
+              <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Open Notional</div>
               <div className="text-sm font-mono text-[var(--text-primary)]">
-                {hlStatus.available_balance !== null ? `$${hlStatus.available_balance.toFixed(2)}` : '...'}
+                {hlStatus.open_notional !== null ? `$${hlStatus.open_notional.toFixed(0)}` : '—'}
               </div>
             </div>
-            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--text-muted)] mb-0.5">Positions</div>
+            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
+              <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Margin Used</div>
               <div className="text-sm font-mono text-[var(--text-primary)]">
-                {hlStatus.positions_count ?? '...'}
+                {hlStatus.margin_used !== null ? `$${hlStatus.margin_used.toFixed(2)}` : '—'}
+                {marginPct > 0 && <span className="text-[var(--text-muted)]"> ({marginPct}%)</span>}
+              </div>
+            </div>
+            <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
+              <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Positions</div>
+              <div className="text-sm font-mono text-[var(--text-primary)]">
+                {hlStatus.positions_count ?? '—'}
               </div>
             </div>
           </div>
         </div>
 
         {/* Deposit & Withdraw (requires wallet) */}
-        {isConnected && (
+        {isConnected ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Deposit */}
             <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
@@ -447,7 +473,9 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
               </div>
               <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] mb-2">
                 <Wallet className="h-3 w-3" />
-                <span>${hlStatus.available_balance?.toFixed(2) ?? '...'} available</span>
+                <span>{(hlStatus.withdrawable ?? 0) > 0
+                  ? `$${hlStatus.withdrawable?.toFixed(2)} withdrawable`
+                  : 'Nothing withdrawable'}</span>
               </div>
               <div className="flex gap-2">
                 <input
@@ -461,7 +489,7 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
                 />
                 <button
                   onClick={handleWithdraw}
-                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || withdrawLoading}
+                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || withdrawLoading || (hlStatus.withdrawable ?? 0) <= 0}
                   className="px-3 py-1.5 rounded-lg font-medium text-xs transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {withdrawLoading ? 'Signing...' : 'Withdraw'}
@@ -474,9 +502,7 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
               )}
             </div>
           </div>
-        )}
-
-        {!isConnected && (
+        ) : (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
             <p className="text-sm text-[var(--text-secondary)] mb-3">
               Connect your wallet to deposit or withdraw USDC.
@@ -485,15 +511,15 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-2">
+        {/* Secondary Actions */}
+        <div className="flex items-center justify-between pt-1">
           <button
             onClick={handleTestTrade}
             disabled={testTradeLoading}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors disabled:opacity-50"
           >
             {testTradeLoading ? (
-              <><Loader2 className="h-3 w-3 animate-spin" /> Testing...</>
+              <><Loader2 className="h-3 w-3 animate-spin" /> Running test...</>
             ) : (
               <><Zap className="h-3 w-3" /> Test Trade</>
             )}
@@ -502,17 +528,10 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
           <button
             onClick={handleDisconnect}
             disabled={disconnecting}
-            className="flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--loss-color)] hover:border-[var(--loss-color)] disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--loss-color)] transition-colors disabled:opacity-50"
           >
             {disconnecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
             Disconnect
-          </button>
-
-          <button
-            onClick={fetchStatus}
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-          >
-            Refresh
           </button>
         </div>
 

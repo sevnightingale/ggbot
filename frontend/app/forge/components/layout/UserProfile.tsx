@@ -68,18 +68,24 @@ export function UserProfile({}: UserProfileProps) {
     getUserData()
   }, [supabase.auth])
 
-  // Fetch Hyperliquid balance for connected users
-  const [hlBalance, setHlBalance] = useState<number | null>(null)
+  // Fetch Hyperliquid account status for connected users
+  const [hlStatus, setHlStatus] = useState<{
+    account_value: number | null
+    withdrawable: number | null
+  } | null>(null)
 
   useEffect(() => {
     if (userProfile?.hyperliquid_connected) {
       apiClient.getHyperliquidStatus()
         .then(status => {
-          if (status?.available_balance !== null && status?.available_balance !== undefined) {
-            setHlBalance(status.available_balance)
+          if (status?.connected) {
+            setHlStatus({
+              account_value: status.account_value,
+              withdrawable: status.withdrawable ?? 0,
+            })
           }
         })
-        .catch(err => console.error('Failed to fetch HL balance:', err))
+        .catch(err => console.error('Failed to fetch HL status:', err))
     }
   }, [userProfile?.hyperliquid_connected])
 
@@ -265,17 +271,31 @@ export function UserProfile({}: UserProfileProps) {
                 </div>
               )}
 
-              {/* Live Trading Balance */}
-              {userProfile?.hyperliquid_connected && hlBalance !== null && (
-                <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                  <span className="flex items-center gap-1">
-                    <Zap className="h-3 w-3" />
-                    Live Trading
-                  </span>
-                  <span>${hlBalance.toFixed(2)}</span>
-                </div>
-              )}
             </div>
+
+            {/* Hyperliquid Account Overview — separate section */}
+            {userProfile?.hyperliquid_connected && hlStatus && (
+              <div className="border-b border-[var(--border)] px-3 py-2 mb-2">
+                <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+                  <Zap className="h-2.5 w-2.5" />
+                  Hyperliquid
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center justify-between text-[var(--text-secondary)]">
+                    <span>Equity</span>
+                    <span className="font-mono font-medium text-[var(--accent)]">
+                      {hlStatus.account_value !== null ? `$${hlStatus.account_value.toFixed(2)}` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[var(--text-muted)]">
+                    <span>Withdrawable</span>
+                    <span className="font-mono">
+                      ${hlStatus.withdrawable?.toFixed(2) ?? '0.00'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Menu Items */}
             <div className="space-y-1">

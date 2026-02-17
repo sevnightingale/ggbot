@@ -311,30 +311,57 @@ export function ActivationBar({
           </div>
         </div>
 
-        {/* Row 2: KPI Metrics - Only show for Paper Trading */}
-        {metrics && selectedBot.trading_mode === 'paper' && (
+        {/* Row 2: KPI Metrics */}
+        {metrics && (
           <>
-            {/* Row 1: Financial Health */}
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <KPICard label="Total Equity" value={`$${Math.round(metrics.totalEquity).toLocaleString()}`} />
-              <KPICard label="Available" value={`$${Math.round(metrics.availableBalance).toLocaleString()}`} />
-              <KPICard
-                label="Unrealized"
-                value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
-                positive={metrics.pnl >= 0}
-              />
-            </div>
-
-            {/* Row 2: Trading Performance */}
-            <div className="grid grid-cols-3 gap-3">
-              <KPICard label="Trades" value={String(metrics.trades)} />
-              <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
-              <KPICard
-                label="Perf"
-                value={`${metrics.performance.toFixed(2)}%`}
-                positive={metrics.performance >= 0}
-              />
-            </div>
+            {isLiveTrading ? (
+              <>
+                {/* Live Trading: Cumulative P&L focused */}
+                <div className="grid grid-cols-3 gap-3 mb-2">
+                  <KPICard
+                    label="Cumulative P&L"
+                    value={`${metrics.totalEquity >= 0 ? '+' : ''}$${Math.round(metrics.totalEquity).toLocaleString()}`}
+                    positive={metrics.totalEquity >= 0}
+                  />
+                  <KPICard
+                    label="Unrealized"
+                    value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
+                    positive={metrics.pnl >= 0}
+                  />
+                  <KPICard label="Trades" value={String(metrics.trades)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
+                  <KPICard
+                    label="Perf"
+                    value={`${metrics.performance.toFixed(2)}%`}
+                    positive={metrics.performance >= 0}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Paper Trading: Full equity view */}
+                <div className="grid grid-cols-3 gap-3 mb-2">
+                  <KPICard label="Total Equity" value={`$${Math.round(metrics.totalEquity).toLocaleString()}`} />
+                  <KPICard label="Available" value={`$${Math.round(metrics.availableBalance).toLocaleString()}`} />
+                  <KPICard
+                    label="Unrealized"
+                    value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
+                    positive={metrics.pnl >= 0}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <KPICard label="Trades" value={String(metrics.trades)} />
+                  <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
+                  <KPICard
+                    label="Perf"
+                    value={`${metrics.performance.toFixed(2)}%`}
+                    positive={metrics.performance >= 0}
+                  />
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

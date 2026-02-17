@@ -249,10 +249,11 @@ class ConfigService:
             # Store in database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    initial_equity = 0 if config.trading_mode in ('hyperliquid', 'symphony', 'aster') else 10000.00
                     cur.execute("""
                         INSERT INTO configurations
                         (config_id, user_id, config_type, config_name, config_data, trading_mode, symphony_agent_id, initial_equity, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, 10000.00, NOW(), NOW())
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                     """, (
                         config_id,
                         user_id,
@@ -260,7 +261,8 @@ class ConfigService:
                         config_name,
                         json.dumps(config.to_jsonb()),
                         config.trading_mode,
-                        symphony_agent_id
+                        symphony_agent_id,
+                        initial_equity
                     ))
                 conn.commit()
 

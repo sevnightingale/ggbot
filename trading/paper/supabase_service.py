@@ -783,12 +783,12 @@ class SupabasePaperTradingService:
                     # starts fresh from $10,000
                     cur.execute("""
                         INSERT INTO activities (
-                            config_id, user_id, type, priority, data,
-                            total_equity, created_at
+                            config_id, user_id, activity_type, activity_source,
+                            summary, details, importance, total_equity
                         ) VALUES (
-                            %s, %s, 'account_reset', 0,
-                            '{"summary": "Account reset to $10,000"}'::jsonb,
-                            10000.00, NOW()
+                            %s, %s, 'account_reset', 'system',
+                            'Account reset to $10,000', '{}',
+                            1, 10000.00
                         )
                     """, (config_id, user_id))
 

@@ -68,6 +68,7 @@ def get_platform_stats():
             stats['active_paper_bots'] = 0
             stats['active_symphony_bots'] = 0
             stats['active_aster_bots'] = 0
+            stats['active_hyperliquid_bots'] = 0
             for row in mode_data:
                 mode = row[0] or 'paper'
                 if mode == 'paper':
@@ -76,8 +77,10 @@ def get_platform_stats():
                     stats['active_symphony_bots'] = row[1]
                 elif mode == 'aster':
                     stats['active_aster_bots'] = row[1]
+                elif mode == 'hyperliquid':
+                    stats['active_hyperliquid_bots'] = row[1]
             # Combined live count for backward compatibility
-            stats['active_live_bots'] = stats['active_symphony_bots'] + stats['active_aster_bots']
+            stats['active_live_bots'] = stats['active_symphony_bots'] + stats['active_aster_bots'] + stats['active_hyperliquid_bots']
 
             # Trading activity
             cur.execute("""
@@ -210,6 +213,7 @@ def print_status_report(stats):
     print(f"    Paper: {stats['active_paper_bots']}")
     print(f"    Symphony: {stats['active_symphony_bots']}")
     print(f"    Aster: {stats['active_aster_bots']}")
+    print(f"    Hyperliquid (Live): {stats['active_hyperliquid_bots']}")
     print(f"  Inactive: {stats['inactive_bots']}")
     print(f"Avg Bots per User: {stats['total_bots']/stats['users_with_bots']:.1f}")
 
@@ -971,6 +975,7 @@ def update_active_md(stats):
         f"  - Paper: {stats['active_paper_bots']}",
         f"  - Symphony (Live): {stats['active_symphony_bots']}",
         f"  - Aster (DEX): {stats['active_aster_bots']}",
+        f"  - Hyperliquid (Live): {stats['active_hyperliquid_bots']}",
         f"- **Inactive Bots**: {stats['inactive_bots']}",
         f"- **Avg Bots per User**: {stats['total_bots']/stats['users_with_bots']:.1f}",
         "",
