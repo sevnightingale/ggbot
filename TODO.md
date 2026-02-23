@@ -89,24 +89,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ### **Phase 5: Single Live Bot Slot + Strategy Versioning + Equity Tracking** ✅ COMPLETE (2026-02-17)
 
-**Planning Doc**: [DOCS/todo/SINGLE_LIVE_BOT_SLOT.md](DOCS/todo/SINGLE_LIVE_BOT_SLOT.md)
-
-**Summary**: Replaced multi-live-bot model with single permanent live slot per user. Paper bot strategies promoted to live via new endpoint. Equity tracking now uses real Hyperliquid account balance instead of PnL-only approximation.
-
-- [x] Remove multi-bot validation from `ggbot.py` (allocation + unique symbol checks)
-- [x] Add `POST /api/v2/bot/{config_id}/promote-to-live` endpoint with strategy versioning
-- [x] Block `trading_mode='hyperliquid'` creation via `create_config` (paper-only)
-- [x] Fix equity tracking chain: adapter → snapshot → activity_logger (real balance, not PnL-only)
-- [x] Modify `vault_utils.py` disconnect: keep live slot inactive (don't convert to paper)
-- [x] Auto-create live bot config during Hyperliquid setup (idempotent)
-- [x] `BotRail.tsx` — pinned live slot with 4 states, gold accent, Zap icon, LIVE badge
-- [x] `BotManagementMenu.tsx` — "Promote to Live" action for paper bots
-- [x] `BotCreationModal.tsx` — paper-only (removed live trading mode)
-- [x] `TradeSettings.tsx` — removed allocation bar
-- [x] Fix equity display: `page.tsx`, `ActivationBar.tsx`, `PerformanceChart.tsx`
-- [x] Wire up live bot state in `page.tsx` + LiveTradingSetupModal
-
-**15 files across 3 workstreams** — see planning doc for full specification.
+See CHANGELOG.md (2026-02-17) and [DOCS/completed/SINGLE_LIVE_BOT_SLOT.md](DOCS/completed/SINGLE_LIVE_BOT_SLOT.md).
 
 ### **Phase 6: HIP-3 — Equities, Commodities, Indices** (PLANNED)
 

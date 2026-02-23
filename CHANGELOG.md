@@ -6,6 +6,42 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-17 - Hyperliquid Phase 5: Single Live Bot Slot + Strategy Versioning + Equity Tracking
+
+**Planning Doc**: [DOCS/completed/SINGLE_LIVE_BOT_SLOT.md](DOCS/completed/SINGLE_LIVE_BOT_SLOT.md)
+
+**Single Live Bot Slot** (`ggbot.py`, `BotRail.tsx`, `BotCreationModal.tsx`, `ConfigureLayout.tsx`):
+- Replaced multi-live-bot model with one permanent live config per user, auto-created during HL setup
+- `POST /api/v2/bot/{config_id}/promote-to-live` — copies paper bot strategy to live slot with version tracking
+- Paper-only bot creation (blocked `trading_mode='hyperliquid'` in `create_config`)
+- Removed allocation validation + unique symbol enforcement from `start_bot`
+- BotRail: pinned live slot with 4 states (not connected / no strategy / promoted / disconnected)
+- Disconnect preserves live slot (`state='inactive'`, not converted to paper)
+
+**Equity Tracking** (`hyperliquid_adapter.py`, `account_snapshot.py`, `dashboard_data.py`, `page.tsx`):
+- Adapter returns `current_balance=account_value` (was `None` in multi-bot model)
+- `total_equity = current_balance + unrealized_pnl` for Hyperliquid (same formula as paper)
+- ActivationBar/PerformanceChart show real equity, not cumulative P&L
+- SSE dashboard enrichment merges HL API data with DB snapshots
+
+**Strategy Versioning** (`ggbot.py`, `activity_logger.py`, `tv-timeline.tsx`, `ActivationBar.tsx`):
+- `strategy_updated` activity logged on promote-to-live (with version number + config snapshot)
+- `strategy_updated` activity logged on config edits via batched save (changed fields tracked)
+- `bot_created` activity logged during HL setup auto-creation
+- TV timeline: square marker for strategy updates, gear icon in activity modal
+- `initial_equity` fallback in `get_latest_snapshot()` for new bots without snapshots
+
+**Bug Fixes** (discovered during live testing):
+- `config_service.py`: `data["selected_pair"]` → `data.get("selected_pair", "")` — empty live bot config crashed `from_dict`
+- `ggbot.py:start_bot`: missing `from core.common.db import get_db_connection` import
+- `ActivationBar.tsx`: guard `temp-` IDs from API calls during duplication
+- `BotManagementMenu.tsx`: standardized promote confirmation as inline popover (was browser `confirm()`)
+- `account-monitor` PM2 process: 6-day stale code caused NULL `current_balance` in snapshots
+
+**15 files changed across 3 workstreams** — backend, frontend, monitoring.
+
+---
+
 ## 2026-02-13 - Vercel Build Fix (CVE-2026-0969) + Frontend Cleanup + Arena Filter
 
 **Vercel Deployment Blocker** (`frontend/package.json`):

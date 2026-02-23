@@ -1,64 +1,64 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-02-17 10:28:16 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-02-23 03:21:55 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 319
+- **Total Users**: 321
 - **Prepaid Users**: 20 (20 active subscriptions)
-- **Free Users**: 293
-- **Users with Bots**: 309 (96.9%)
+- **Free Users**: 295
+- **Users with Bots**: 311 (96.9%)
 
 ### Bot Statistics
-- **Total Bots**: 476
-- **Active Bots**: 18 (3.8%)
-  - Paper: 17
+- **Total Bots**: 478
+- **Active Bots**: 17 (3.6%)
+  - Paper: 16
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 1
-- **Inactive Bots**: 458
+- **Inactive Bots**: 461
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,323
-  - Wins: 2,423
-  - Losses: 4,900
-  - Platform Win Rate: 33.09%
-  - Total P&L: $105,047.21
+- **Total Trades (All Time)**: 7,447
+  - Wins: 2,485
+  - Losses: 4,962
+  - Platform Win Rate: 33.37%
+  - Total P&L: $104,854.77
 - **Recent Activity**:
-  - Last 24 hours: 41 trades
-  - Last 7 days: 389 trades
-  - Last 30 days: 2148 trades
+  - Last 24 hours: 24 trades
+  - Last 7 days: 176 trades
+  - Last 30 days: 2171 trades
 
 ### Open Positions
-- **Open Positions**: 6
-- **Unique Symbols**: 2
-- **Total Exposure**: $115,394.35
-- **Unrealized P&L**: $2,188.46
+- **Open Positions**: 8
+- **Unique Symbols**: 3
+- **Total Exposure**: $304,450.48
+- **Unrealized P&L**: $8,748.03
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,196.95
+- **Average Balance**: $10,195.72
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
 - **BTC/USDT**: 14 bots
-- **ETH/USDT**: 3 bots
+- **ETH/USDT**: 2 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 362 decisions (avg confidence: 48.4%)
-- **enter**: 41 decisions (avg confidence: 64.5%)
-- **exit**: 20 decisions (avg confidence: 72.5%)
-- **close**: 3 decisions (avg confidence: 75.3%)
-- **long**: 2 decisions (avg confidence: 71.0%)
+- **wait**: 309 decisions (avg confidence: 49.6%)
+- **enter**: 21 decisions (avg confidence: 65.4%)
+- **exit**: 12 decisions (avg confidence: 69.9%)
+- **close**: 3 decisions (avg confidence: 72.0%)
+- **long**: 3 decisions (avg confidence: 72.7%)
 
 ### System Health
-- **Decisions (last hour)**: 14
+- **Decisions (last hour)**: 13
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -67,23 +67,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0.1% | 12MB | 7d 23h | 2 |
-| error-alerts | 🟢 online | 0% | 13MB | 7d 23h | 2 |
-| ggbot | 🟢 online | 1.8% | 261MB | 2h 41m | 18 |
-| account-monitor | 🟢 online | 1% | 27MB | 6d 2h | 4 |
-| sebastian-bot | 🟢 online | 0.2% | 43MB | 3d 16h | 5 |
-| market-data-ws | 🟢 online | 1% | 23MB | 7d 23h | 2 |
-| sebastian-chrome | 🟢 online | 0.4% | 81MB | 4h 18m | 2 |
+| error-alerts | 🟢 online | 0% | 8MB | 5d 14h | 0 |
+| ggbot | 🟢 online | 1.6% | 308MB | 5d 14h | 0 |
+| account-monitor | 🟢 online | 0.6% | 25MB | 5d 14h | 0 |
+| sebastian-chrome | 🟢 online | 0.1% | 127MB | 5d 14h | 0 |
+| sebastian-bot | 🟢 online | 0.1% | 53MB | 4d 5h | 1 |
+| market-data-ws | 🟢 online | 1% | 15MB | 5d 14h | 0 |
+| sebastian-telegram | 🟢 online | 0% | 11MB | 4d 4h | 0 |
 
 ### VM Resources
 
-- **Disk**: 56G / 78G (72%)
-- **Memory**: 1.5Gi / 3.8Gi
-- **CPU Load**: 0.20 / 0.30 / 0.39 (1m/5m/15m)
+- **Disk**: 57G / 78G (74%)
+- **Memory**: 2.1Gi / 3.8Gi
+- **CPU Load**: 1.60 / 0.59 / 0.36 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 22.67M)
+- **Redis**: 🟢 connected (Memory: 22.22M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -517,7 +517,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-02-17 10:28:17 UTC
+**Last Updated**: 2026-02-23 03:21:56 UTC
 
 ---
 
@@ -1412,7 +1412,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-02-17 10:28:17 UTC
+**Last Updated**: 2026-02-23 03:21:56 UTC
 
 ---
 

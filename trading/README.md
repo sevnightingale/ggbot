@@ -151,25 +151,37 @@ INSERT INTO live_trades (batch_id, config_id, decision_id, provider, symbol, ...
 VALUES ('uuid', 'config-uuid', 'decision-uuid', 'hyperliquid', 'BTC-USDT', ...);
 ```
 
+### Single Live Bot Slot (Phase 5)
+
+**Model**: One permanent `trading_mode='hyperliquid'` config per user. Auto-created during Hyperliquid setup. Cannot be deleted — only deactivated on disconnect.
+
+**Promote to Live**: Paper bot strategies copied to live slot via `POST /api/v2/bot/{config_id}/promote-to-live`. Logs `strategy_updated` activity with version number and config snapshot. Paper bot continues running for comparison.
+
+**Equity Tracking**: Real account balance, not PnL-only.
+- `total_equity = current_balance + unrealized_pnl` (same formula as paper)
+- Adapter sets `current_balance = account_value` from `user_state.marginSummary`
+- Dashboard shows Total Equity, Available Balance, Unrealized P&L (full equity view)
+
 ### Account Monitoring
 
 **Adapter**: `core/monitoring/adapters/hyperliquid_adapter.py`
 - Queries `Info.user_state()` for account data (118ms avg latency)
-- Per-bot P&L via symbol attribution (cross-references `live_trades`)
-- Shared account model: `current_balance=None` (all bots share one wallet)
-- `total_pnl = realized_pnl + unrealized_pnl` per-bot
-- Dashboard chart shows "Cumulative P&L" starting from $0
+- Single live bot model: account balance = bot balance (`current_balance = account_value`)
+- `total_equity = current_balance + unrealized_pnl` (same as paper mode)
+- Trade stats from `user_fills_by_time()` matched to `live_trades` by symbol
+- Position close detection via fill monitoring (logs `trade_exit` activities)
 
 ### API Endpoints
 
 **Setup & Management** (under `/api/v2/hyperliquid/`):
-- `POST /setup` — Store API wallet + wallet address
+- `POST /setup` — Store API wallet + wallet address, auto-create live bot config
 - `GET /status` — Connection status + live balance/positions
-- `POST /disconnect` — Remove credentials, set bots to paper mode
+- `POST /disconnect` — Remove credentials, preserve live slot as inactive
 - `POST /test-trade` — Open 0.01 ETH long, close after 2s
 
 **Trading**:
 - `POST /api/v2/bot/{config_id}/execute` — Routes to Hyperliquid if `trading_mode='hyperliquid'`
+- `POST /api/v2/bot/{config_id}/promote-to-live` — Copy paper strategy to live slot
 - `GET /api/v2/bot/{config_id}/positions` — Open positions from Hyperliquid Info API
 - `GET /api/v2/bot/{config_id}/account` — Account metrics
 - `POST /api/v2/positions/hyperliquid/{batch_id}/close` — Close position
@@ -183,10 +195,13 @@ See `core/symbols/registry.py` for `hyperliquid_compatible` flags.
 ### Frontend Integration
 
 **Setup**: Settings modal → LiveTradingSetupModal (wagmi + RainbowKit on Arbitrum)
-**Bot Creation**: Paper + Live Trading modes in BotCreationModal
-**Dashboard**: PerformanceChart recognizes `source: 'hyperliquid'` → cumulative P&L mode
+**BotRail**: Pinned live slot with 4 states — not connected, connected (no strategy), strategy promoted, disconnected (preserved slot). Gold accent, Zap icon, LIVE badge.
+**Bot Creation**: Paper-only in BotCreationModal (live bot auto-created during HL setup)
+**Promote to Live**: Paper bot 3-dot menu → "Promote to Live" with inline confirmation popover
+**Dashboard**: ActivationBar + PerformanceChart show real equity (Total Equity, Available, Unrealized P&L)
 **Positions**: PositionsTable routes close to `/api/v2/positions/hyperliquid/{batch_id}/close`
-**Activation**: Credential check + unique symbol per active bot
+**Activation**: Credential check via VaultManager (no more per-symbol uniqueness gate)
+**Strategy Versioning**: `strategy_updated` activities rendered as square markers on TV timeline chart
 
 ---
 

@@ -72,6 +72,9 @@ export const metadata: Metadata = {
     ],
   },
   manifest: "/manifest.json",
+  other: {
+    "virtual-protocol-site-verification": "c4316302f905b5de7bc4470b35aeec0a",
+  },
 }
 
 export default function RootLayout({
