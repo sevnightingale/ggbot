@@ -302,11 +302,8 @@ function LiveBotRow({
           )}
         </div>
 
-        {/* Metadata badges */}
+        {/* Metadata badges: model, pair, performance */}
         <div className="flex flex-wrap gap-1 mb-2">
-          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-            {pair}
-          </span>
           {logoPath && (
             <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">
               <div
@@ -328,6 +325,9 @@ function LiveBotRow({
               </div>
             </span>
           )}
+          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+            {pair}
+          </span>
           {performancePct != null && performancePct !== 0 && (
             <span className={`rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-medium flex items-center gap-0.5 ${
               performancePct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
@@ -428,11 +428,8 @@ function BotRow({
           )}
         </div>
 
-        {/* Metadata badges: pair, model, performance */}
+        {/* Metadata badges: model, pair, performance */}
         <div className="flex flex-wrap gap-1 mb-2">
-          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-            {pair}
-          </span>
           {logoPath && (
             <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">
               <div
@@ -454,6 +451,9 @@ function BotRow({
               </div>
             </span>
           )}
+          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+            {pair}
+          </span>
           {performancePct != null && performancePct !== 0 && (
             <span className={`rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-medium flex items-center gap-0.5 ${
               performancePct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
