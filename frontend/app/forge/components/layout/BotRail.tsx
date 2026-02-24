@@ -2,9 +2,14 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { BarChart2, Loader2, Circle, Zap } from 'lucide-react'
+import { BarChart2, Loader2, Circle, Zap, TrendingUp, TrendingDown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
+
+interface AccountData {
+  config_id: string
+  performance_pct?: number
+}
 
 // Logo mapping for LLM models (shared with StrategyEditor)
 const MODEL_LOGOS: Record<string, string> = {
@@ -41,6 +46,7 @@ interface BotRailProps {
   onDelete?: (configId: string) => void
   onResetAccount?: (configId: string) => void
   isBotAction?: boolean
+  accounts?: AccountData[]
   className?: string
 }
 
@@ -59,6 +65,7 @@ export function BotRail({
   onDelete,
   onResetAccount,
   isBotAction = false,
+  accounts = [],
   className = ''
 }: BotRailProps) {
   // Paper bots only (live bot shown separately)
@@ -152,6 +159,7 @@ export function BotRail({
               onRename={onRename}
               onResetAccount={onResetAccount}
               isBotAction={isBotAction}
+              performancePct={accounts.find(a => a.config_id === liveBot.config_id)?.performance_pct}
             />
           ) : hyperliquidConnected && !liveBot ? (
             // Edge case: connected but no live bot config yet (should not happen normally)
@@ -209,6 +217,7 @@ export function BotRail({
                 onResetAccount={onResetAccount}
                 onPromoteToLive={hyperliquidConnected ? onPromoteToLive : undefined}
                 isBotAction={isBotAction}
+                performancePct={accounts.find(a => a.config_id === bot.config_id)?.performance_pct}
               />
             ))
           )}
@@ -226,6 +235,7 @@ interface LiveBotRowProps {
   onRename?: (configId: string, newName: string) => void
   onResetAccount?: (configId: string) => void
   isBotAction: boolean
+  performancePct?: number
 }
 
 function LiveBotRow({
@@ -234,7 +244,8 @@ function LiveBotRow({
   onClick,
   onRename,
   onResetAccount,
-  isBotAction
+  isBotAction,
+  performancePct
 }: LiveBotRowProps) {
   const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
   const pair = bot.config_data.selected_pair || 'No pair'
@@ -317,6 +328,17 @@ function LiveBotRow({
               </div>
             </span>
           )}
+          {performancePct != null && performancePct !== 0 && (
+            <span className={`rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-medium flex items-center gap-0.5 ${
+              performancePct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
+            }`}>
+              {performancePct >= 0
+                ? <TrendingUp className="h-3 w-3" />
+                : <TrendingDown className="h-3 w-3" />
+              }
+              {performancePct >= 0 ? '+' : ''}{performancePct.toFixed(1)}%
+            </span>
+          )}
         </div>
 
         {/* Frequency */}
@@ -337,6 +359,7 @@ interface BotRowProps {
   onResetAccount?: (configId: string) => void
   onPromoteToLive?: (configId: string) => void
   isBotAction: boolean
+  performancePct?: number
 }
 
 function BotRow({
@@ -348,14 +371,12 @@ function BotRow({
   onDelete,
   onResetAccount,
   onPromoteToLive,
-  isBotAction
+  isBotAction,
+  performancePct
 }: BotRowProps) {
   // Get bot metadata
   const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
-  const configType =
-    bot.config_type === 'signal_validation' ? 'Signal validation' :
-    bot.config_type === 'agent' ? 'Agent strategy' :
-    'Autonomous trading'
+  const pair = bot.config_data.selected_pair || 'No pair'
 
   // Format frequency text based on mode
   let frequency = ''
@@ -407,13 +428,11 @@ function BotRow({
           )}
         </div>
 
-        {/* Metadata badges */}
+        {/* Metadata badges: pair, model, performance */}
         <div className="flex flex-wrap gap-1 mb-2">
           <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-            {configType === 'Signal validation' ? 'Signal' : configType === 'Agent strategy' ? 'Agent' : 'Auto'}
+            {pair}
           </span>
-
-          {/* LLM Model Logo */}
           {logoPath && (
             <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">
               <div
@@ -433,6 +452,17 @@ function BotRow({
                   className="object-contain"
                 />
               </div>
+            </span>
+          )}
+          {performancePct != null && performancePct !== 0 && (
+            <span className={`rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-medium flex items-center gap-0.5 ${
+              performancePct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
+            }`}>
+              {performancePct >= 0
+                ? <TrendingUp className="h-3 w-3" />
+                : <TrendingDown className="h-3 w-3" />
+              }
+              {performancePct >= 0 ? '+' : ''}{performancePct.toFixed(1)}%
             </span>
           )}
         </div>

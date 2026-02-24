@@ -1221,6 +1221,7 @@ function ForgeApp() {
             onDelete={handleDeleteBot}
             onResetAccount={handleResetAccount}
             isBotAction={isBotAction}
+            accounts={accounts}
             className="col-span-12 hidden md:col-span-3 md:block"
           />
 

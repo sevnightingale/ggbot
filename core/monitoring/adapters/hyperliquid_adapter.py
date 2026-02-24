@@ -203,15 +203,18 @@ class HyperliquidAccountAdapter(AccountAdapter):
 
             # Build snapshot
             # Single live bot model: the Hyperliquid account balance IS this bot's balance.
-            # current_balance = account_value, available_balance = withdrawable.
-            # total_equity = current_balance + unrealized_pnl (same formula as paper).
+            # HL accountValue already INCLUDES unrealized PnL, so we subtract it out
+            # to get the cash-only balance. This way the universal formula
+            # total_equity = current_balance + unrealized_pnl works correctly
+            # (same as paper where current_balance is cash-only).
+            cash_balance = account_value - bot_unrealized_pnl
             snapshot = AccountSnapshot(
                 snapshot_id=None,
                 config_id=config_id,
                 user_id=user_id,
                 trading_mode='hyperliquid',
                 timestamp=datetime.now(timezone.utc),
-                current_balance=account_value,
+                current_balance=cash_balance,
                 available_balance=withdrawable,
                 margin_used=bot_margin_used if bot_margin_used > 0 else None,
                 total_pnl=total_pnl,

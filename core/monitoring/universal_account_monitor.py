@@ -249,9 +249,10 @@ class UniversalAccountMonitor:
         if last.open_positions != current.open_positions:
             return True
 
-        # Total P&L changed (any change in realized P&L indicates trade close)
-        if abs(current.total_pnl - last.total_pnl) > Decimal('0.01'):  # $0.01 threshold
-            return True
+        # Realized P&L changed (indicates a trade was closed)
+        if current.realized_pnl is not None and last.realized_pnl is not None:
+            if abs(current.realized_pnl - last.realized_pnl) > Decimal('0.01'):
+                return True
 
         # Balance changed significantly (if available)
         if current.current_balance and last.current_balance:
