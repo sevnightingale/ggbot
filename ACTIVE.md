@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-02-23 04:24:43 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-02-24 10:36:09 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -13,52 +13,50 @@
 
 ### Bot Statistics
 - **Total Bots**: 478
-- **Active Bots**: 17 (3.6%)
-  - Paper: 16
+- **Active Bots**: 16 (3.3%)
+  - Paper: 15
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 1
-- **Inactive Bots**: 461
+- **Inactive Bots**: 462
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,448
-  - Wins: 2,485
-  - Losses: 4,963
-  - Platform Win Rate: 33.36%
-  - Total P&L: $104,765.39
+- **Total Trades (All Time)**: 7,475
+  - Wins: 2,497
+  - Losses: 4,978
+  - Platform Win Rate: 33.40%
+  - Total P&L: $104,911.34
 - **Recent Activity**:
-  - Last 24 hours: 26 trades
-  - Last 7 days: 178 trades
+  - Last 24 hours: 24 trades
+  - Last 7 days: 155 trades
   - Last 30 days: 2175 trades
 
 ### Open Positions
-- **Open Positions**: 11
+- **Open Positions**: 9
 - **Unique Symbols**: 3
-- **Total Exposure**: $352,489.61
-- **Unrealized P&L**: $8,711.73
+- **Total Exposure**: $124,209.63
+- **Unrealized P&L**: $3,278.97
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,195.53
+- **Average Balance**: $10,195.84
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 14 bots
+- **BTC/USDT**: 13 bots
 - **ETH/USDT**: 2 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 310 decisions (avg confidence: 50.6%)
-- **enter**: 23 decisions (avg confidence: 68.4%)
-- **exit**: 10 decisions (avg confidence: 71.4%)
-- **close**: 3 decisions (avg confidence: 72.0%)
-- **long**: 3 decisions (avg confidence: 72.7%)
+- **wait**: 318 decisions (avg confidence: 52.1%)
+- **enter**: 24 decisions (avg confidence: 71.8%)
+- **exit**: 10 decisions (avg confidence: 76.9%)
 
 ### System Health
-- **Decisions (last hour)**: 20
+- **Decisions (last hour)**: 13
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -67,23 +65,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 18MB | 5d 15h | 0 |
-| ggbot | 🟢 online | 1.4% | 286MB | 47m | 1 |
-| account-monitor | 🟢 online | 0.5% | 24MB | 5d 15h | 0 |
-| sebastian-chrome | 🟢 online | 0% | 102MB | 5d 15h | 0 |
-| sebastian-bot | 🟢 online | 0.2% | 44MB | 4d 6h | 1 |
-| market-data-ws | 🟢 online | 0.9% | 15MB | 5d 15h | 0 |
-| sebastian-telegram | 🟢 online | 0% | 11MB | 4d 5h | 0 |
+| error-alerts | 🟢 online | 0% | 18MB | 6d 21h | 0 |
+| ggbot | 🟢 online | 1.7% | 300MB | 1h 17m | 3 |
+| account-monitor | 🟢 online | 0.5% | 24MB | 6d 21h | 0 |
+| sebastian-chrome | 🟢 online | 0.3% | 116MB | 2h 3m | 4 |
+| sebastian-bot | 🟢 online | 0.2% | 32MB | 5d 12h | 1 |
+| market-data-ws | 🟢 online | 1.1% | 15MB | 6d 21h | 0 |
+| sebastian-telegram | 🟢 online | 0% | 14MB | 5d 12h | 0 |
 
 ### VM Resources
 
-- **Disk**: 57G / 78G (74%)
-- **Memory**: 2.6Gi / 3.8Gi
-- **CPU Load**: 0.52 / 0.68 / 0.64 (1m/5m/15m)
+- **Disk**: 58G / 78G (74%)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.93 / 0.53 / 0.40 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 21.55M)
+- **Redis**: 🟢 connected (Memory: 20.00M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -513,7 +511,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-02-23 04:24:44 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-02-24 10:36:10 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -701,7 +699,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-02-23 04:24:44 UTC
+Source: `core/config/models.py` | Auto-generated 2026-02-24 10:36:10 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

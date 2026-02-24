@@ -18,8 +18,9 @@ from core.common.logger import logger
 router = APIRouter(prefix="/api/v2/public", tags=["public"])
 
 
-# Season 1 competition start time - all chart data starts from here
+# Season 1 competition window - freeze results to this period
 COMPETITION_START = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)
+COMPETITION_END = datetime(2026, 2, 11, 12, 0, 0, tzinfo=timezone.utc)
 
 # Redis cache for arena performance
 ARENA_CACHE_KEY = "arena:performance"
@@ -126,6 +127,8 @@ async def get_arena_performance(
                         WHERE pt.config_id = c.config_id
                           AND pt.close_reason = 'manual'
                           AND pt.status = 'closed'
+                          AND pt.opened_at >= '2026-01-21 12:00:00+00'
+                          AND pt.closed_at <= '2026-02-11 12:00:00+00'
                     ), 0) as manual_closes
                 FROM configurations c
                 LEFT JOIN paper_accounts pa ON c.config_id = pa.config_id
@@ -134,6 +137,7 @@ async def get_arena_performance(
             bot_metadata = {row[0]: row for row in cur.fetchall()}
 
             # Query 2: Get hourly snapshots (no JSONB extraction - fast!)
+            # Capped at COMPETITION_END to freeze Season 1 results
             cur.execute("""
                 SELECT DISTINCT ON (s.config_id, date_trunc('hour', s.timestamp))
                     s.config_id,
@@ -148,8 +152,9 @@ async def get_arena_performance(
                 FROM account_snapshots s
                 WHERE s.config_id IN (SELECT config_id FROM configurations WHERE is_public_performance = true)
                 AND s.timestamp >= %s
+                AND s.timestamp <= %s
                 ORDER BY s.config_id, date_trunc('hour', s.timestamp), s.timestamp DESC
-            """, (cutoff_time,))
+            """, (cutoff_time, COMPETITION_END))
             snapshots = cur.fetchall()
 
             # Build bots_data by combining metadata with snapshots
@@ -276,6 +281,7 @@ async def get_arena_balance_series(config_id: str) -> Dict[str, Any]:
             config_created = config[1]
 
             # Get activities with equity data (AI's conscious moments)
+            # Capped at competition window for Season 1
             cur.execute("""
                 SELECT
                     created_at,
@@ -283,8 +289,10 @@ async def get_arena_balance_series(config_id: str) -> Dict[str, Any]:
                 FROM activities
                 WHERE config_id = %s
                   AND total_equity IS NOT NULL
+                  AND created_at >= %s
+                  AND created_at <= %s
                 ORDER BY created_at ASC
-            """, (config_id,))
+            """, (config_id, COMPETITION_START, COMPETITION_END))
             activities = cur.fetchall()
 
     # Build timeline from AI's observations
@@ -366,7 +374,7 @@ async def get_arena_activities(
             if not config:
                 return {"status": "error", "message": "Bot not found or not public"}
 
-            # Get activities
+            # Get activities (only within competition window)
             cur.execute("""
                 SELECT
                     activity_id, activity_type, activity_source, summary, details,
@@ -374,9 +382,10 @@ async def get_arena_activities(
                     importance, created_at
                 FROM activities
                 WHERE config_id = %s
+                  AND created_at >= %s AND created_at <= %s
                 ORDER BY created_at DESC
                 LIMIT %s
-            """, (config_id, limit))
+            """, (config_id, COMPETITION_START, COMPETITION_END, limit))
             activities = cur.fetchall()
 
     return {
@@ -446,7 +455,7 @@ async def get_arena_metadata(config_id: str) -> Dict[str, Any]:
             created_at = config[2]
             initial_balance = float(config[3]) if config[3] else 10000.0
 
-            # Get trade metrics
+            # Get trade metrics (only trades within competition window)
             cur.execute("""
                 SELECT
                     COUNT(*) as total_trades,
@@ -454,17 +463,19 @@ async def get_arena_metadata(config_id: str) -> Dict[str, Any]:
                     SUM(realized_pnl) as total_pnl
                 FROM paper_trades
                 WHERE config_id = %s AND status = 'closed'
-            """, (config_id,))
+                  AND opened_at >= %s AND closed_at <= %s
+            """, (config_id, COMPETITION_START, COMPETITION_END))
             metrics = cur.fetchone()
 
-            # Get current balance from latest snapshot
+            # Get balance at competition end (not latest — Season 1 is frozen)
             cur.execute("""
                 SELECT current_balance + COALESCE(unrealized_pnl, 0) as total_equity
                 FROM account_snapshots
                 WHERE config_id = %s
+                  AND timestamp <= %s
                 ORDER BY timestamp DESC
                 LIMIT 1
-            """, (config_id,))
+            """, (config_id, COMPETITION_END))
             latest = cur.fetchone()
 
     total_trades = metrics[0] or 0

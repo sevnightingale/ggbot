@@ -71,11 +71,13 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     return `${sign}$${pnl.toFixed(2)}`
   }
 
-  const formatPercentage = (entry: number | null | undefined, current: number | null | undefined) => {
+  const formatPercentage = (entry: number | null | undefined, current: number | null | undefined, side?: string) => {
     // Handle null/undefined for Symphony positions during settlement
     if (entry == null || current == null || isNaN(entry) || isNaN(current) || entry === 0) return '—%'
 
-    const change = ((current - entry) / entry) * 100
+    let change = ((current - entry) / entry) * 100
+    // For shorts, profit = price going down, so negate the price change
+    if (side && side.toLowerCase() === 'short') change = -change
     const sign = change >= 0 ? '+' : ''
     return `${sign}${change.toFixed(2)}%`
   }
@@ -176,7 +178,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
       newDisplayPrices[positionId] = {
         current: formatPrice(currentPrice),
         pnl: formatPnL(position.unrealized_pnl),
-        percentage: formatPercentage(position.entry_price, currentPrice)
+        percentage: formatPercentage(position.entry_price, currentPrice, position.side)
       }
 
       // Always trigger animation on SSE update (like MetricsBar)
@@ -333,7 +335,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                       </div>
                       <div className="text-xs">
                         <AnimatedValue
-                          value={displayPrices[positionId]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                          value={displayPrices[positionId]?.percentage || formatPercentage(position.entry_price, position.current_price, position.side)}
                           isAnimating={animatingPrices[positionId] || false}
                         />
                       </div>
@@ -395,7 +397,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
               </div>
               <div className={`text-sm font-semibold ${getPnLColor(position.unrealized_pnl)}`}>
                 <AnimatedValue
-                  value={displayPrices[positionId]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                  value={displayPrices[positionId]?.percentage || formatPercentage(position.entry_price, position.current_price, position.side)}
                   isAnimating={animatingPrices[positionId] || false}
                 />
               </div>
