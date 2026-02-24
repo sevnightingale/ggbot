@@ -417,22 +417,51 @@ def get_database_schema():
     return schema
 
 
+def _compact_type(type_str):
+    """Shorten SQL type names for compact schema output."""
+    replacements = {
+        'timestamp with time zone': 'timestamptz',
+        'timestamp without time zone': 'timestamp',
+        'character varying': 'varchar',
+        'boolean': 'bool',
+        'integer': 'int',
+        'USER-DEFINED': 'enum',
+    }
+    for old, new in replacements.items():
+        type_str = type_str.replace(old, new)
+    return type_str
+
+
+def _is_boring_default(default_str, col_type):
+    """Check if a default value is standard/obvious and can be omitted."""
+    if not default_str:
+        return True
+    boring = [
+        'gen_random_uuid()', 'uuid_generate_v4()', 'now()',
+        "nextval(", "0", "0.00", "false", "0.00)",
+        "ARRAY[]",
+    ]
+    for b in boring:
+        if b in default_str:
+            return True
+    return False
+
+
 def format_schema_markdown(schema):
-    """Format database schema as markdown for README.md with comprehensive metadata."""
+    """Format database schema as compact markdown. Convention: ? = nullable, =val for non-obvious defaults."""
     lines = [
         "## 📊 Database Schema",
         "",
-        "**Auto-generated schema reference** - Updated automatically by `scripts/status_check.py`",
+        "**Auto-generated** by `scripts/status_check.py` | "
+        f"**Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')} | "
+        "**Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)",
         "",
-        "**For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).",
-        "",
-        f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "**Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted",
         "",
         "---",
         ""
     ]
 
-    # Sort tables alphabetically
     for table_name in sorted(schema.keys()):
         table_data = schema[table_name]
         columns = table_data['columns']
@@ -441,47 +470,58 @@ def format_schema_markdown(schema):
         indexes = table_data['indexes']
         unique_constraints = table_data['unique_constraints']
 
-        lines.append(f"### `{table_name}` ({len(columns)} columns)")
-        lines.append("")
-
-        # Primary Keys
+        # Header line: table name, col count, PK, FKs, unique constraints
+        header_parts = [f"### {table_name} ({len(columns)} cols)"]
         if primary_keys:
-            pk_str = ", ".join([f"`{pk}`" for pk in primary_keys])
-            lines.append(f"**Primary Key**: {pk_str}")
-            lines.append("")
-
-        # Foreign Keys
+            header_parts.append(f"PK: {','.join(primary_keys)}")
         if foreign_keys:
-            lines.append("**Foreign Keys**:")
-            for fk in foreign_keys:
-                lines.append(f"- `{fk['column']}` → `{fk['foreign_table']}({fk['foreign_column']})`")
-            lines.append("")
-
-        # Indexes
-        if indexes:
-            lines.append("**Indexes**:")
-            for idx in indexes:
-                # Use columns field from new structure
-                if 'columns' in idx:
-                    lines.append(f"- `{idx['name']}` on ({idx['columns']})")
-                else:
-                    lines.append(f"- `{idx['name']}`")
-            lines.append("")
-
-        # Unique Constraints
+            fk_strs = [f"{fk['column']}→{fk['foreign_table']}" for fk in foreign_keys]
+            header_parts.append(f"FK: {', '.join(fk_strs)}")
         if unique_constraints:
-            uc_str = ", ".join([f"`{uc}`" for uc in unique_constraints])
-            lines.append(f"**Unique Constraints**: {uc_str}")
-            lines.append("")
+            header_parts.append(f"UQ: {','.join(unique_constraints)}")
+        lines.append(' | '.join(header_parts))
 
-        # Column table
-        lines.append("| Column | Type | Nullable | Default |")
-        lines.append("|--------|------|----------|---------|")
+        # Indexes on one line (skip deprecated)
+        active_indexes = [idx for idx in indexes if not idx['name'].startswith('_deprecated')]
+        if active_indexes:
+            idx_strs = [f"{idx['name']}({idx.get('columns', '')})" for idx in active_indexes]
+            idx_line = "Idx: " + ", ".join(idx_strs)
+            # Wrap if too long
+            if len(idx_line) > 200:
+                idx_line = idx_line[:197] + "..."
+            lines.append(idx_line)
 
+        # Columns as compact inline list
+        col_parts = []
         for col in columns:
-            nullable = "✓" if col['nullable'] else ""
-            default = str(col['default'])[:30] if col['default'] else ""
-            lines.append(f"| `{col['name']}` | {col['type']} | {nullable} | {default} |")
+            col_type = _compact_type(col['type'])
+            nullable = '?' if col['nullable'] else ''
+            default_str = str(col['default']) if col['default'] else ''
+
+            # Only show non-obvious defaults
+            default_suffix = ''
+            if not _is_boring_default(default_str, col_type):
+                # Clean up default string
+                # Strip SQL casts and quotes
+                import re
+                clean_default = re.sub(r"::\w+(\[\])?", "", default_str)
+                clean_default = clean_default.strip("'")
+                if len(clean_default) > 20:
+                    clean_default = clean_default[:17] + "..."
+                default_suffix = f"={clean_default}"
+
+            col_parts.append(f"{col['name']} {col_type}{nullable}{default_suffix}")
+
+        # Join columns, wrap at ~120 chars per line
+        col_line = ""
+        for part in col_parts:
+            if col_line and len(col_line) + len(part) + 2 > 120:
+                lines.append(col_line)
+                col_line = part
+            else:
+                col_line = col_line + ", " + part if col_line else part
+        if col_line:
+            lines.append(col_line)
 
         lines.append("")
 
@@ -573,53 +613,50 @@ def get_domain_models():
 
 
 def format_domain_models_markdown(domain_models):
-    """Format domain models as markdown for README.md."""
+    """Format domain models as compact markdown."""
     if not domain_models:
         return ""
 
     lines = [
         "## 🎯 Domain Models & Business Logic",
         "",
-        "**Note**: Domain models add business logic, validation, and computed properties on top of database tables.",
-        "",
-        "**For schema design context**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).",
+        "Business logic on top of DB tables. See [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md) for design decisions.",
         "",
         "---",
         ""
     ]
 
     for model in domain_models:
-        lines.append(f"### `{model['class_name']}` (core/domain/{model['file']})")
-        lines.append("")
-
-        # Add docstring if exists
+        # Header with purpose
+        purpose = ""
         if model['docstring']:
-            # First line of docstring as purpose
-            first_line = model['docstring'].split('\n')[0].strip()
-            lines.append(f"**Purpose**: {first_line}")
-            lines.append("")
+            purpose = f" — {model['docstring'].split(chr(10))[0].strip()}"
+        lines.append(f"### {model['class_name']} (core/domain/{model['file']}){purpose}")
 
-        # Fields
+        # Fields as inline list
         if model['fields']:
-            lines.append("**Fields**:")
-            for field in model['fields'][:10]:  # Limit to first 10 fields
-                lines.append(f"- `{field['name']}: {field['type']}`")
-            if len(model['fields']) > 10:
-                lines.append(f"- ... and {len(model['fields']) - 10} more fields")
-            lines.append("")
+            field_strs = [f"{f['name']}: {f['type']}" for f in model['fields']]
+            field_line = "Fields: " + ", ".join(field_strs)
+            # Wrap long field lines
+            if len(field_line) > 150:
+                field_line = field_line[:147] + "..."
+            lines.append(field_line)
 
-        # Properties (business logic)
+        # Properties as inline list with brief docs
         if model['properties']:
-            lines.append("**Business Logic (@property methods)**:")
+            prop_strs = []
             for prop in model['properties']:
-                if prop['doc']:
-                    lines.append(f"- `{prop['name']}` - {prop['doc']}")
-                else:
-                    lines.append(f"- `{prop['name']}`")
-            lines.append("")
+                doc = prop['doc'].split('\n')[0].strip() if prop['doc'] else ""
+                # Truncate long docs
+                if len(doc) > 60:
+                    doc = doc[:57] + "..."
+                prop_strs.append(f"`{prop['name']}` ({doc})" if doc else f"`{prop['name']}`")
+            lines.append("@property: " + " | ".join(prop_strs))
 
-        lines.append("---")
         lines.append("")
+
+    lines.append("---")
+    lines.append("")
 
     return '\n'.join(lines)
 
@@ -699,47 +736,23 @@ def get_botconfig_structure():
 
 
 def format_botconfig_markdown(botconfig):
-    """Format BotConfig structure as markdown."""
+    """Format BotConfig structure as compact markdown."""
     if not botconfig:
         return ""
 
     lines = [
         "## ⚙️ Configuration Structure (config_data JSONB)",
         "",
-        "**Canonical source**: `core/config/models.py` (BotConfig Pydantic model)",
-        "",
-        "**Auto-generated** - Updated automatically by `scripts/status_check.py`",
-        "",
-        f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
-        "",
-        "---",
+        f"Source: `core/config/models.py` | Auto-generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
         ""
     ]
 
-    # Add docstring if exists
-    if botconfig['docstring']:
-        first_para = botconfig['docstring'].split('\n\n')[0].strip()
-        lines.append(f"**Purpose**: {first_para}")
-        lines.append("")
-
-    # Add fields table
-    lines.append("### Configuration Fields")
-    lines.append("")
-    lines.append("| Field | Type | Default | Description |")
-    lines.append("|-------|------|---------|-------------|")
-
+    # Fields as compact list
     for field in botconfig['fields']:
-        default_str = str(field['default']) if field['default'] is not None else ""
-        if len(default_str) > 40:
-            default_str = default_str[:37] + "..."
-        desc_str = field['description'] if field['description'] else ""
-        if len(desc_str) > 60:
-            desc_str = desc_str[:57] + "..."
+        default_str = f"={field['default']}" if field['default'] is not None else ""
+        desc_str = f" — {field['description']}" if field['description'] else ""
+        lines.append(f"- `{field['name']}`: {field['type']}{default_str}{desc_str}")
 
-        lines.append(f"| `{field['name']}` | {field['type']} | {default_str} | {desc_str} |")
-
-    lines.append("")
-    lines.append("**Full validation rules**: See `core/config/models.py` for complete Pydantic model with field validators.")
     lines.append("")
     lines.append("---")
     lines.append("")

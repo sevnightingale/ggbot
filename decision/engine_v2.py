@@ -816,7 +816,10 @@ class DecisionEngineV2:
         opened_at = position_data['opened_at']
         if isinstance(opened_at, str):
             opened_at = datetime.fromisoformat(opened_at.replace('Z', '+00:00'))
-        
+        # Ensure timezone-aware (live_trades.created_at may be naive)
+        if opened_at is not None and opened_at.tzinfo is None:
+            opened_at = opened_at.replace(tzinfo=timezone.utc)
+
         duration = datetime.now(timezone.utc) - opened_at
         hours_held = duration.total_seconds() / 3600
         
@@ -1935,6 +1938,12 @@ Take Profit: {take_profit_text}
 
                                 side = "long" if szi > 0 else "short"
 
+                                # Ensure opened_at is timezone-aware (live_trades.created_at is timestamp without time zone)
+                                opened_at_raw = row[3]
+                                if opened_at_raw and opened_at_raw.tzinfo is None:
+                                    from datetime import timezone as tz
+                                    opened_at_raw = opened_at_raw.replace(tzinfo=tz.utc)
+
                                 position_data = {
                                     'trade_id': batch_id,
                                     'batch_id': batch_id,
@@ -1944,7 +1953,7 @@ Take Profit: {take_profit_text}
                                     'current_price': current_mid,
                                     'size_usd': notional,
                                     'unrealized_pnl': unrealized_pnl,
-                                    'opened_at': row[3],  # lt.created_at
+                                    'opened_at': opened_at_raw,
                                     'stop_loss': None,  # HL manages SL/TP as separate orders
                                     'take_profit': None,
                                     'confidence_score': entry_confidence,

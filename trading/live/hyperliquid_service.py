@@ -92,6 +92,20 @@ class HyperliquidLiveTradingService:
         self.base_url = constants.MAINNET_API_URL
         self.settlement_wait = 2  # seconds
 
+    def _round_price(self, exchange: Exchange, coin: str, px: float) -> float:
+        """
+        Round price to Hyperliquid-valid precision.
+
+        Mirrors the SDK's _slippage_price rounding: 5 significant figures,
+        then (6 - szDecimals) decimal places for perps. Without this,
+        trigger order prices get rejected with 'Order has invalid price.'
+        """
+        asset = exchange.info.coin_to_asset[coin]
+        is_spot = asset >= 10_000
+        sz_decimals = exchange.info.asset_to_sz_decimals[asset]
+        max_decimals = (6 if not is_spot else 8) - sz_decimals
+        return round(float(f"{px:.5g}"), max_decimals)
+
     async def _get_exchange(self, user_id: str) -> Optional[Exchange]:
         """
         Initialize Hyperliquid Exchange SDK with user's API wallet from Vault.
@@ -593,22 +607,23 @@ class HyperliquidLiveTradingService:
 
             if stop_loss:
                 try:
+                    sl_px = self._round_price(exchange, hl_symbol, stop_loss)
                     sl_order_type = {
                         "trigger": {
-                            "triggerPx": round(stop_loss, 2),
+                            "triggerPx": sl_px,
                             "isMarket": True,
                             "tpsl": "sl"
                         }
                     }
                     self._log.info(
                         f"Placing SL trigger: {hl_symbol} {'SELL' if is_buy else 'BUY'} "
-                        f"{filled_sz} @ trigger=${stop_loss:.2f}"
+                        f"{filled_sz} @ trigger=${sl_px}"
                     )
                     sl_result = exchange.order(
                         hl_symbol,
                         not is_buy,  # Opposite side to close
                         filled_sz,
-                        round(stop_loss, 2),  # limit_px (not used for market trigger, but required)
+                        sl_px,  # limit_px (not used for market trigger, but required)
                         sl_order_type,
                         reduce_only=True
                     )
@@ -619,7 +634,7 @@ class HyperliquidLiveTradingService:
                                 sl_order_id = str(s["resting"]["oid"])
                                 break
                         if sl_order_id:
-                            self._log.info(f"Stop-loss placed: oid={sl_order_id} @ ${stop_loss:.2f}")
+                            self._log.info(f"Stop-loss placed: oid={sl_order_id} @ ${sl_px}")
                         else:
                             self._log.warning(f"SL order accepted but no resting oid. Statuses: {sl_statuses}")
                     else:
@@ -629,22 +644,23 @@ class HyperliquidLiveTradingService:
 
             if take_profit:
                 try:
+                    tp_px = self._round_price(exchange, hl_symbol, take_profit)
                     tp_order_type = {
                         "trigger": {
-                            "triggerPx": round(take_profit, 2),
+                            "triggerPx": tp_px,
                             "isMarket": True,
                             "tpsl": "tp"
                         }
                     }
                     self._log.info(
                         f"Placing TP trigger: {hl_symbol} {'SELL' if is_buy else 'BUY'} "
-                        f"{filled_sz} @ trigger=${take_profit:.2f}"
+                        f"{filled_sz} @ trigger=${tp_px}"
                     )
                     tp_result = exchange.order(
                         hl_symbol,
                         not is_buy,  # Opposite side to close
                         filled_sz,
-                        round(take_profit, 2),
+                        tp_px,
                         tp_order_type,
                         reduce_only=True
                     )
@@ -655,7 +671,7 @@ class HyperliquidLiveTradingService:
                                 tp_order_id = str(s["resting"]["oid"])
                                 break
                         if tp_order_id:
-                            self._log.info(f"Take-profit placed: oid={tp_order_id} @ ${take_profit:.2f}")
+                            self._log.info(f"Take-profit placed: oid={tp_order_id} @ ${tp_px}")
                         else:
                             self._log.warning(f"TP order accepted but no resting oid. Statuses: {tp_statuses}")
                     else:

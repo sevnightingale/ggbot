@@ -394,20 +394,19 @@ async def get_timeline_metadata(
     """
     Get bot/agent metadata for timeline header display.
 
-    Returns bot name, type, performance metrics from all trade types (paper, live, aster).
-    Metrics calculated from closed trades across all sources.
+    Uses account_snapshots as single source of truth (same as SSE dashboard).
+    Works for all trading modes: paper, hyperliquid, symphony, aster.
 
     Returns:
     {
         "status": "success",
         "metadata": {
             "botName": "RSI Scalper v2",
-            "configType": "scheduled_trading",
-            "startingBalance": 0,
-            "currentBalance": 125.50,  # Cumulative P&L
+            "startingBalance": 10000.0,
+            "currentBalance": 10125.50,  # Total equity (balance + unrealized P&L)
             "totalTrades": 12,
-            "winRate": 66.7,
-            "performance": 125.50,  # Cumulative P&L
+            "winRate": 66.7,  # Percentage (0-100)
+            "performance": 1.26,  # Percentage return
             "createdAt": "2025-11-01T00:00:00Z"
         }
     }
@@ -415,140 +414,85 @@ async def get_timeline_metadata(
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Verify config exists (no auth required for public viewing)
+                # Single query: config + latest snapshot (works for ALL trading modes)
+                # Uses account_snapshots as single source of truth (same as SSE dashboard)
                 cur.execute("""
-                    SELECT user_id FROM configurations WHERE config_id = %s
+                    SELECT
+                        c.config_name,
+                        c.config_type,
+                        c.created_at,
+                        c.trading_mode,
+                        c.initial_equity,
+                        asn.current_balance,
+                        asn.unrealized_pnl,
+                        asn.total_pnl,
+                        asn.total_trades,
+                        asn.win_trades,
+                        asn.win_rate
+                    FROM configurations c
+                    LEFT JOIN LATERAL (
+                        SELECT current_balance, unrealized_pnl, total_pnl,
+                               total_trades, win_trades, win_rate
+                        FROM account_snapshots
+                        WHERE config_id = c.config_id
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    ) asn ON true
+                    WHERE c.config_id = %s
                 """, (config_id,))
-                config = cur.fetchone()
+                row = cur.fetchone()
 
-                if not config:
+                if not row:
                     raise HTTPException(status_code=404, detail="Configuration not found")
 
-                # Get config info including trading_mode
-                cur.execute("""
-                    SELECT config_name, config_type, created_at, trading_mode
-                    FROM configurations
-                    WHERE config_id = %s
-                """, (config_id,))
-                config_row = cur.fetchone()
+                (config_name, config_type, created_at, trading_mode,
+                 initial_equity, current_balance, unrealized_pnl, total_pnl,
+                 total_trades, win_trades, win_rate) = row
 
-                config_name = config_row[0]
-                config_type = config_row[1]
-                created_at = config_row[2]
-                trading_mode = config_row[3] or 'paper'
+        # Defaults for bots with no snapshots yet
+        trading_mode = trading_mode or 'paper'
+        initial_equity = float(initial_equity) if initial_equity else 10000.0
+        total_trades = total_trades or 0
+        win_trades = win_trades or 0
+        total_pnl = float(total_pnl) if total_pnl else 0.0
 
-                # Get Aster trade IDs for this config (CLOSED trades only for metrics)
-                cur.execute("""
-                    SELECT batch_id FROM live_trades
-                    WHERE config_id = %s AND provider = 'aster' AND closed_at IS NOT NULL
-                """, (config_id,))
-                aster_trade_ids = {str(row[0]) for row in cur.fetchall()}
-
-        # Check trading mode and route to appropriate service
-        if trading_mode == 'symphony':
-            # SYMPHONY BOT: Use Symphony API for metrics
-            symphony_service = SymphonyLiveTradingService()
-            symphony_metrics = await symphony_service.get_account_metrics(config_id)
-
-            if symphony_metrics:
-                # Symphony doesn't provide balance, so we show cumulative P&L
-                total_pnl = symphony_metrics.get('total_pnl', 0)
-                total_trades = symphony_metrics.get('total_trades', 0)
-                win_rate = symphony_metrics.get('win_rate', 0)
-
-                return {
-                    "status": "success",
-                    "metadata": {
-                        "botName": config_name,
-                        "startingBalance": 0,  # Symphony doesn't provide balance
-                        "currentBalance": total_pnl,  # Show cumulative P&L as "balance"
-                        "totalTrades": total_trades,
-                        "winRate": round(win_rate, 1),
-                        "performance": total_pnl,  # P&L in USD
-                        "createdAt": created_at.isoformat()
-                    }
-                }
-
-        # Check if this is an Aster bot
-        aster_service = AsterDEXV3LiveTradingService()
-
-        if trading_mode == 'aster' and aster_trade_ids:
-            # ASTER BOT: Use actual account balance
-            # Get current Aster balance (sum USDT + USDC)
-            balance_data = await aster_service._get_account_balance()
-            current_balance = 0.0
-
-            if balance_data and isinstance(balance_data, dict):
-                # Sum both USDT and USDC (Aster pays profits in USDT, capital may be in USDC)
-                assets = balance_data.get('assets', [])
-                for asset in assets:
-                    if isinstance(asset, dict) and asset.get('asset') in ['USDT', 'USDC']:
-                        # crossWalletBalance = settled balance + unrealized P&L for this asset
-                        current_balance += float(asset.get('crossWalletBalance', 0))
-
-            # Get ALL Aster income records (more complete than userTrades)
-            # userTrades only shows recent ~7 days, income shows full history
-            income_records = await aster_service.get_income_history(
-                income_type="REALIZED_PNL",
-                start_time=int(created_at.timestamp() * 1000),  # From bot creation
-                limit=1000
-            )
-
-            # Calculate account-wide metrics from income records
-            total_pnl = sum(float(r.get('income', 0)) for r in (income_records or []))
-
-            # Count only non-zero P&L records (actual position closes)
-            closed_records = [r for r in (income_records or []) if float(r.get('income', 0)) != 0]
-            total_trades = len(closed_records)
-            win_trades = sum(1 for r in closed_records if float(r.get('income', 0)) > 0)
-            win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
-
-            # Calculate starting balance
-            starting_balance = current_balance - total_pnl
-
-            return {
-                "status": "success",
-                "metadata": {
-                    "botName": config_name,  # Use camelCase for frontend
-                    "startingBalance": starting_balance,
-                    "currentBalance": current_balance,  # Actual Aster balance
-                    "totalTrades": total_trades,
-                    "winRate": round(win_rate, 1),
-                    "performance": ((current_balance - starting_balance) / starting_balance * 100) if starting_balance > 0 else 0,
-                    "createdAt": created_at.isoformat()
-                }
-            }
+        # Compute total equity (same formula as SSE dashboard_data.py)
+        is_legacy_live = trading_mode in ('symphony', 'aster')
+        if is_legacy_live:
+            # Legacy live modes: cumulative P&L (no account balance concept)
+            current_equity = total_pnl
+            starting_balance = 0.0
         else:
-            # PAPER BOT: Use P&L metrics
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT
-                            COUNT(*) as total_trades,
-                            SUM(CASE WHEN realized_pnl >= 0 THEN 1 ELSE 0 END) as wins,
-                            SUM(realized_pnl) as total_pnl
-                        FROM paper_trades
-                        WHERE config_id = %s AND status = 'closed'
-                    """, (config_id,))
-                    paper_metrics = cur.fetchone()
+            # Paper + Hyperliquid: real account equity
+            cb = float(current_balance) if current_balance else initial_equity
+            upnl = float(unrealized_pnl) if unrealized_pnl else 0.0
+            current_equity = cb + upnl
+            starting_balance = initial_equity
 
-            paper_total = paper_metrics[0] or 0
-            paper_wins = paper_metrics[1] or 0
-            paper_pnl = float(paper_metrics[2]) if paper_metrics[2] else 0.0
-            win_rate = (paper_wins / paper_total * 100) if paper_total > 0 else 0
+        # Win rate: stored as decimal (0-1), display as percentage
+        # Same conversion as page.tsx:1241
+        win_rate_pct = round(float(win_rate) * 100, 1) if win_rate else 0.0
 
-            return {
-                "status": "success",
-                "metadata": {
-                    "bot_name": config_name,
-                    "startingBalance": 0,
-                    "currentBalance": paper_pnl,
-                    "totalTrades": paper_total,
-                    "winRate": round(win_rate, 1),
-                    "performance": paper_pnl,
-                    "createdAt": created_at.isoformat()
-                }
+        # Performance %: same formula as dashboard_data.py:187-188
+        if initial_equity > 0 and not is_legacy_live:
+            performance_pct = ((current_equity - initial_equity) / initial_equity) * 100
+        elif is_legacy_live:
+            performance_pct = total_pnl  # Dollar P&L for legacy (no % possible)
+        else:
+            performance_pct = 0.0
+
+        return {
+            "status": "success",
+            "metadata": {
+                "botName": config_name,  # Consistent camelCase
+                "startingBalance": starting_balance,
+                "currentBalance": round(current_equity, 2),
+                "totalTrades": total_trades,
+                "winRate": win_rate_pct,
+                "performance": round(performance_pct, 2),
+                "createdAt": created_at.isoformat()
             }
+        }
 
     except HTTPException:
         raise

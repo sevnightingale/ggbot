@@ -240,7 +240,11 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     if (diffMins < 60) return `${diffMins}m ago`
     const diffHours = Math.floor(diffMins / 60)
     if (diffHours < 24) return `${diffHours}h ago`
-    return new Date(timestamp).toLocaleDateString()
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays < 30) return `${diffDays}d ago`
+    const diffWeeks = Math.floor(diffDays / 7)
+    if (diffDays < 90) return `${diffWeeks}w ago`
+    return `${Math.floor(diffDays / 30)}mo ago`
   }
 
   // Animated value component - matches MetricsBar style exactly

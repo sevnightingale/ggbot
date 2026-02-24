@@ -560,18 +560,24 @@ async def _enrich_live_positions_and_accounts(
                                 if not (p.get('config_id') == config_id and p.get('source') == 'hyperliquid')
                             ]
 
-                            # Look up live_trade metadata (opened_at, SL/TP) for this config
+                            # Look up live_trade metadata (opened_at, SL/TP prices) for this config
                             trade_metadata = {}
                             try:
                                 with get_db_connection() as conn:
                                     with conn.cursor() as cur:
+                                        # Join activities to get intended SL/TP prices
                                         cur.execute("""
-                                            SELECT batch_id, symbol, created_at,
-                                                   stop_loss_order_id, take_profit_order_id
-                                            FROM live_trades
-                                            WHERE config_id = %s AND provider = 'hyperliquid'
-                                              AND closed_at IS NULL
-                                            ORDER BY created_at DESC
+                                            SELECT lt.batch_id, lt.symbol, lt.created_at,
+                                                   lt.stop_loss_order_id, lt.take_profit_order_id,
+                                                   a.details->>'stop_loss_price' AS sl_price,
+                                                   a.details->>'take_profit_price' AS tp_price
+                                            FROM live_trades lt
+                                            LEFT JOIN activities a
+                                              ON a.trade_id = lt.batch_id
+                                              AND a.activity_type = 'trade_entry'
+                                            WHERE lt.config_id = %s AND lt.provider = 'hyperliquid'
+                                              AND lt.closed_at IS NULL
+                                            ORDER BY lt.created_at DESC
                                         """, (config_id,))
                                         for row in cur.fetchall():
                                             trade_metadata[row[1]] = {
@@ -579,6 +585,8 @@ async def _enrich_live_positions_and_accounts(
                                                 'opened_at': row[2].isoformat() if row[2] else None,
                                                 'sl_order_id': row[3],
                                                 'tp_order_id': row[4],
+                                                'stop_loss_price': float(row[5]) if row[5] else None,
+                                                'take_profit_price': float(row[6]) if row[6] else None,
                                             }
                             except Exception as meta_err:
                                 logger.warning(f"Failed to fetch live_trade metadata: {meta_err}")
@@ -614,8 +622,8 @@ async def _enrich_live_positions_and_accounts(
                                     'current_price': current_price,
                                     'unrealized_pnl': pos.get('unrealized_pnl'),
                                     'opened_at': meta.get('opened_at'),
-                                    'stop_loss': None,  # HL uses trigger orders, not price on record
-                                    'take_profit': None,
+                                    'stop_loss': meta.get('stop_loss_price'),
+                                    'take_profit': meta.get('take_profit_price'),
                                     'liquidation_price': pos.get('liquidation_price'),
                                     'leverage': pos.get('leverage'),
                                     'margin_type': pos.get('margin_type', 'cross'),
