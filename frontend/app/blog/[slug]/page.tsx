@@ -106,6 +106,23 @@ const mdxComponents = {
   em: (props: React.HTMLAttributes<HTMLElement>) => (
     <em className="text-[var(--text-primary)]" {...props} />
   ),
+  table: (props: React.HTMLAttributes<HTMLTableElement>) => (
+    <div className="overflow-x-auto mb-6 rounded-lg border border-[var(--border)]">
+      <table className="w-full text-sm" {...props} />
+    </div>
+  ),
+  thead: (props: React.HTMLAttributes<HTMLTableSectionElement>) => (
+    <thead className="bg-[var(--bg-tertiary)] text-[var(--text-primary)]" {...props} />
+  ),
+  th: (props: React.HTMLAttributes<HTMLTableCellElement>) => (
+    <th className="px-4 py-2.5 text-left font-semibold border-b border-[var(--border)] whitespace-nowrap" {...props} />
+  ),
+  td: (props: React.HTMLAttributes<HTMLTableCellElement>) => (
+    <td className="px-4 py-2.5 text-[var(--text-secondary)] border-b border-[var(--border)]" {...props} />
+  ),
+  tr: (props: React.HTMLAttributes<HTMLTableRowElement>) => (
+    <tr className="hover:bg-[var(--bg-secondary)] transition-colors" {...props} />
+  ),
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
