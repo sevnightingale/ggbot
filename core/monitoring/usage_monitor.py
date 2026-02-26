@@ -186,28 +186,24 @@ class UsageMonitor:
         """
         Get combined credit + usage status for a user.
 
-        Both tiers now use Redis monthly counter for consistency with decision engine.
-        The activities table has incomplete records, so Redis is the source of truth.
-
-        Note: For prepaid users, credits don't reset monthly but usage tracking does.
-        This is acceptable because we're checking "can they afford THIS month's usage"
-        rather than "have they exceeded their total lifetime credits".
+        Prepaid users: total_purchased (from Stripe grants) - cumulative Redis usage.
+        Metered users: Stripe credit balance - monthly Redis usage.
         """
-        # Get credits from Stripe
-        credits = await self._get_stripe_credits(user_id)
-
-        # Determine usage based on tier
+        # Determine tier if not provided
         if is_prepaid is None:
-            # Check tier if not provided
             is_prepaid = await self._is_prepaid_tier(user_id)
 
-        # Use Redis monthly counter for BOTH tiers - this is the source of truth
-        # The activities table has incomplete records (usage gets logged to Redis first)
-        # This matches what decision engine uses, ensuring consistency
-        period = datetime.utcnow().strftime("%Y-%m")
-        usage_key = f"usage:user:{user_id}:{period}"
-        usage_raw = self.redis.get(usage_key)
-        usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+        if is_prepaid:
+            # Prepaid: lifetime pool — total purchased minus all-time usage
+            credits = await self._get_total_purchased_from_stripe(user_id)
+            usage_raw = self.redis.get(f"usage:prepaid:{user_id}")
+            usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+        else:
+            # Metered: monthly cycle — Stripe balance minus this month's usage
+            credits = await self._get_stripe_credits(user_id)
+            period = datetime.utcnow().strftime("%Y-%m")
+            usage_raw = self.redis.get(f"usage:user:{user_id}:{period}")
+            usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
         net = credits - usage
 
@@ -592,34 +588,67 @@ class UsageMonitor:
 
         Called every 5 minutes. Caches summaries in Redis for instant API responses.
 
-        Both tiers now use Redis monthly counter for usage (source of truth).
-        Credits come from Stripe for both tiers.
+        Prepaid users: total_purchased - cumulative usage (lifetime).
+        Metered users: Stripe balance - monthly Redis usage.
         """
         period = datetime.utcnow().strftime("%Y-%m")
+        processed_user_ids = set()
 
         try:
-            # Get all users with usage this period
-            keys = self.redis.keys(f"usage:user:*:{period}")
-
-            cached_count = 0
-            for key in keys:
+            # Pass 1: Prepaid users (cumulative keys — no monthly reset)
+            prepaid_keys = self.redis.keys("usage:prepaid:*")
+            for key in prepaid_keys:
                 try:
-                    # Extract user_id from key format: usage:user:{user_id}:{period}
+                    # Key format: usage:prepaid:{user_id}
+                    parts = key.split(":")
+                    if len(parts) < 3:
+                        continue
+
+                    user_id = parts[2]
+                    processed_user_ids.add(user_id)
+
+                    usage_raw = self.redis.get(key)
+                    usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+
+                    credits = await self._get_total_purchased_from_stripe(user_id)
+                    net_balance = max(Decimal("0"), credits - usage)
+
+                    summary = {
+                        "period": "cumulative",
+                        "usage_usd": float(usage),
+                        "credits_usd": float(credits),
+                        "net_balance_usd": float(net_balance),
+                        "updated_at": datetime.utcnow().isoformat()
+                    }
+
+                    self.redis.setex(
+                        f"usage:summary:{user_id}",
+                        300,
+                        json.dumps(summary)
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error caching prepaid summary for key {key}: {e}")
+
+            # Pass 2: Metered users (monthly keys)
+            monthly_keys = self.redis.keys(f"usage:user:*:{period}")
+            cached_count = 0
+            for key in monthly_keys:
+                try:
                     parts = key.split(":")
                     if len(parts) < 3:
                         continue
 
                     user_id = parts[2]
 
-                    # Use Redis monthly counter for usage (source of truth for both tiers)
-                    # This matches decision engine's credit check
+                    # Skip if already cached in prepaid pass
+                    if user_id in processed_user_ids:
+                        continue
+
                     usage_raw = self.redis.get(key)
                     usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
-                    # Get credits from Stripe
                     credits = await self._get_stripe_credits(user_id)
-
-                    # Calculate net balance (never negative for display)
                     net_balance = max(Decimal("0"), credits - usage)
 
                     summary = {
@@ -630,7 +659,6 @@ class UsageMonitor:
                         "updated_at": datetime.utcnow().isoformat()
                     }
 
-                    # Cache with 5 minute TTL
                     self.redis.setex(
                         f"usage:summary:{user_id}",
                         300,
@@ -641,8 +669,9 @@ class UsageMonitor:
                 except Exception as e:
                     logger.error(f"Error caching summary for key {key}: {e}")
 
-            if cached_count > 0:
-                logger.debug(f"📊 Cached {cached_count} usage summaries")
+            total_cached = len(processed_user_ids) + cached_count
+            if total_cached > 0:
+                logger.debug(f"Cached {total_cached} usage summaries ({len(processed_user_ids)} prepaid, {cached_count} metered)")
 
         except Exception as e:
             logger.error(f"Failed to cache usage summaries: {e}")

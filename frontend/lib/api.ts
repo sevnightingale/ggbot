@@ -769,6 +769,7 @@ export class ApiClient {
     period: string
     period_usage_usd: number
     today_usage_usd: number
+    total_usage_usd: number
   }> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/usage/config/${configId}`)
 

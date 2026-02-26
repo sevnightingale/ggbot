@@ -6,6 +6,31 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-26 - Hyperliquid Trade Close Fixes + Account Stats + Live Strategy Tuning
+
+**Trade Close Activity Logging** (`trading/live/hyperliquid_service.py`):
+- `close_position()` now snapshots position via Info API BEFORE `market_close()` — captures entry_price, side, size, leverage, unrealized_pnl
+- Extracts exit price from `market_close()` fill data (`statuses[].filled.avgPx`)
+- Computes realized P&L from actual prices, duration from `live_trades.created_at`
+- Activity details now match paper trading format: entry_price, exit_price, pnl, pnl_pct, side, size_usd, leverage, duration_seconds
+- Telegram exit notifications enriched with real P&L and side (was hardcoded `pnl: 0`, `side: 'unknown'`)
+
+**Adapter Close Detection** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- Auto-close activities now include derived entry_price (`entry = exit ± pnl/size`), pnl_pct, size_usd, duration
+- `bot_symbols` query: removed `closed_at IS NULL` filter — closed trade symbols now match fills for realized P&L
+- Fill aggregation: groups by timestamp to count trades, not individual partial fills (8 fills from 1 `market_close` = 1 trade)
+
+**Account Endpoint** (`ggbot.py`):
+- `/bot/{config_id}/account` for Hyperliquid: replaced hardcoded zeros with `account_snapshots` data (total_trades, win_trades, win_rate, realized_pnl)
+- Added `initial_equity` lookup + `performance_percent` calculation (was 0.0)
+
+**Live Strategy Tuning** (config_data update, `b9d9bf00`):
+- Softened regime anchor: removed "Do NOT exit for 4H pullback within intact 1D regime"; added "3+ domains reversed = exit, regime gets voice not veto"
+- Lowered counter-trend bar: "exceptional evidence" → "strong confluence (3+ domains)"; penalty -0.12/-0.08 → -0.08/-0.05
+- Added profit protection: when meaningfully profitable, burden of proof flips — need reasons to stay, not reasons to leave
+
+---
+
 ## 2026-02-17 - Hyperliquid Phase 5: Single Live Bot Slot + Strategy Versioning + Equity Tracking
 
 **Planning Doc**: [DOCS/completed/SINGLE_LIVE_BOT_SLOT.md](DOCS/completed/SINGLE_LIVE_BOT_SLOT.md)

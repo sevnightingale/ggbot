@@ -825,7 +825,34 @@ class HyperliquidLiveTradingService:
                 except Exception as e:
                     self._log.warning(f"Failed to cancel TP order {tp_order_id}: {e}")
 
-            # Step 4: Close position via market_close with retry
+            # Step 4: Snapshot position data BEFORE closing (for activity/telegram)
+            entry_price = 0.0
+            position_side = 'unknown'
+            position_size = 0.0
+            position_leverage = 1
+            size_usd = 0.0
+            unrealized_pnl = 0.0
+            try:
+                info_result = await self._get_info(user_id)
+                if info_result:
+                    info, wallet_address = info_result
+                    user_state = info.user_state(wallet_address)
+                    for pos_wrapper in user_state.get("assetPositions", []):
+                        pos = pos_wrapper.get("position", {})
+                        if pos.get("coin") == hl_symbol:
+                            szi = float(pos.get("szi", 0))
+                            entry_price = float(pos.get("entryPx", 0))
+                            position_side = "long" if szi > 0 else "short"
+                            position_size = abs(szi)
+                            size_usd = position_size * entry_price
+                            unrealized_pnl = float(pos.get("unrealizedPnl", 0))
+                            lev = pos.get("leverage", {})
+                            position_leverage = int(float(lev.get("value", 1))) if isinstance(lev, dict) else int(float(lev or 1))
+                            break
+            except Exception as e:
+                self._log.warning(f"Could not snapshot position before close (non-critical): {e}")
+
+            # Step 5: Close position via market_close with retry
             self._log.info(f"Closing position: {hl_symbol}")
             close_result = None
             for attempt in range(self.MAX_RETRIES + 1):
@@ -858,21 +885,67 @@ class HyperliquidLiveTradingService:
                     "reason": f"Failed to close position: {error_msg}"
                 }
 
-            # Step 5: Mark trade as closed
-            await self._mark_trade_closed(batch_id)
-            self._log.info(f"Position closed for {hl_symbol} (batch_id={batch_id})")
-
-            # Step 6: Log activity
+            # Step 6: Extract exit price from fill data
+            exit_price = 0.0
             try:
+                statuses = close_result.get("response", {}).get("data", {}).get("statuses", [])
+                for status in statuses:
+                    if isinstance(status, dict) and "filled" in status:
+                        exit_price = float(status["filled"].get("avgPx", 0))
+                        break
+            except Exception:
+                pass
+
+            # Compute realized P&L from fill data (more accurate than pre-close unrealized)
+            if entry_price > 0 and exit_price > 0 and position_size > 0:
+                if position_side == "long":
+                    realized_pnl = (exit_price - entry_price) * position_size
+                else:
+                    realized_pnl = (entry_price - exit_price) * position_size
+            else:
+                realized_pnl = unrealized_pnl  # Fallback to pre-close snapshot
+
+            pnl_pct = (realized_pnl / size_usd * 100) if size_usd > 0 else 0.0
+
+            # Compute duration from trade record
+            duration_seconds = 0.0
+            try:
+                created_at = trade_record.get("created_at")
+                if created_at:
+                    from datetime import datetime, timezone
+                    if isinstance(created_at, str):
+                        created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    duration_seconds = (datetime.now(timezone.utc) - created_at).total_seconds()
+            except Exception:
+                pass
+
+            # Step 7: Mark trade as closed
+            await self._mark_trade_closed(batch_id)
+            self._log.info(
+                f"Position closed for {hl_symbol} (batch_id={batch_id}): "
+                f"entry=${entry_price:,.2f} exit=${exit_price:,.2f} P&L=${realized_pnl:+.2f}"
+            )
+
+            # Step 8: Log activity with full trade details
+            try:
+                pnl_display = f"{'+' if realized_pnl >= 0 else ''}{realized_pnl:.2f}"
                 log_activity_safe(
                     config_id=config_id,
                     user_id=user_id,
                     activity_type='trade_exit',
                     activity_source='hyperliquid_service',
-                    summary=f"Closed {symbol} position",
+                    summary=f"Closed {symbol}: ${pnl_display} ({pnl_pct:+.1f}%)",
                     details={
                         'symbol': symbol,
+                        'side': position_side,
+                        'entry_price': entry_price,
+                        'exit_price': exit_price,
+                        'pnl': realized_pnl,
+                        'pnl_pct': pnl_pct,
                         'close_reason': 'manual',
+                        'size_usd': size_usd,
+                        'leverage': position_leverage,
+                        'duration_seconds': duration_seconds,
                         'batch_id': batch_id
                     },
                     trade_id=batch_id,
@@ -883,7 +956,7 @@ class HyperliquidLiveTradingService:
             except Exception as e:
                 self._log.warning(f"Failed to log close activity (non-critical): {e}")
 
-            # Step 7: Publish exit notification to Telegram
+            # Step 9: Publish exit notification to Telegram
             try:
                 from signals.publishing_service import publish_exit_to_telegram
 
@@ -904,11 +977,11 @@ class HyperliquidLiveTradingService:
                     exit_data={
                         'bot_name': bot_name,
                         'symbol': symbol,
-                        'side': 'unknown',  # Not tracked in live_trades
-                        'pnl': 0,
-                        'pnl_pct': 0,
+                        'side': position_side,
+                        'pnl': realized_pnl,
+                        'pnl_pct': pnl_pct,
                         'close_reason': 'manual',
-                        'duration_seconds': 0,
+                        'duration_seconds': duration_seconds,
                         'live_tag': 'Hyperliquid'
                     }
                 )

@@ -193,47 +193,43 @@ class DecisionEngineV2:
             raise InsufficientCreditsError("No payment method configured for prepaid account")
 
         try:
-            # Get credits from Stripe Credit Balance
-            credits = Decimal("0")
-            summary = stripe.billing.CreditBalanceSummary.retrieve(
-                customer=customer_id,
-                filter={'type': 'applicability_scope', 'applicability_scope': {'price_type': 'metered'}}
-            )
-            if summary.balances and len(summary.balances) > 0:
-                balance = summary.balances[0]
-                if hasattr(balance, 'available_balance') and balance.available_balance:
-                    # Stripe returns cents, convert to dollars
-                    credits = Decimal(str(balance.available_balance.monetary.value / 100))
+            # Get total purchased from Stripe Credit Grants (sum of all grants, in dollars)
+            # We use CreditGrant.list instead of CreditBalanceSummary because prepaid users
+            # bypass Stripe metering (stripe_reported=True), so the "available" balance
+            # never decreases. We track usage ourselves in Redis.
+            total_purchased = Decimal("0")
+            grants = stripe.billing.CreditGrant.list(customer=customer_id, limit=100)
+            for grant in grants.data:
+                amount = Decimal(str(grant.amount.monetary.value / 100))
+                total_purchased += amount
 
-            # Get current period usage from Redis
-            period = datetime.utcnow().strftime("%Y-%m")
+            # Get cumulative all-time usage from Redis (no monthly reset for prepaid)
             redis_client = redis.from_url(
                 os.getenv('REDIS_URL', 'redis://localhost:6379'),
                 decode_responses=True
             )
-            usage_key = f"usage:user:{self.user_id}:{period}"
-            usage_raw = redis_client.get(usage_key)
+            usage_raw = redis_client.get(f"usage:prepaid:{self.user_id}")
             usage = Decimal(usage_raw) if usage_raw else Decimal("0")
 
-            net_balance = credits - usage
+            net_balance = total_purchased - usage
 
             if net_balance <= 0:
                 logger.bind(
                     user_id=self.user_id,
-                    credits=float(credits),
-                    usage=float(usage),
+                    total_purchased=float(total_purchased),
+                    cumulative_usage=float(usage),
                     net_balance=float(net_balance)
-                ).warning("⛔ Prepaid credits exhausted - blocking LLM call")
+                ).warning("Prepaid credits exhausted - blocking LLM call")
                 raise InsufficientCreditsError(
-                    f"Prepaid credits exhausted. Credits: ${credits:.2f}, Usage: ${usage:.2f}"
+                    f"Prepaid credits exhausted. Purchased: ${total_purchased:.2f}, Used: ${usage:.2f}"
                 )
 
             logger.bind(
                 user_id=self.user_id,
-                credits=float(credits),
-                usage=float(usage),
+                total_purchased=float(total_purchased),
+                cumulative_usage=float(usage),
                 net_balance=float(net_balance)
-            ).debug("✅ Prepaid credit check passed")
+            ).debug("Prepaid credit check passed")
 
             return True
 
@@ -241,7 +237,7 @@ class DecisionEngineV2:
             raise  # Re-raise our custom exception
         except stripe.error.StripeError as e:
             logger.bind(user_id=self.user_id).error(f"Stripe error during credit check: {e}")
-            # Fail open? Or fail closed? For prepaid, fail closed is safer
+            # Fail closed for prepaid — safer than letting unbillable usage through
             raise InsufficientCreditsError(f"Unable to verify credit balance: {e}")
         except Exception as e:
             logger.bind(user_id=self.user_id).error(f"Unexpected error during credit check: {e}")
@@ -989,7 +985,7 @@ Take Profit: {take_profit_text}
                 pass  # Default to non-prepaid if check fails
 
             # Log activity with token tracking (standalone - no decision_id)
-            log_llm_activity_safe(
+            activity_id = log_llm_activity_safe(
                 config_id=self.config_id,
                 user_id=self.user_id,
                 activity_source='scheduled_bot',
@@ -1028,21 +1024,30 @@ Take Profit: {take_profit_text}
             ).info("LLM activity logged with token tracking")
 
             # Update Redis usage counters for real-time billing visibility
-            try:
-                redis_client = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
-                period = datetime.utcnow().strftime("%Y-%m")
-                day = datetime.utcnow().strftime("%Y-%m-%d")
+            # Only increment if DB insert succeeded — prevents Redis/DB drift
+            if activity_id is not None:
+                try:
+                    redis_client = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
+                    period = datetime.utcnow().strftime("%Y-%m")
+                    day = datetime.utcnow().strftime("%Y-%m-%d")
 
-                # Atomic increments - fast and non-blocking
-                pipe = redis_client.pipeline()
-                pipe.incrbyfloat(f"usage:user:{self.user_id}:{period}", float(platform_cost))
-                pipe.incrbyfloat(f"usage:config:{self.config_id}:{period}", float(platform_cost))
-                pipe.incrbyfloat(f"usage:config:{self.config_id}:{day}", float(platform_cost))
-                pipe.expire(f"usage:config:{self.config_id}:{day}", 90 * 24 * 3600)  # 90 day TTL
-                pipe.execute()
-            except Exception as redis_err:
-                # Non-fatal - activities table is source of truth
-                logger.warning(f"Failed to update Redis usage counters: {redis_err}")
+                    # Atomic increments - fast and non-blocking
+                    pipe = redis_client.pipeline()
+                    pipe.incrbyfloat(f"usage:user:{self.user_id}:{period}", float(platform_cost))
+                    pipe.incrbyfloat(f"usage:config:{self.config_id}:{period}", float(platform_cost))
+                    pipe.incrbyfloat(f"usage:config:{self.config_id}:{day}", float(platform_cost))
+                    pipe.expire(f"usage:config:{self.config_id}:{day}", 90 * 24 * 3600)  # 90 day TTL
+                    # Cumulative key for prepaid users (no TTL — tracks lifetime spend)
+                    if is_prepaid:
+                        pipe.incrbyfloat(f"usage:prepaid:{self.user_id}", float(platform_cost))
+                    # Per-config cumulative key (no TTL — tracks all-time bot cost)
+                    pipe.incrbyfloat(f"usage:config:total:{self.config_id}", float(platform_cost))
+                    pipe.execute()
+                except Exception as redis_err:
+                    # Non-fatal - activities table is source of truth
+                    logger.warning(f"Failed to update Redis usage counters: {redis_err}")
+            else:
+                logger.warning(f"Skipping Redis increment — DB insert failed for {self.config_id}")
 
         except Exception as e:
             # Non-blocking - don't fail the decision if activity logging fails

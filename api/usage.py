@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2
 from core.services.config_service import config_service
 from core.common.logger import logger
+from core.common.db import get_db_connection
 
 
 router = APIRouter(prefix="/api/v2/usage", tags=["usage"])
@@ -53,12 +54,31 @@ async def get_my_usage(
             return summary
 
         # Fallback to direct Redis read (no Stripe call - credits will be None)
-        period = datetime.utcnow().strftime("%Y-%m")
-        usage_raw = redis_client.get(f"usage:user:{user_id}:{period}")
-        usage = float(usage_raw) if usage_raw else 0.0
+        # Check if prepaid tier to use correct Redis key
+        is_prepaid = False
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT subscription_tier FROM user_profiles WHERE user_id = %s",
+                        (user_id,)
+                    )
+                    result = cur.fetchone()
+                    is_prepaid = result[0] in ('prepaid', 'ggbase') if result else False
+        except Exception:
+            pass
+
+        if is_prepaid:
+            usage_raw = redis_client.get(f"usage:prepaid:{user_id}")
+            usage = float(usage_raw) if usage_raw else 0.0
+            period_label = "cumulative"
+        else:
+            period_label = datetime.utcnow().strftime("%Y-%m")
+            usage_raw = redis_client.get(f"usage:user:{user_id}:{period_label}")
+            usage = float(usage_raw) if usage_raw else 0.0
 
         return {
-            "period": period,
+            "period": period_label,
             "usage_usd": usage,
             "credits_usd": None,  # Requires Stripe call - use cached summary
             "net_balance_usd": None,
@@ -110,16 +130,19 @@ async def get_config_usage(
 
         period_usage_raw = redis_client.get(f"usage:config:{config_id}:{period}")
         today_usage_raw = redis_client.get(f"usage:config:{config_id}:{day}")
+        total_usage_raw = redis_client.get(f"usage:config:total:{config_id}")
 
         period_usage = float(period_usage_raw) if period_usage_raw else 0.0
         today_usage = float(today_usage_raw) if today_usage_raw else 0.0
+        total_usage = float(total_usage_raw) if total_usage_raw else 0.0
 
         return {
             "config_id": config_id,
             "config_name": config.config_name,
             "period": period,
             "period_usage_usd": period_usage,
-            "today_usage_usd": today_usage
+            "today_usage_usd": today_usage,
+            "total_usage_usd": total_usage
         }
 
     except Exception as e:

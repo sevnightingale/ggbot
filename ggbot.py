@@ -4102,24 +4102,69 @@ async def get_bot_account(
             positions = metrics.get('positions', [])
             margin_used = account_value - available
 
+            # Pull trade stats from latest account_snapshot (computed by adapter)
+            snapshot_stats = {}
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT total_trades, win_trades, loss_trades, win_rate,
+                                   realized_pnl, total_pnl
+                            FROM account_snapshots
+                            WHERE config_id = %s AND trading_mode = 'hyperliquid'
+                            ORDER BY timestamp DESC LIMIT 1
+                        """, (config_id,))
+                        row = cur.fetchone()
+                        if row:
+                            snapshot_stats = {
+                                'total_trades': row[0] or 0,
+                                'win_trades': row[1] or 0,
+                                'loss_trades': row[2] or 0,
+                                'win_rate': float(row[3] or 0),
+                                'realized_pnl': float(row[4] or 0),
+                                'total_pnl': float(row[5] or 0),
+                            }
+            except Exception as e:
+                logger.warning(f"Failed to fetch HL snapshot stats: {e}")
+
+            # Get initial_equity from config for performance calculation
+            initial_equity = None
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT initial_equity FROM configurations WHERE config_id = %s", (config_id,))
+                        row = cur.fetchone()
+                        if row and row[0]:
+                            initial_equity = float(row[0])
+            except Exception:
+                pass
+
+            total_equity = account_value
+            performance_pct = 0.0
+            if initial_equity and initial_equity > 0:
+                performance_pct = ((total_equity - initial_equity) / initial_equity) * 100
+
+            realized_pnl_val = snapshot_stats.get('realized_pnl', 0.0)
+            total_pnl_val = realized_pnl_val + unrealized_pnl
+
             return {
                 "status": "success",
                 "config_id": config_id,
                 "account": {
-                    "initial_balance": account_value,  # No concept of initial for live
+                    "initial_balance": initial_equity or account_value,
                     "current_balance": account_value,
                     "available_balance": available,
                     "margin_used": margin_used,
-                    "total_pnl": unrealized_pnl,
+                    "total_pnl": total_pnl_val,
                     "unrealized_pnl": unrealized_pnl,
-                    "realized_pnl": 0.0,
-                    "total_equity": account_value,
-                    "performance_percent": 0.0,
+                    "realized_pnl": realized_pnl_val,
+                    "total_equity": total_equity,
+                    "performance_percent": performance_pct,
                     "open_positions": len(positions),
-                    "total_trades": 0,
-                    "win_trades": 0,
-                    "loss_trades": 0,
-                    "win_rate": 0.0,
+                    "total_trades": snapshot_stats.get('total_trades', 0),
+                    "win_trades": snapshot_stats.get('win_trades', 0),
+                    "loss_trades": snapshot_stats.get('loss_trades', 0),
+                    "win_rate": snapshot_stats.get('win_rate', 0.0),
                     "source": "hyperliquid"
                 }
             }

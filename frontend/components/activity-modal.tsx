@@ -23,6 +23,7 @@ interface Activity {
     entry_price?: number
     stop_loss_price?: number
     take_profit_price?: number
+    platform_cost_usd?: number
   }
 }
 
@@ -291,6 +292,13 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
           </div>
         </div>
       </div>
+
+      {/* LLM cost if available */}
+      {activity.data.platform_cost_usd != null && activity.data.platform_cost_usd > 0 && (
+        <div className="text-xs text-right text-[var(--text-muted)]">
+          Cost: ${activity.data.platform_cost_usd.toFixed(4)}
+        </div>
+      )}
 
       {/* Structured or raw reasoning */}
       {isStructured ? (

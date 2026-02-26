@@ -83,7 +83,7 @@ async def get_activities(
                     SELECT
                         activity_id, activity_type, activity_source, summary, details,
                         trade_id, trade_type, decision_id, related_symbol,
-                        importance, created_at
+                        importance, created_at, platform_cost_usd
                     FROM activities
                     WHERE config_id = %s
                 """
@@ -135,7 +135,8 @@ async def get_activities(
                                 "symbol": a[8],
                                 "importance": a[9],
                                 "trade_id": str(a[5]) if a[5] else None,
-                                "trade_type": a[6]
+                                "trade_type": a[6],
+                                "platform_cost_usd": float(a[11]) if a[11] else None
                             }
                         }
                         for a in activities

@@ -99,14 +99,15 @@ class HyperliquidAccountAdapter(AccountAdapter):
             bot_margin_used = Decimal('0')
             bot_open_count = 0
 
-            # Get this bot's tracked symbols from live_trades
+            # Get this bot's tracked symbols from live_trades (open AND closed)
+            # Must include closed trades so fills still match for realized P&L
             bot_symbols = set()
             try:
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
                         cur.execute("""
-                            SELECT symbol FROM live_trades
-                            WHERE config_id = %s AND provider = 'hyperliquid' AND closed_at IS NULL
+                            SELECT DISTINCT symbol FROM live_trades
+                            WHERE config_id = %s AND provider = 'hyperliquid'
                         """, (config_id,))
                         for row in cur.fetchall():
                             bot_symbols.add(row[0])
@@ -144,19 +145,19 @@ class HyperliquidAccountAdapter(AccountAdapter):
                     bot_margin_used += pos_margin
                     bot_open_count += 1
 
-            # Get trade stats from user_fills for this bot's symbols
+            # Get trade stats from live_trades + user_fills
             total_trades = 0
             win_trades = 0
             loss_trades = 0
             realized_pnl = Decimal('0')
-            trade_pnls = []
 
             try:
-                # Query fills for bot's tracked symbols from live_trades
+                # Count trades and closed trades from live_trades
+                closed_trade_symbols = []
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
                         cur.execute("""
-                            SELECT batch_id, symbol FROM live_trades
+                            SELECT batch_id, symbol, closed_at FROM live_trades
                             WHERE config_id = %s AND provider = 'hyperliquid'
                         """, (config_id,))
                         all_bot_trades = cur.fetchall()
@@ -168,18 +169,24 @@ class HyperliquidAccountAdapter(AccountAdapter):
                 seven_days_ago = int((datetime.now(timezone.utc) - timedelta(days=7)).timestamp() * 1000)
                 fills = self._info.user_fills_by_time(wallet, seven_days_ago)
 
-                # Match fills to this bot's symbols and compute realized P&L
+                # Sum closedPnl across all fills per symbol (partial fills = 1 trade)
+                # Group by fill timestamp to aggregate partial fills from same market order
+                from collections import defaultdict
+                trade_pnl_by_time = defaultdict(Decimal)  # fill_time -> net P&L
+
                 for fill in fills:
                     coin = fill.get("coin", "")
                     closed_pnl = Decimal(str(fill.get("closedPnl", 0)))
                     fill_dir = fill.get("dir", "")
+                    fill_time = fill.get("time", 0)
 
                     if coin in bot_hl_symbols and "Close" in fill_dir and closed_pnl != 0:
                         realized_pnl += closed_pnl
-                        trade_pnls.append(closed_pnl)
+                        trade_pnl_by_time[fill_time] += closed_pnl
 
-                win_trades = sum(1 for p in trade_pnls if p > 0)
-                loss_trades = sum(1 for p in trade_pnls if p < 0)
+                # Count wins/losses by aggregated trade (not individual fills)
+                win_trades = sum(1 for pnl in trade_pnl_by_time.values() if pnl > 0)
+                loss_trades = sum(1 for pnl in trade_pnl_by_time.values() if pnl <= 0)
 
             except Exception as e:
                 self._log.warning(f"Failed to compute trade stats for {config_id}: {e}")
@@ -192,6 +199,7 @@ class HyperliquidAccountAdapter(AccountAdapter):
             avg_loss = None
             largest_win = None
             largest_loss = None
+            trade_pnls = list(trade_pnl_by_time.values())
             wins = [p for p in trade_pnls if p > 0]
             losses = [p for p in trade_pnls if p < 0]
             if wins:
@@ -302,13 +310,14 @@ class HyperliquidAccountAdapter(AccountAdapter):
 
                 pnl_display = f"{'+' if closed_pnl > 0 else ''}{closed_pnl:.2f}"
 
-                # Look up batch_id from live_trades for trade_id linkage
+                # Look up batch_id + entry data from live_trades for trade_id linkage
                 batch_id = None
+                trade_created_at = None
                 try:
                     with get_db_connection() as conn:
                         with conn.cursor() as cur:
                             cur.execute("""
-                                SELECT batch_id FROM live_trades
+                                SELECT batch_id, created_at FROM live_trades
                                 WHERE config_id = %s AND provider = 'hyperliquid'
                                   AND symbol = %s
                                 ORDER BY COALESCE(closed_at, created_at) DESC
@@ -317,23 +326,48 @@ class HyperliquidAccountAdapter(AccountAdapter):
                             result = cur.fetchone()
                             if result:
                                 batch_id = result[0]
+                                trade_created_at = result[1]
                 except Exception:
                     pass
+
+                # Compute entry price from fill data: entry = exit - pnl/size (for longs)
+                entry_price = 0.0
+                size_usd = fill_size * fill_price if fill_size > 0 else 0.0
+                pnl_pct = (closed_pnl / size_usd * 100) if size_usd > 0 else 0.0
+                if fill_size > 0 and fill_price > 0:
+                    if side == "long":
+                        entry_price = fill_price - (closed_pnl / fill_size)
+                    else:
+                        entry_price = fill_price + (closed_pnl / fill_size)
+
+                # Compute duration
+                duration_seconds = 0.0
+                if trade_created_at:
+                    try:
+                        if isinstance(trade_created_at, str):
+                            trade_created_at = datetime.fromisoformat(trade_created_at.replace('Z', '+00:00'))
+                        if trade_created_at.tzinfo is None:
+                            trade_created_at = trade_created_at.replace(tzinfo=timezone.utc)
+                        duration_seconds = (datetime.now(timezone.utc) - trade_created_at).total_seconds()
+                    except Exception:
+                        pass
 
                 log_activity_safe(
                     config_id=config_id,
                     user_id=user_id,
                     activity_type='trade_exit',
                     activity_source='hyperliquid_monitor',
-                    summary=f"Closed {platform_symbol}: ${pnl_display} realized",
+                    summary=f"Closed {platform_symbol}: ${pnl_display} ({pnl_pct:+.1f}%)",
                     details={
                         'symbol': platform_symbol,
                         'side': side,
+                        'entry_price': entry_price,
                         'exit_price': fill_price,
-                        'size': fill_size,
                         'pnl': closed_pnl,
-                        'realized_pnl': closed_pnl,
+                        'pnl_pct': pnl_pct,
+                        'size_usd': size_usd,
                         'close_reason': 'auto',
+                        'duration_seconds': duration_seconds,
                         'fill_hash': fill_hash,
                         'fill_time_ms': fill_time,
                         'source': 'position_monitor'

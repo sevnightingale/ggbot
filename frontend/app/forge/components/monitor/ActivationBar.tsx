@@ -35,6 +35,7 @@ interface Activity {
     leverage?: number
     entry_price?: number
     stop_loss_price?: number
+    platform_cost_usd?: number
   }
 }
 
@@ -90,6 +91,7 @@ export function ActivationBar({
   const [configUsage, setConfigUsage] = useState<{
     period_usage_usd: number
     today_usage_usd: number
+    total_usage_usd: number
   } | null>(null)
 
   useEffect(() => {
@@ -101,7 +103,8 @@ export function ActivationBar({
         const usage = await apiClient.getConfigUsage(selectedBot.config_id)
         setConfigUsage({
           period_usage_usd: usage.period_usage_usd,
-          today_usage_usd: usage.today_usage_usd
+          today_usage_usd: usage.today_usage_usd,
+          total_usage_usd: usage.total_usage_usd
         })
       } catch (err) {
         // Non-critical - just don't show usage if it fails
@@ -230,6 +233,12 @@ export function ActivationBar({
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   <span>{countdown}</span>
+                </div>
+              )}
+              {configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0 && (
+                <div className="flex items-center gap-1" title="Total LLM cost for this bot (all-time)">
+                  <Coins className="h-3.5 w-3.5" />
+                  <span>${configUsage.total_usage_usd.toFixed(2)} total</span>
                 </div>
               )}
               {getAvgDailyCost() && (

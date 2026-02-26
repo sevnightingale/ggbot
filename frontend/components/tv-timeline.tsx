@@ -57,6 +57,7 @@ interface Activity {
     leverage?: number;
     entry_price?: number;
     stop_loss_price?: number;
+    platform_cost_usd?: number;
     take_profit_price?: number;
   };
 }
