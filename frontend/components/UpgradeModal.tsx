@@ -20,31 +20,7 @@ interface UpgradeModalProps {
 
 type PaymentMode = 'choose' | 'usage' | 'prepay'
 
-// Cost per decision by model and tier (with 70% markup already included)
-// Based on real testing with production prompts (2026-01-05)
-// Each model has 3 tiers: economy (mini/fast), standard (balanced), premium (reasoning)
-const MODEL_TIER_COSTS: Record<string, { economy: number; standard: number; premium: number }> = {
-  'grok': { economy: 0.0014, standard: 0.0027, premium: 0.0264 },
-  'deepseek': { economy: 0.0035, standard: 0.0034, premium: 0.0167 },
-  'gemini': { economy: 0.0013, standard: 0.0448, premium: 0.0595 },
-  'gpt': { economy: 0.0044, standard: 0.0504, premium: 1.2022 },
-  'claude': { economy: 0.0275, standard: 0.0658, premium: 0.1452 },
-  'kimi': { economy: 0.0076, standard: 0.0108, premium: 0.0164 },
-  'qwen': { economy: 0.0007, standard: 0.0049, premium: 0.0152 },
-  'default': { economy: 0.003, standard: 0.010, premium: 0.030 }
-}
-
-// Decisions per day by frequency
-const FREQUENCY_TO_DECISIONS: Record<string, number> = {
-  '5m': 288,
-  '15m': 96,
-  '30m': 48,
-  '1h': 24,
-  '4h': 6,
-  '1d': 1,
-  '1w': 0.14,  // ~1 per week
-  'signal_driven': 5  // estimate ~5 signals/day
-}
+import { MODEL_TIER_COSTS, FREQUENCY_TO_DECISIONS } from '@/lib/cost-estimation'
 
 // Human-readable frequency labels
 const FREQUENCY_LABELS: Record<string, string> = {

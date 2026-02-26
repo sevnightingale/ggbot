@@ -9,6 +9,7 @@ import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 import { BotImageUpload } from '@/components/BotImageUpload'
 import { ArenaRegistrationModal } from '@/components/arena-registration-modal'
+import { estimateDailyCost } from '@/lib/cost-estimation'
 
 interface AccountMetrics {
   totalEquity: number
@@ -118,24 +119,31 @@ export function ActivationBar({
     return () => clearInterval(interval)
   }, [selectedBot.config_id])
 
-  // Calculate average daily cost
-  const getAvgDailyCost = (): string | null => {
-    if (!configUsage) return null
+  // Calculate daily cost display: actual avg when usage exists, estimate when not
+  const getDailyCostDisplay = (): { text: string; title: string } | null => {
+    // Try actual usage first
+    if (configUsage && configUsage.period_usage_usd > 0) {
+      const dayOfMonth = new Date().getDate()
 
-    const dayOfMonth = new Date().getDate()
-
-    if (dayOfMonth === 1) {
-      // First day of month - just show today's usage
-      return configUsage.today_usage_usd > 0
-        ? `$${configUsage.today_usage_usd.toFixed(2)} today`
-        : null
-    } else {
-      // Day 2+: show average
-      const avgDaily = configUsage.period_usage_usd / dayOfMonth
-      return avgDaily > 0.001
-        ? `~$${avgDaily.toFixed(2)}/day`
-        : null
+      if (dayOfMonth === 1) {
+        return configUsage.today_usage_usd > 0
+          ? { text: `$${configUsage.today_usage_usd.toFixed(2)} today`, title: 'LLM cost today' }
+          : null
+      } else {
+        const avgDaily = configUsage.period_usage_usd / dayOfMonth
+        return avgDaily > 0.001
+          ? { text: `~$${avgDaily.toFixed(2)}/day`, title: 'Average daily LLM cost this month' }
+          : null
+      }
     }
+
+    // No real usage — show estimate from config
+    const estimated = estimateDailyCost(selectedBot.config_data)
+    if (estimated && estimated > 0.001) {
+      return { text: `~$${estimated.toFixed(2)}/day est.`, title: 'Estimated daily LLM cost based on model, tier, and frequency' }
+    }
+
+    return null
   }
 
   const handleActivate = () => {
@@ -241,10 +249,10 @@ export function ActivationBar({
                   <span>${configUsage.total_usage_usd.toFixed(2)} total</span>
                 </div>
               )}
-              {getAvgDailyCost() && (
-                <div className="flex items-center gap-1" title="Average daily LLM cost for this bot">
+              {getDailyCostDisplay() && (
+                <div className="flex items-center gap-1" title={getDailyCostDisplay()!.title}>
                   <Coins className="h-3.5 w-3.5" />
-                  <span>{getAvgDailyCost()}</span>
+                  <span>{getDailyCostDisplay()!.text}</span>
                 </div>
               )}
             </div>
