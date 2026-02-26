@@ -164,6 +164,7 @@ usage:user:{user_id}:{YYYY-MM}           # Monthly user spend
 # Config-level (updated on every LLM call)
 usage:config:{config_id}:{YYYY-MM}       # Monthly bot spend
 usage:config:{config_id}:{YYYY-MM-DD}    # Daily bot spend (90-day TTL)
+usage:config:total:{config_id}            # All-time bot spend (no TTL)
 
 # Cached summaries (updated every 5min by usage monitor)
 usage:summary:{user_id}                   # JSON: usage + credits + net balance
@@ -190,6 +191,9 @@ pipe.incrbyfloat(f"usage:user:{self.user_id}:{period}", float(platform_cost))
 pipe.incrbyfloat(f"usage:config:{self.config_id}:{period}", float(platform_cost))
 pipe.incrbyfloat(f"usage:config:{self.config_id}:{day}", float(platform_cost))
 pipe.expire(f"usage:config:{self.config_id}:{day}", 90 * 24 * 3600)
+if is_prepaid:
+    pipe.incrbyfloat(f"usage:prepaid:{self.user_id}", float(platform_cost))
+pipe.incrbyfloat(f"usage:config:total:{self.config_id}", float(platform_cost))
 pipe.execute()
 ```
 
@@ -304,7 +308,8 @@ Specific bot's usage (instant from Redis).
   "config_name": "BTC Scalper",
   "period": "2026-01",
   "period_usage_usd": 5.67,
-  "today_usage_usd": 0.89
+  "today_usage_usd": 0.89,
+  "total_usage_usd": 42.15
 }
 ```
 
@@ -520,17 +525,25 @@ When a bot is paused due to credit exhaustion, shows amber warning:
 
 **Implementation**: `BotConfiguration.pause_reason` field populated by `_fetch_pause_reasons_for_bots()` in `core/sse/dashboard_data.py`.
 
-### ActivationBar Daily Cost (`frontend/.../ActivationBar.tsx`)
+### ActivationBar Cost Display (`frontend/.../ActivationBar.tsx`)
 
-Shows average daily LLM cost per bot:
+Three cost indicators:
 
 ```typescript
-// Day 1 of month
-🪙 $0.89 today
+// Total all-time cost (from usage:config:total:{id})
+🪙 $42.15 total
 
-// Day 2+
-🪙 ~$0.35/day  // period_usage / days_elapsed
+// Daily cost — actual avg when usage exists, estimate for new bots
+🪙 ~$0.35/day       // actual: period_usage / days_elapsed
+🪙 ~$14.52/day est.  // estimate: model × tier × frequency (from lib/cost-estimation.ts)
+
+// Day 1 of month fallback
+🪙 $0.89 today
 ```
+
+**Cost estimation** (`frontend/lib/cost-estimation.ts`): Shared `MODEL_TIER_COSTS` and `FREQUENCY_TO_DECISIONS` tables. `estimateDailyCost(configData)` returns predicted daily cost from model, tier, frequency. Used by ActivationBar (pre-activation) and UpgradeModal (paywall).
+
+**Activity cost**: `platform_cost_usd` returned per activity from `/api/v2/activities/{config_id}`. Displayed as "Cost: $0.XXXX" in activity modal `LLMThoughtContent`.
 
 **API**: `getConfigUsage(configId)` → `GET /api/v2/usage/config/{id}`
 
@@ -555,6 +568,7 @@ apiClient.getConfigUsage(configId): Promise<{
   period: string
   period_usage_usd: number
   today_usage_usd: number
+  total_usage_usd: number
 }>
 ```
 

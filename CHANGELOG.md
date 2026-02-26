@@ -6,6 +6,25 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-02-26 - Cumulative Bot Cost Tracking + Activity Cost Display + Cost Estimation
+
+**Per-Bot Lifetime Cost** (`decision/engine_v2.py`, `api/usage.py`, `ActivationBar.tsx`):
+- New Redis key `usage:config:total:{config_id}` — incremented on every LLM call, no TTL
+- `/api/v2/usage/config/{id}` returns `total_usage_usd` (all-time bot cost)
+- ActivationBar shows "$X.XX total" next to daily cost
+- Backfill script (`scripts/backfill_prepaid_cumulative.py`) now includes per-config cumulative keys — 92 configs, $584.88 total
+
+**Activity Cost Display** (`api/activities.py`, `activity-modal.tsx`):
+- Activities API returns `platform_cost_usd` per activity (column added to SELECT)
+- Activity modal `LLMThoughtContent` shows "Cost: $0.XXXX" on LLM thought activities
+
+**Cost Estimation for New Bots** (`frontend/lib/cost-estimation.ts`, `ActivationBar.tsx`, `UpgradeModal.tsx`):
+- Extracted `MODEL_TIER_COSTS` + `FREQUENCY_TO_DECISIONS` to shared `lib/cost-estimation.ts`
+- ActivationBar daily cost slot: shows "~$X.XX/day est." for new bots (no usage data), switches to actual avg once bot has run
+- UpgradeModal imports from shared util (was duplicated)
+
+---
+
 ## 2026-02-26 - Hyperliquid Trade Close Fixes + Account Stats + Live Strategy Tuning
 
 **Trade Close Activity Logging** (`trading/live/hyperliquid_service.py`):
