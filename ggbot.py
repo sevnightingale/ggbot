@@ -1,42 +1,35 @@
 """
-GGBot V2 Orchestrator - Clean Architecture Implementation
+GGBot V2 Orchestrator - API Server
 
-Main orchestrator API that coordinates all V2 modules with Supabase integration.
-Provides unified entry point for autonomous trading with multi-user isolation.
+FastAPI API server for the ggbots platform. Handles HTTP/SSE endpoints,
+authentication, billing, and bot lifecycle. Bot execution runs in separate
+ggbot_scheduler process.
 """
 
+# stdlib
 import asyncio
-import uuid
+import json
 import os
+import re
+import time
+import uuid
+from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
-from contextlib import asynccontextmanager
 
+# third-party
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Query, Header
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_serializer
-import uvicorn
-import json
 import psycopg2.extras
-import numpy as np
 import stripe
+import uvicorn
 
-# APScheduler imports
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.schedulers.base import STATE_RUNNING
-from apscheduler.triggers.cron import CronTrigger
-import redis.asyncio as redis
+# local — scheduler utilities (calculate_next_run replaces live scheduler queries)
+from core.scheduler.utils import calculate_next_run, extract_timeframe_from_config
 
-# Scheduler utilities
-from core.scheduler import (
-    cron_for,
-    last_closed_close_ts,
-    get_misfire_grace_time,
-    format_redis_idempotency_key,
-    get_redis_ttl_for_timeframe
-)
-
-# V2 Core Components
+# local — auth, SSE
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
 from core.sse import get_unified_dashboard_data
 
@@ -44,9 +37,6 @@ class ServiceUser:
     """Represents an authenticated service."""
     def __init__(self, service_name: str):
         self.service_name = service_name
-
-import time
-from collections import defaultdict
 
 service_calls = defaultdict(list)
 
@@ -88,24 +78,26 @@ async def get_mock_user_for_dev():
         email="user@example.com",
         claims={"sub": "00000000-0000-0000-0000-000000000000", "email": "user@example.com"}
     )
+
+# local — services
 from core.services.config_service import ConfigService, BotConfigV2, config_service
 from core.services.user_service import UserService, user_service
 from core.services.llm_service import LLMService, llm_service
 from core.services.indicator_service import IndicatorService
 from core.common.logger import logger as base_logger
+from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
 
 DEMO_MODE = os.getenv("GGBOT_DEMO_MODE", "false").lower() == "true"
 
 logger = base_logger
 
-from extraction.v2.extraction_engine import ExtractionEngineV2
-from decision.engine_v2 import DecisionEngineV2
-from trading.paper.supabase_service import SupabasePaperTradingService
-from trading.live.symphony_service import SymphonyLiveTradingService
-from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
-from trading.live.hyperliquid_service import HyperliquidLiveTradingService
-from signals.publishing_service import publish_signal_to_telegram
-from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
+# Constants
+PAPER_INITIAL_BALANCE = 10000.0
+CREDIT_PURCHASE_MIN_CENTS = 500      # $5
+CREDIT_PURCHASE_MAX_CENTS = 50000    # $500
+API_BASE_URL = os.getenv("API_BASE_URL", "https://ggbots-api.nightingale.business")
+
+
 class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
@@ -142,62 +134,8 @@ class SignalOrchestrationRequest(BaseModel):
     override_symbol: Optional[str] = None
 
 
-def serialize_numpy_types(obj):
-    """
-    Recursively convert numpy types, pandas types, and Decimal to Python native types.
-
-    This is a belt-and-suspenders approach to ensure ALL numpy/pandas types are
-    converted before Pydantic serialization, preventing serialization errors.
-    """
-    from decimal import Decimal
-    import pandas as pd
-
-    # Handle numpy integer types
-    if isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
-        return int(obj)
-    # Handle numpy float types
-    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
-        return float(obj)
-    # Handle numpy boolean types (CRITICAL: This prevents PydanticSerializationError)
-    elif isinstance(obj, np.bool_):
-        return bool(obj)
-    # Handle numpy arrays
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    # Handle pandas NA/NaT values
-    elif pd.isna(obj):
-        return None
-    # Handle Decimal types
-    elif isinstance(obj, Decimal):
-        return float(obj)
-    # Recursively handle dictionaries
-    elif isinstance(obj, dict):
-        return {key: serialize_numpy_types(value) for key, value in obj.items()}
-    # Recursively handle lists
-    elif isinstance(obj, list):
-        return [serialize_numpy_types(item) for item in obj]
-    # Recursively handle tuples (convert to list)
-    elif isinstance(obj, tuple):
-        return [serialize_numpy_types(item) for item in obj]
-    # Return all other types as-is
-    else:
-        return obj
-
-class OrchestrationResult(BaseModel):
-    status: str
-    config_id: str
-    extraction_result: Optional[Dict[str, Any]] = None
-    decision_result: Optional[Dict[str, Any]] = None
-    trading_result: Optional[Dict[str, Any]] = None
-    execution_time_ms: int
-    timestamp: str
-    
-    @field_serializer('extraction_result', 'decision_result', 'trading_result')
-    def serialize_results(self, value):
-        """Convert numpy types to JSON-serializable Python types."""
-        if value is None:
-            return None
-        return serialize_numpy_types(value)
+# Orchestrator and result types (extracted to their own module)
+from core.orchestrator.orchestrator import GGBotOrchestrator, OrchestrationResult, serialize_numpy_types
 
 
 # FastAPI lifespan handler
@@ -225,49 +163,27 @@ async def lifespan(app: FastAPI):
         logger.info("✅ LLM service initialized")
 
 
-        # Start APScheduler (if enabled)
-        enable_scheduler = os.getenv("ENABLE_SCHEDULER", "true").lower() == "true"
-        if enable_scheduler:
-            scheduler.start()
-            logger.info("✅ APScheduler started")
-
-            # Schedule daily Stripe meter reporting (midnight UTC)
-            from billing.stripe_meter_reporter import run_daily_report
-            from apscheduler.triggers.cron import CronTrigger
-
-            scheduler.add_job(
-                func=run_daily_report,
-                trigger=CronTrigger(hour=0, minute=0),  # Midnight UTC daily
-                id="stripe_meter_reporting",
-                replace_existing=True,
-                max_instances=1,
-                coalesce=True,
-                misfire_grace_time=3600  # 1 hour grace period
-            )
-            logger.info("✅ Stripe meter reporting scheduled (daily at midnight UTC)")
-        else:
-            logger.info("⏸️  APScheduler disabled (ENABLE_SCHEDULER=false)")
+        # NOTE: APScheduler now runs in separate ggbot_scheduler process.
+        # Bot scheduling is handled there via DB reconciliation loop.
+        logger.info("Scheduler runs in separate process (ggbot_scheduler)")
 
         # Start monitoring service (positions only - no WebSocket spam!)
         from core.monitoring.service import MonitoringService
         monitoring_service = MonitoringService()
         monitoring_task = asyncio.create_task(monitoring_service.start())
-        logger.info("✅ Monitoring service started (positions only - no WebSocket spam!)")
+        logger.info("Monitoring service started")
 
-        # Reconcile active bots from database
-        await reconcile_active_bots()
-        
-        logger.info("🟢 GGBot V2 Orchestrator ready")
-        
+        logger.info("GGBot V2 API ready")
+
     except Exception as e:
-        logger.error(f"❌ Startup failed: {e}")
+        logger.error(f"Startup failed: {e}")
         raise
-    
+
     yield
-    
+
     # Shutdown tasks
-    logger.info("🔄 Shutting down GGBot V2 Orchestrator")
-    
+    logger.info("Shutting down GGBot V2 API")
+
     # Shutdown monitoring service
     if monitoring_service and monitoring_task:
         await monitoring_service.stop()
@@ -277,12 +193,7 @@ async def lifespan(app: FastAPI):
                 await monitoring_task
             except asyncio.CancelledError:
                 pass
-        logger.info("✅ Monitoring service stopped")
-    
-    # Shutdown scheduler
-    if scheduler.state == STATE_RUNNING:
-        scheduler.shutdown(wait=False)
-        logger.info("✅ APScheduler shutdown")
+        logger.info("Monitoring service stopped")
 
 
 # Create FastAPI app
@@ -312,1232 +223,8 @@ app.include_router(public_router)
 app.include_router(usage_router)
 
 
-class GGBotOrchestrator:
-    """Main orchestrator class coordinating all V2 modules with full integration."""
-
-    # Maximum cached engines to prevent memory leaks
-    # Engines are evicted LRU-style when limit is exceeded
-    MAX_EXTRACTION_ENGINES = 30  # Per user_id
-    MAX_DECISION_ENGINES = 50    # Per config_id
-
-    def __init__(self):
-        self.config_service = config_service
-        self.llm_service = llm_service
-        self.paper_trading = SupabasePaperTradingService()
-        self.symphony_trading = SymphonyLiveTradingService()
-        self.aster_trading = AsterDEXV3LiveTradingService()
-        self.hyperliquid_trading = HyperliquidLiveTradingService()
-        self._log = logger.bind(component="orchestrator")
-
-        # Use OrderedDict for LRU eviction (oldest first)
-        from collections import OrderedDict
-        self._extraction_engines: OrderedDict = OrderedDict()
-        self._decision_engines: OrderedDict = OrderedDict()
-
-    def invalidate_engines(self, config_id: str) -> None:
-        """Evict cached engines for a config so next run picks up fresh config."""
-        evicted = []
-        if config_id in self._extraction_engines:
-            engine = self._extraction_engines.pop(config_id)
-            if hasattr(engine, 'cleanup'):
-                engine.cleanup()
-            evicted.append("extraction")
-        if config_id in self._decision_engines:
-            self._decision_engines.pop(config_id)
-            evicted.append("decision")
-        if evicted:
-            self._log.info(f"Invalidated {', '.join(evicted)} engine(s) for config {config_id}")
-
-    async def run_autonomous_cycle(
-        self,
-        config_id: str,
-        user_id: str,
-        signal_data: Optional[Dict] = None,
-        override_symbol: Optional[str] = None,
-        run_id: Optional[str] = None
-    ) -> OrchestrationResult:
-        """
-        Run a complete trading cycle (autonomous or signal validation).
-
-        Args:
-            config_id: Bot configuration ID
-            user_id: User ID for access validation
-            signal_data: Signal data for validation mode
-            override_symbol: Dynamic symbol override for signals
-            run_id: 6-char hex correlation ID for log tracing
-
-        Returns:
-            OrchestrationResult with execution details
-        """
-        start_time = datetime.now(timezone.utc)
-        log = self._log.bind(config_id=config_id, run_id=run_id) if run_id else self._log.bind(config_id=config_id)
-        log.info(f"Starting V2 autonomous cycle")
-        
-        try:
-            config = await self.config_service.get_config(config_id, user_id)
-            if not config:
-                raise HTTPException(status_code=404, detail="Configuration not found")
-
-            # Permission check: Verify user can still activate/run bots
-            user_profile = await user_service.get_profile(user_id)
-            is_first_run_allowed = False  # Creation auto-run (free, doesn't count)
-            is_free_manual_run = False    # Manual "Run Once" using free runs
-
-            if not user_profile.can_activate_bots:
-                # Check if this is their free first run (creation auto-run)
-                if not config.first_run_used:
-                    log.info(
-                        f"Allowing free first run - "
-                        f"user on {user_profile.subscription_tier.value} tier"
-                    )
-                    is_first_run_allowed = True
-                # Check if they have free manual runs remaining
-                elif config.free_runs_remaining > 0:
-                    log.info(
-                        f"Allowing free manual run - "
-                        f"{config.free_runs_remaining} free runs remaining"
-                    )
-                    is_free_manual_run = True
-                else:
-                    log.warning(
-                        f"Blocking bot execution - "
-                        f"lost activation permission (tier: {user_profile.subscription_tier.value}), "
-                        f"no free runs remaining"
-                    )
-                    # Auto-deactivate bot if user lost permission
-                    # CRITICAL: Remove scheduler job to stop repeated execution attempts
-                    config_dict = config.to_jsonb()
-                    timeframe = extract_timeframe_from_config(config_dict)
-                    if timeframe and timeframe != "signal_driven":
-                        remove_bot_job(user_id, config_id, timeframe)
-                        log.info(f"Removed scheduler job for deactivated bot")
-                    await self.config_service.set_bot_state(config_id, user_id, "inactive")
-                    raise HTTPException(
-                        status_code=403,
-                        detail="No free test runs remaining. Subscribe to run your bot again."
-                    )
-
-            log.debug(f"config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
-
-            # Execute the appropriate cycle
-            if config.config_type == "signal_validation":
-                if signal_data:
-                    result = await self._run_signal_validation_cycle(
-                        config, signal_data, override_symbol, run_id=run_id
-                    )
-                else:
-                    latest_signal = await self._fetch_latest_ggshot_signal()
-                    signal_dict = self._signal_data_to_dict(latest_signal)
-                    result = await self._run_signal_validation_cycle(
-                        config, signal_dict, override_symbol, run_id=run_id
-                    )
-            else:
-                result = await self._run_autonomous_trading_cycle(config, run_id=run_id)
-
-            # Handle free run tracking after successful execution
-            if result.status != "error":
-                if is_first_run_allowed:
-                    # Mark creation auto-run as used
-                    await self.config_service.mark_first_run_used(config_id)
-                    log.info(f"Marked first run used")
-                elif is_free_manual_run:
-                    # Decrement free manual runs
-                    remaining = await self.config_service.decrement_free_runs(config_id)
-                    log.info(f"Decremented free runs, {remaining} remaining")
-
-            return result
-
-        except Exception as e:
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-
-            log.error(f"V2 orchestration failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Orchestration failed: {str(e)}")
-            
-    async def _run_autonomous_trading_cycle(self, config: BotConfigV2, run_id: Optional[str] = None) -> OrchestrationResult:
-        """Run traditional autonomous trading cycle."""
-        start_time = datetime.now(timezone.utc)
-        user_id = config.user_id
-        config_id = config.config_id
-        
-        try:
-            extraction_engine = await self._get_extraction_engine(user_id)
-
-            extraction_config = config.extraction or {}
-            requested_indicators = self._extract_indicators_from_config(extraction_config)
-            timeframes = self._extract_timeframes_from_config(extraction_config)
-
-            from core.sse import set_execution_phase
-            await set_execution_phase(config_id, "extracting", f"Gathering market data for {config.selected_pair}...")
-
-            extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id, requested_indicators, timeframes, run_id=run_id
-            )
-
-            await set_execution_phase(config_id, "deciding", "Analyzing market conditions for trading opportunities...")
-
-            decision_result = await self._run_decision_v2(
-                config_id, config, extraction_result, run_id=run_id
-            )
-
-            action = decision_result.get('action', 'wait')
-            if action in ['wait', 'no_action', 'hold']:
-                message = "No trading opportunity found - waiting for better setup..."
-            elif action == 'long':
-                message = "Opening long position..."
-            elif action == 'short':
-                message = "Opening short position..."
-            elif action == 'close':
-                message = "Closing position..."
-            else:
-                message = f"Executing trade..."
-
-            await set_execution_phase(config_id, "trading", message)
-
-            trading_result = await self._run_trading_v2(
-                config, user_id, decision_result, run_id=run_id
-            )
-
-            if self._should_publish_signal(config, decision_result):
-                await self._trigger_signal_publishing(
-                    config, {}, decision_result
-                )
-            
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            
-            result = OrchestrationResult(
-                status="success",
-                config_id=str(config_id),
-                extraction_result=extraction_result,
-                decision_result=decision_result,
-                trading_result=trading_result,
-                execution_time_ms=execution_time_ms,
-                timestamp=end_time.isoformat()
-            )
-            
-            await set_execution_phase(config_id, "completed", f"Cycle completed in {execution_time_ms/1000:.1f}s")
-            
-            self._log.info(f"V2 autonomous cycle completed in {execution_time_ms}ms")
-            return result
-            
-        except Exception as e:
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            
-            self._log.error(f"V2 autonomous cycle failed: {e}")
-            return OrchestrationResult(
-                status="error",
-                config_id=str(config_id),
-                extraction_result={"error": str(e)},
-                decision_result=None,
-                trading_result=None,
-                execution_time_ms=execution_time_ms,
-                timestamp=end_time.isoformat()
-            )
-    
-    async def _run_signal_validation_cycle(
-        self,
-        config: BotConfigV2,
-        signal_data: Dict,
-        override_symbol: Optional[str] = None,
-        run_id: Optional[str] = None
-    ) -> OrchestrationResult:
-        """Run signal validation cycle for external signals."""
-        start_time = datetime.now(timezone.utc)
-        user_id = config.user_id
-        config_id = config.config_id
-        
-        try:
-            symbol = override_symbol or signal_data.get('symbol') or config.selected_pair
-
-            if not symbol:
-                raise ValueError("No symbol specified for signal validation")
-
-            self._log.info(f"Running signal validation for {symbol}")
-
-            extraction_config = config.extraction or {}
-            signal_indicators = self._extract_indicators_from_config(extraction_config)
-            timeframes = self._extract_timeframes_from_config(extraction_config)
-
-            extraction_engine = await self._get_extraction_engine(user_id)
-
-            from core.sse import set_execution_phase
-            await set_execution_phase(config_id, "extracting", f"Gathering market data for {symbol} signal...")
-
-            extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id,
-                signal_indicators, timeframes,
-                override_symbol=symbol, run_id=run_id
-            )
-
-            await set_execution_phase(config_id, "deciding", "Analyzing signal against current market conditions...")
-
-            decision_result = await self._run_decision_v2(
-                config_id, config, extraction_result, signal_data, run_id=run_id
-            )
-
-            action = decision_result.get('action', 'wait')
-            if action in ['wait', 'no_action', 'hold']:
-                message = "Signal rejected - conditions not favorable..."
-            else:
-                message = f"Signal validated - executing {action} position..."
-
-            await set_execution_phase(config_id, "trading", message)
-
-            trading_result = await self._run_trading_v2(
-                config, user_id, decision_result, run_id=run_id
-            )
-
-            if self._should_publish_signal(config, decision_result):
-                await self._trigger_signal_publishing(
-                    config, signal_data, decision_result
-                )
-            
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            
-            result = OrchestrationResult(
-                status="success",
-                config_id=str(config_id),
-                extraction_result=extraction_result,
-                decision_result=decision_result,
-                trading_result=trading_result,
-                execution_time_ms=execution_time_ms,
-                timestamp=end_time.isoformat()
-            )
-            
-            await set_execution_phase(config_id, "completed", f"Signal validation completed in {execution_time_ms/1000:.1f}s")
-            
-            self._log.info(f"Signal validation completed in {execution_time_ms}ms")
-            return result
-            
-        except Exception as e:
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            
-            self._log.error(f"Signal validation failed: {e}")
-            return OrchestrationResult(
-                status="error",
-                config_id=str(config_id),
-                extraction_result={"error": str(e)},
-                decision_result=None,
-                trading_result=None,
-                execution_time_ms=execution_time_ms,
-                timestamp=end_time.isoformat()
-            )
-    
-    def _extract_indicators_from_config(self, extraction_config: Dict) -> List[str]:
-        """Extract technical indicators from user's extraction config.
-
-        Only extracts from 'technical_analysis' source. Market intelligence sources
-        (derivatives_leverage, macro_economics, sentiment_social, etc.) are handled
-        separately by market_intelligence.orchestrator.fetch_market_intelligence().
-        """
-        requested_indicators = []
-
-        if "selected_data_sources" in extraction_config:
-            data_sources = extraction_config.get("selected_data_sources", {})
-            # Only extract from technical_analysis source
-            # Other sources are handled by the market_intelligence orchestrator
-            ta_config = data_sources.get("technical_analysis", {})
-            if isinstance(ta_config, dict):
-                data_points = ta_config.get("data_points", [])
-                requested_indicators.extend(data_points)
-
-        elif "indicators" in extraction_config:
-            requested_indicators = extraction_config["indicators"]
-        else:
-            # Legacy format fallback
-            data_sources = extraction_config.get("data_sources", {})
-            for category, indicators in data_sources.items():
-                if isinstance(indicators, list):
-                    requested_indicators.extend(indicators)
-
-        if not requested_indicators:
-            requested_indicators = ["rsi", "macd", "ema"]
-
-        return requested_indicators
-    
-    def _extract_timeframes_from_config(self, extraction_config: Dict) -> List[str]:
-        """Extract timeframes from user's extraction config."""
-        timeframes = ["1h"]
-        
-        if "selected_data_sources" in extraction_config:
-            data_sources = extraction_config.get("selected_data_sources", {})
-            
-            if "technical_analysis" in data_sources:
-                ta_config = data_sources["technical_analysis"]
-                if isinstance(ta_config, dict):
-                    ta_timeframes = ta_config.get("timeframes", [])
-                    if ta_timeframes:
-                        timeframes = ta_timeframes
-                        self._log.debug(f"Found {len(timeframes)} timeframes from technical_analysis: {timeframes}")
-                        return timeframes
-            
-            all_timeframes = set()
-            for source_name, source_config in data_sources.items():
-                if isinstance(source_config, dict) and source_name != "signals":
-                    data_points = source_config.get("data_points", [])
-                    if data_points:
-                        source_timeframes = source_config.get("timeframes", [])
-                        all_timeframes.update(source_timeframes)
-            
-            if all_timeframes:
-                timeframes = list(all_timeframes)
-                self._log.debug(f"Found {len(timeframes)} timeframes from all sources: {timeframes}")
-        
-        self._log.debug(f"Using timeframes: {timeframes}")
-        return timeframes
-    
-    async def _fetch_latest_ggshot_signal(self):
-        """Fetch the latest real ggShot signal from Telegram for manual testing."""
-        from signals.listener_service import SignalData
-        from telethon import TelegramClient
-        import os
-        import sys
-        from dotenv import load_dotenv
-
-        try:
-            load_dotenv()
-            
-            api_id = int(os.getenv('TG_API_ID'))
-            api_hash = os.getenv('TG_API_HASH')
-            channel_name = os.getenv('GGSHOT_CHANNEL', 'GGShot_Bot')
-            
-            if not api_id or not api_hash:
-                raise ValueError("Missing TG_API_ID or TG_API_HASH environment variables")
-            
-            session_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
-            session_path = os.path.join(session_dir, 'manual_trigger_session')
-            
-            client = TelegramClient(session_path, api_id, api_hash)
-            await client.start()
-            
-            try:
-                channel = await client.get_entity(channel_name)
-                messages = await client.get_messages(channel, limit=10)
-
-                from signals.ggshot_parser import GGShotParser
-                parser = GGShotParser()
-                
-                for message in messages:
-                    if message.message:
-                        signal_data = parser.parse_signal(message.message)
-                        if signal_data:
-                            self._log.info(f"Found latest ggShot signal: {signal_data['symbol']} {signal_data['direction']}")
-
-                            return SignalData(
-                                source='ggshot',
-                                symbol=signal_data['symbol'],
-                                direction=signal_data['direction'],
-                                timeframe=signal_data['timeframe'],
-                                confidence=signal_data.get('strategy_accuracy', 80) / 100.0,
-                                entry_zone=signal_data['entry_zone'],
-                                stop_loss=signal_data['stop_loss'],
-                                take_profit=signal_data['target_1'],
-                                reasoning=f"Latest ggShot signal with {signal_data.get('strategy_accuracy', 80)}% accuracy",
-                                raw_message=message.message,
-                                metadata={
-                                    'targets': signal_data['targets'],
-                                    'trend_line': signal_data.get('trend_line'),
-                                    'strategy_accuracy': signal_data.get('strategy_accuracy'),
-                                    'manual_fetch': True
-                                },
-                                timestamp=datetime.now(timezone.utc)
-                            )
-                
-                raise ValueError("No valid ggShot signals found in recent messages")
-                
-            finally:
-                await client.disconnect()
-                
-        except Exception as e:
-            self._log.error(f"Failed to fetch latest ggShot signal: {e}")
-            raise
-
-    def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
-        """Check if signal should be published to telegram."""
-        telegram_config = config.telegram_integration or {}
-        publisher_config = telegram_config.get('publisher', {})
-
-        if not publisher_config.get('enabled', False):
-            return False
-
-        # Only publish on trade entries (long/short), not waits
-        action = decision_result.get('action', 'wait').lower()
-        if action not in ['long', 'short', 'enter', 'buy', 'sell']:
-            return False
-
-        try:
-            from core.common.db import get_db_connection
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT subscription_tier, subscription_status
-                        FROM user_profiles
-                        WHERE user_id = %s
-                    """, (config.user_id,))
-
-                    result = cur.fetchone()
-                    if not result:
-                        self._log.warning(f"No user profile found for {config.user_id}")
-                        return False
-
-                    tier, status = result
-
-                    # Match publishing_service logic: allow all paid tiers
-                    paid_tiers = ('usage_based', 'prepaid', 'pro')
-                    if tier not in paid_tiers or status != 'active':
-                        self._log.info(f"User {config.user_id} requires paid subscription for signal publishing")
-                        return False
-
-        except Exception as e:
-            self._log.error(f"Failed to check subscription for signal publishing: {e}")
-            return False
-
-        return True
-    
-    async def _trigger_signal_publishing(
-        self,
-        config: BotConfigV2,
-        signal_data: Dict,
-        decision_result: Dict
-    ) -> None:
-        """Trigger signal publishing to user's Telegram group."""
-        try:
-            from signals.publishing_service import publish_signal_to_telegram
-
-            # Enrich signal_data with bot context for scheduled_trading bots
-            trading_mode = getattr(config, 'trading_mode', 'paper')
-            live_tag = 'Hyperliquid' if trading_mode == 'hyperliquid' else None
-            enriched_signal_data = {
-                **signal_data,
-                'bot_name': config.config_name,
-                'symbol': config.selected_pair,
-                'config_type': config.config_type,
-                'live_tag': live_tag
-            }
-
-            success = await publish_signal_to_telegram(
-                config_id=config.config_id,
-                user_id=config.user_id,
-                signal_data=enriched_signal_data,
-                decision_result=decision_result
-            )
-
-            if success:
-                self._log.info(f"📡 Published signal to Telegram for {config.config_name}")
-            else:
-                self._log.warning(f"Failed to publish signal for config {config.config_id}")
-                
-        except ImportError:
-            self._log.warning("Publishing service not available - signals not published")
-        except Exception as e:
-            self._log.error(f"Error publishing signal for config {config.config_id}: {e}")
-
-    def _signal_data_to_dict(self, signal_data) -> Dict:
-        """Convert SignalData object to dict for decision engine."""
-        return {
-            'source': signal_data.source,
-            'symbol': signal_data.symbol,
-            'direction': signal_data.direction,
-            'timeframe': signal_data.timeframe,
-            'confidence': signal_data.confidence,
-            'entry_zone': signal_data.entry_zone,
-            'stop_loss': signal_data.stop_loss,
-            'take_profit': signal_data.take_profit,
-            'reasoning': signal_data.reasoning,
-            'raw_message': signal_data.raw_message,
-            'metadata': signal_data.metadata,
-            'timestamp': signal_data.timestamp.isoformat() if hasattr(signal_data.timestamp, 'isoformat') else str(signal_data.timestamp)
-        }
-
-    async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
-        """Get or create V2 extraction engine for user with LRU eviction."""
-        if user_id in self._extraction_engines:
-            # Move to end (most recently used)
-            self._extraction_engines.move_to_end(user_id)
-            return self._extraction_engines[user_id]
-
-        # Evict oldest if at capacity
-        while len(self._extraction_engines) >= self.MAX_EXTRACTION_ENGINES:
-            oldest_user_id, oldest_engine = self._extraction_engines.popitem(last=False)
-            try:
-                await oldest_engine.cleanup()
-                self._log.info(f"Evicted extraction engine for user {oldest_user_id} (LRU)")
-            except Exception as e:
-                self._log.warning(f"Error cleaning up evicted extraction engine: {e}")
-
-        # Create new engine
-        self._extraction_engines[user_id] = ExtractionEngineV2(
-            user_id=user_id,
-            use_advanced_preprocessing=True,
-            use_database_storage=True,
-            use_file_storage=False
-        )
-        return self._extraction_engines[user_id]
-    
-    async def _run_extraction_v2(
-        self,
-        extraction_engine: ExtractionEngineV2,
-        config: BotConfigV2,
-        user_id: str,
-        indicators: List[str],
-        timeframes: List[str] = ["1h"],
-        override_symbol: Optional[str] = None,
-        run_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Run V2 extraction engine for multiple timeframes with proper integration."""
-        try:
-            symbol = override_symbol or config.selected_pair or "BTC/USDT"
-
-            # Extract all timeframes in parallel for speed
-            self._log.debug(f"Extracting {len(indicators)} indicators for {symbol} across {len(timeframes)} timeframes in parallel")
-
-            tasks = [
-                extraction_engine.extract_for_symbol(
-                    symbol=symbol,
-                    indicators=indicators,
-                    timeframe=timeframe,
-                    limit=200,
-                    connector="kucoin",
-                    config_id=config.config_id
-                )
-                for timeframe in timeframes
-            ]
-
-            results = await asyncio.gather(*tasks)
-
-            # Map results back to timeframes
-            timeframe_results = {}
-            successful_extractions = 0
-
-            for timeframe, result in zip(timeframes, results):
-                timeframe_results[timeframe] = result
-
-                if result.get("status") == "success":
-                    successful_extractions += 1
-                    self._log.debug(f"V2 Extraction completed for {symbol} ({timeframe})")
-                else:
-                    self._log.error(f"❌ V2 Extraction failed for {symbol} ({timeframe}): {result.get('error')}")
-            
-            overall_result = {
-                "status": "success" if successful_extractions > 0 else "error",
-                "symbol": symbol,
-                "timeframes": timeframe_results,
-                "summary": {
-                    "total_timeframes": len(timeframes),
-                    "successful_extractions": successful_extractions,
-                    "failed_extractions": len(timeframes) - successful_extractions,
-                    "indicators": indicators
-                }
-            }
-
-            if successful_extractions == 0:
-                overall_result["error"] = "All timeframe extractions failed"
-
-            # Query ggShot signals for additional market context (requires both config + permission)
-            try:
-                from core.services.user_service import UserService
-
-                # Check if ggshot is enabled in bot config
-                extraction_config = config.extraction or {}
-                selected_sources = extraction_config.get('selected_data_sources', {})
-                trading_signals_config = selected_sources.get('trading_signals', {})
-                ggshot_enabled = 'ggshot' in trading_signals_config.get('data_points', [])
-
-                if ggshot_enabled:
-                    # Check if user has permission to access ggshot signals
-                    user_service = UserService()
-                    profile = await user_service.get_profile(user_id)
-
-                    if profile and profile.paid_data_points and 'ggshot' in profile.paid_data_points:
-                        # User has paid access and ggshot is enabled in config
-                        from market_intelligence.adapters.signals.ggshot_adapter import GGShotAdapter
-                        from market_intelligence.types import QueryParams
-
-                        ggshot_adapter = GGShotAdapter()
-                        params = QueryParams(params={'symbol': symbol, 'include_raw': False})
-                        ggshot_response = await ggshot_adapter.fetch(params)
-
-                        if ggshot_response.data and ggshot_response.data.get('signals'):
-                            overall_result["ggshot_signals"] = ggshot_response.data['signals']
-                            overall_result["ggshot_metadata"] = ggshot_response.data.get('metadata', {})
-                            overall_result["ggshot_confidence"] = ggshot_response.confidence
-
-                            timeframes_found = list(ggshot_response.data['signals'].keys())
-                            self._log.info(f"✅ Fetched ggShot signals for {symbol}: {len(timeframes_found)} timeframes ({', '.join(timeframes_found)})")
-                        else:
-                            self._log.info(f"No ggShot signals found for {symbol}")
-                            overall_result["ggshot_signals"] = {}
-
-                        await ggshot_adapter.close()
-                    else:
-                        # User does not have permission to ggshot signals
-                        self._log.debug(f"User {user_id} does not have access to ggshot signals (paid_data_points: {profile.paid_data_points if profile else 'no profile'})")
-                        overall_result["ggshot_signals"] = {}
-                else:
-                    # ggShot not enabled in config
-                    self._log.debug(f"ggShot signals not enabled in config for {config.config_id}")
-                    overall_result["ggshot_signals"] = {}
-
-            except Exception as e:
-                self._log.warning(f"Failed to fetch ggShot signals (non-critical): {e}")
-                overall_result["ggshot_signals"] = {}
-
-            # Fetch market intelligence via orchestrator (funding rates, macro, etc.)
-            # This uses the Universal Data Layer to fetch non-technical data sources
-            # based on config.extraction.selected_data_sources
-            try:
-                from market_intelligence.orchestrator import fetch_market_intelligence
-
-                market_intel = await fetch_market_intelligence(
-                    config=config,
-                    user_id=user_id,
-                    symbol=symbol,
-                    run_id=run_id
-                )
-
-                if market_intel:
-                    overall_result["market_intelligence"] = market_intel
-                    total_points = sum(len(category) for category in market_intel.values())
-                    categories = list(market_intel.keys())
-                    self._log.info(
-                        f"✅ Market intelligence: {total_points} data points from "
-                        f"{len(categories)} categories ({', '.join(categories)})"
-                    )
-                else:
-                    overall_result["market_intelligence"] = {}
-                    self._log.debug("No market intelligence sources enabled in config")
-
-            except Exception as e:
-                self._log.warning(f"Failed to fetch market intelligence (non-critical): {e}")
-                overall_result["market_intelligence"] = {}
-
-            self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(timeframes)} successful")
-            return overall_result
-            
-        except Exception as e:
-            self._log.error(f"V2 Multi-timeframe extraction failed: {e}")
-            return {
-                "status": "error",
-                "error": str(e),
-                "symbol": config.selected_pair or "Unknown",
-                "indicators": indicators,
-                "timeframes": timeframes
-            }
-    
-    async def _get_decision_engine(self, config_id: str, user_id: str) -> DecisionEngineV2:
-        """Get or create V2 decision engine for config with LRU eviction."""
-        if config_id in self._decision_engines:
-            # Move to end (most recently used)
-            self._decision_engines.move_to_end(config_id)
-            return self._decision_engines[config_id]
-
-        # Evict oldest if at capacity
-        while len(self._decision_engines) >= self.MAX_DECISION_ENGINES:
-            oldest_config_id, oldest_engine = self._decision_engines.popitem(last=False)
-            self._log.info(f"Evicted decision engine for config {oldest_config_id} (LRU)")
-            # DecisionEngineV2 doesn't have cleanup(), but releasing reference allows GC
-
-        # Create new engine
-        engine = DecisionEngineV2(config_id, user_id)
-        await engine.initialize()
-        self._decision_engines[config_id] = engine
-        return engine
-    
-    async def _run_decision_v2(
-        self,
-        config_id: str,
-        config: BotConfigV2,
-        extraction_result: Dict[str, Any],
-        signal_data: Optional[Dict] = None,
-        run_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Run V2 decision engine with full context management."""
-        try:
-            if extraction_result.get("status") == "error":
-                return {
-                    "status": "error",
-                    "error": "Extraction failed, cannot make decision",
-                    "action": "wait",
-                    "confidence": 0.0
-                }
-
-            if signal_data:
-                symbol = signal_data['symbol']
-            else:
-                symbol = config.selected_pair
-
-            if not symbol:
-                raise ValueError("No symbol specified for decision")
-
-            # Extract ggshot signals and market intelligence from extraction result if available
-            ggshot_signals = extraction_result.get('ggshot_signals', {})
-            market_intelligence = extraction_result.get('market_intelligence', {})
-
-            # Route to Rei decision engine if enabled
-            if getattr(config, 'rei_enabled', False):
-                from decision.rei_engine import ReiDecisionEngine
-                rei_engine = ReiDecisionEngine(config_id, config.user_id)
-
-                # Get open positions and account balance for Rei context
-                open_positions = []
-                account_balance = None
-                try:
-                    from trading.paper.supabase_service import SupabasePaperTradingService
-                    paper_service = SupabasePaperTradingService()
-                    open_positions = await paper_service.get_open_positions(config_id)
-                    account_summary = await paper_service.get_account_summary(config_id)
-                    account_balance = account_summary.get('current_balance', 10000.0)
-                except Exception as e:
-                    self._log.warning(f"Could not fetch positions/balance for Rei context: {e}")
-
-                decision_result = await rei_engine.make_decision(
-                    symbol=symbol,
-                    extraction_result=extraction_result,
-                    open_positions=open_positions,
-                    account_balance=account_balance,
-                    market_intelligence=market_intelligence,
-                )
-                self._log.info(f"Rei Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
-                return decision_result
-
-            # Standard OpenRouter LLM decision engine
-            decision_engine = await self._get_decision_engine(config_id, config.user_id)
-
-            decision_result = await decision_engine.make_decision(
-                symbol=symbol,
-                signal_data=signal_data,
-                ggshot_signals=ggshot_signals,
-                market_intelligence=market_intelligence,
-                run_id=run_id
-            )
-
-            self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
-            return decision_result
-
-        except Exception as e:
-            self._log.error(f"V2 Decision failed: {e}")
-            return {
-                "status": "error",
-                "error": str(e),
-                "action": "wait",
-                "confidence": 0.0
-            }
-    
-    async def _run_trading_v2(
-        self,
-        config: BotConfigV2,
-        user_id: str,
-        decision_result: Dict[str, Any],
-        run_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Run V2 trading execution with full paper trading integration."""
-        try:
-            if decision_result.get("status") == "error":
-                return {
-                    "status": "skipped",
-                    "reason": "Decision failed, no trading action"
-                }
-            
-            action = decision_result.get("action", "wait")
-            confidence = decision_result.get("confidence", 0.0)
-
-            # For signal_validation configs: gate trades with confidence threshold
-            # For scheduled_trading configs: trust the bot's decision (no confidence gating)
-            if config.config_type == "signal_validation":
-                if config.telegram_integration and config.telegram_integration.get("publisher"):
-                    publisher_config = config.telegram_integration.get("publisher", {})
-                    threshold = publisher_config.get("confidence_threshold", 0.7)
-                    if confidence < threshold:
-                        self._log.info(
-                            f"Signal rejected: confidence {confidence:.2f} below threshold {threshold:.2f}"
-                        )
-                        return {
-                            "status": "skipped",
-                            "reason": f"Signal confidence {confidence:.2f} below threshold {threshold:.2f}",
-                            "action": action,
-                            "confidence": confidence
-                        }
-
-            if action in ["wait", "no_action", "hold"]:
-                return {
-                    "status": "skipped",
-                    "reason": f"Decision was to {action}",
-                    "action": action
-                }
-            
-            trading_config = config.trading or {}
-            symbol = decision_result.get("symbol") or config.selected_pair
-
-            if not symbol:
-                self._log.error("No symbol available for trading - decision result and config both missing symbol")
-                return {
-                    "status": "error",
-                    "error": "No symbol specified for trading",
-                    "action": action
-                }
-            
-            # Normalize action to trading_action
-            # Handle: enter_long, long, enter → long
-            #         enter_short, short → short
-            #         exit, close → close
-            if action in ["enter", "long", "enter_long"]:
-                trading_action = "long"
-            elif action in ["short", "enter_short"]:
-                trading_action = "short"
-            elif action in ["exit", "close"]:
-                trading_action = "close"
-            else:
-                return {
-                    "status": "skipped",
-                    "reason": f"Unknown action: {action}",
-                    "action": action
-                }
-            
-            trading_intent = {
-                "decision_id": decision_result.get("decision_id"),
-                "user_id": user_id,
-                "config_id": config.config_id,
-                "symbol": symbol,
-                "action": trading_action,
-                "confidence": confidence,
-                "stop_loss_price": decision_result.get("stop_loss_price"),
-                "take_profit_price": decision_result.get("take_profit_price"),
-                "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
-            }
-            
-            # Determine trading mode (paper vs symphony vs aster vs hyperliquid)
-            trading_mode = getattr(config, 'trading_mode', 'paper')
-            is_live = trading_mode == 'symphony'
-            is_aster = trading_mode == 'aster'
-            is_hyperliquid = trading_mode == 'hyperliquid'
-
-            if trading_action == "close":
-                try:
-                    from core.common.db import get_db_connection
-                    open_positions = []
-
-                    if is_live or is_aster or is_hyperliquid:
-                        # Live trading: Query live_trades for batch_id
-                        provider = 'hyperliquid' if is_hyperliquid else ('aster' if is_aster else 'symphony')
-                        with get_db_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute("""
-                                    SELECT batch_id FROM live_trades
-                                    WHERE config_id = %s AND provider = %s AND closed_at IS NULL
-                                    ORDER BY created_at DESC LIMIT 1
-                                """, (config.config_id, provider))
-                                result = cur.fetchone()
-                                if result:
-                                    open_positions.append({'batch_id': result[0]})
-                    else:
-                        # Paper trading: Query paper_trades for trade_id
-                        with get_db_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute("""
-                                    SELECT trade_id, symbol, side FROM paper_trades
-                                    WHERE config_id = %s AND symbol = %s AND status = 'open'
-                                    ORDER BY opened_at DESC LIMIT 1
-                                """, (config.config_id, symbol))
-                                result = cur.fetchone()
-                                if result:
-                                    open_positions.append({
-                                        'trade_id': result[0],
-                                        'symbol': result[1],
-                                        'side': result[2]
-                                    })
-
-                    if not open_positions:
-                        return {
-                            "status": "skipped",
-                            "reason": f"No open positions to close for {symbol}",
-                            "action": "close"
-                        }
-
-                    position = open_positions[0]
-
-                    # Route to appropriate service
-                    if is_hyperliquid:
-                        trade_result = await self.hyperliquid_trading.close_position(
-                            position['batch_id'],
-                            user_id
-                        )
-                    elif is_aster:
-                        trade_result = await self.aster_trading.close_position(
-                            position['batch_id'],
-                            user_id
-                        )
-                    elif is_live:
-                        trade_result = await self.symphony_trading.close_position(
-                            position['batch_id'],
-                            reason="position_management"
-                        )
-                    else:
-                        trade_result = await self.paper_trading.close_position(
-                            position['trade_id'],
-                            reason="position_management"
-                        )
-
-                    self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol} (mode={trading_mode})")
-                    return trade_result
-
-                except Exception as e:
-                    self._log.error(f"Failed to close position for {symbol}: {e}")
-                    return {
-                        "status": "error",
-                        "error": f"Failed to close position: {str(e)}"
-                    }
-            else:
-                # Route based on trading mode
-                if is_hyperliquid:
-                    trade_result = await self.hyperliquid_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 Hyperliquid live trade completed: {trade_result.get('status')} for {symbol}")
-                elif is_aster:
-                    trade_result = await self.aster_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 AsterDEX live trade completed: {trade_result.get('status')} for {symbol}")
-                elif is_live:
-                    trade_result = await self.symphony_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 Symphony live trade completed: {trade_result.get('status')} for {symbol}")
-                else:
-                    trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 Paper trade completed: {trade_result.get('status')} for {symbol}")
-
-                return trade_result
-            
-        except Exception as e:
-            self._log.error(f"V2 Trading failed: {e}")
-            return {
-                "status": "error",
-                "error": str(e)
-            }
-    
-
-
+# Orchestrator instance (used by "Run Now" and signal validation endpoints)
 orchestrator = GGBotOrchestrator()
-
-scheduler = AsyncIOScheduler()
-execution_semaphore = asyncio.Semaphore(50)
-
-
-
-
-async def run_once(user_id: str, config_id: str, timeframe: str):
-    """
-    Job function executed by APScheduler for each bot.
-    Implements Redis idempotency and calls the orchestrator.
-    """
-    # CHECK STATE BEFORE EXECUTING - prevents inactive bots from running
-    # This catches bots paused by UsageMonitor (credit exhaustion) or other means
-    from core.services.config_service import config_service
-    state = await config_service.get_bot_state(config_id, user_id)
-    if state != 'active':
-        logger.info(f"Skipping execution for {config_id} - state is '{state}', removing scheduler job")
-        remove_bot_job(user_id, config_id, timeframe)
-        return
-
-    close_ts = last_closed_close_ts(timeframe)
-    key = format_redis_idempotency_key(user_id, config_id, timeframe, close_ts)
-    
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-    redis_client = redis.from_url(redis_url, decode_responses=True)
-    
-    async with execution_semaphore:
-        try:
-            ttl = get_redis_ttl_for_timeframe(timeframe)
-            if not await redis_client.set(key, "executing", ex=ttl, nx=True):
-                logger.info(f"Skipping execution for {user_id}:{config_id}:{timeframe}:{close_ts} - already executed")
-                return
-            
-            job_id = f"bot:{user_id}:{config_id}:{timeframe}"
-            job = scheduler.get_job(job_id)
-            next_fire = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
-            
-            try:
-                run_id = uuid.uuid4().hex[:6]
-                result = await orchestrator.run_autonomous_cycle(config_id, user_id, run_id=run_id)
-
-                await redis_client.set(key, "completed", ex=ttl)
-                logger.bind(run_id=run_id, config_id=config_id).info(
-                    f"Completed execution for {timeframe}:{close_ts} in {result.execution_time_ms}ms"
-                )
-                
-            except Exception as e:
-                logger.error(f"Execution failed for {user_id}:{config_id}:{timeframe}:{close_ts}: {e}")
-                
-        finally:
-            await redis_client.aclose()
-
-
-def add_bot_job(user_id: str, config_id: str, timeframe: str, jitter: int = 30):
-    """
-    Add a scheduled job for a bot configuration.
-
-    Args:
-        user_id: User ID
-        config_id: Configuration ID
-        timeframe: Trading timeframe
-        jitter: Random jitter in seconds (default 30, spread load to prevent API timeouts)
-    """
-    trigger = cron_for(timeframe)
-    job_id = f"bot:{user_id}:{config_id}:{timeframe}"
-    misfire_grace = get_misfire_grace_time(timeframe)
-    
-    scheduler.add_job(
-        func=run_once,
-        trigger=trigger,
-        id=job_id,
-        args=[user_id, config_id, timeframe],
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=misfire_grace,
-        jitter=jitter,
-    )
-    
-    logger.info(f"Added scheduler job {job_id} with {timeframe} cadence")
-
-
-def remove_bot_job(user_id: str, config_id: str, timeframe: str):
-    """Remove a scheduled job for a bot configuration."""
-    job_id = f"bot:{user_id}:{config_id}:{timeframe}"
-    try:
-        job = scheduler.get_job(job_id)
-        if job:
-            scheduler.remove_job(job_id)
-            logger.info(f"Removed scheduler job {job_id}")
-            return True
-        else:
-            logger.info(f"Job {job_id} was already removed or never existed")
-            return True
-    except Exception as e:
-        logger.warning(f"Failed to remove job {job_id}: {e}")
-        return False
-
-
-async def reconcile_active_bots():
-    """Reconcile active bots from database on startup."""
-    try:
-        from core.common.db import get_db_connection
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT config_id, user_id, config_type, config_data
-                    FROM configurations
-                    WHERE state = 'active'
-                """)
-
-                active_configs = cur.fetchall()
-                scheduled_count = 0
-
-                for row in active_configs:
-                    config_id, user_id, config_type, config_data = row
-
-                    try:
-                        actual_config_type = config_type or 'scheduled_trading'
-                        if actual_config_type != 'scheduled_trading':
-                            logger.info(f"Skipping {actual_config_type} config {config_id} - not scheduling signal_validation configs")
-                            continue
-
-                        timeframe = extract_timeframe_from_config(config_data)
-
-                        add_bot_job(user_id, config_id, timeframe)
-                        scheduled_count += 1
-
-                    except Exception as e:
-                        logger.error(f"Failed to schedule bot {config_id} for user {user_id}: {e}")
-                
-                logger.info(f"✅ Reconciled {scheduled_count} active bots from database")
-                
-    except Exception as e:
-        logger.error(f"Failed to reconcile active bots: {e}")
-
-
-def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
-    """
-    Extract analysis_frequency (timeframe) from bot config.
-
-    Args:
-        config: Bot configuration dictionary (may be nested)
-
-    Returns:
-        Timeframe string (defaults to "1h"). For signal_driven bots, returns "signal_driven"
-    """
-    # Handle nested config structure from database
-    if "config_data" in config:
-        inner_config = config["config_data"]
-        decision_config = inner_config.get("decision", {})
-        config_type = config.get("config_type", "scheduled_trading")  # Use table field
-    else:
-        # Handle flat config structure
-        decision_config = config.get("decision", {})
-        config_type = config.get("config_type", "scheduled_trading")
-
-    analysis_frequency = decision_config.get("analysis_frequency", "1h")
-
-    # For signal validation bots, respect signal_driven frequency
-    if config_type == "signal_validation" and analysis_frequency == "signal_driven":
-        return "signal_driven"
-
-    # For other bots, default signal_driven to 1h
-    if analysis_frequency == "signal_driven":
-        return "1h"
-
-    return analysis_frequency
-
-
-def get_next_run_from_scheduler(user_id: str, config_id: str) -> Optional[str]:
-    """
-    Get next run time for a specific bot from APScheduler.
-
-    Args:
-        user_id: User ID
-        config_id: Bot configuration ID
-
-    Returns:
-        Next run time as ISO string or None if no job exists
-    """
-    try:
-        # Get all jobs for this user
-        user_jobs = [
-            job for job in scheduler.get_jobs()
-            if job.id.startswith(f"bot:{user_id}:{config_id}:")
-        ]
-
-        if user_jobs:
-            job = user_jobs[0]  # Should only be one job per config
-            return job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job.next_run_time else None
-
-        return None
-    except Exception as e:
-        logger.warning(f"Failed to get next run for {user_id}:{config_id}: {e}")
-        return None
-
-
-def has_scheduler_job(user_id: str, config_id: str) -> bool:
-    """
-    Check if a bot has an active scheduler job.
-
-    Args:
-        user_id: User ID
-        config_id: Bot configuration ID
-
-    Returns:
-        True if job exists, False otherwise
-    """
-    try:
-        user_jobs = [
-            job for job in scheduler.get_jobs()
-            if job.id.startswith(f"bot:{user_id}:{config_id}:")
-        ]
-        return len(user_jobs) > 0
-    except Exception as e:
-        logger.warning(f"Failed to check scheduler job for {user_id}:{config_id}: {e}")
-        return False
-
 
 # API Endpoints
 @app.get("/")
@@ -1696,7 +383,6 @@ async def create_config(
             )
 
         # Validate symphony_agent_id format (UUID)
-        import re
         if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", symphony_agent_id, re.IGNORECASE):
             raise HTTPException(
                 status_code=400,
@@ -1796,7 +482,7 @@ async def create_config(
 
     # Create initial account_snapshot for timeline and metrics
     # Paper starts at $10,000, live modes start at $0 (will sync from exchange)
-    initial_balance = 10000.0 if trading_mode == "paper" else 0.0
+    initial_balance = PAPER_INITIAL_BALANCE if trading_mode == "paper" else 0.0
     try:
         from core.common.db import get_db_connection
         with get_db_connection() as conn:
@@ -2055,46 +741,32 @@ async def update_config(
 
     # Invalidate cached engines so next run picks up new config
     orchestrator.invalidate_engines(config_id)
-    
-    # If bot was active, check if timeframe changed and reschedule if needed
+
+    # If bot was active and timeframe changed, include reschedule info in response.
+    # The scheduler process detects timeframe changes via reconcile loop.
     reschedule_info = None
-    if was_active and scheduler.running:
+    if was_active:
         new_timeframe = extract_timeframe_from_config(config.to_jsonb())
-        
+
         if old_timeframe != new_timeframe:
             logger.info(f"Timeframe changed from {old_timeframe} to {new_timeframe} for active bot {config_id}")
-            
-            # Remove old job
-            if old_timeframe:
-                old_removed = remove_bot_job(current_user.user_id, config_id, old_timeframe)
-            else:
-                old_removed = True
-            
-            # Add new job with new timeframe
-            add_bot_job(current_user.user_id, config_id, new_timeframe)
-            
-            # Get next run time for response
-            job_id = f"bot:{current_user.user_id}:{config_id}:{new_timeframe}"
-            job = scheduler.get_job(job_id)
-            next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
-            
+            next_run = calculate_next_run(new_timeframe)
+
             reschedule_info = {
                 "rescheduled": True,
                 "old_timeframe": old_timeframe,
                 "new_timeframe": new_timeframe,
                 "next_run": next_run
             }
-            
-            # 🔥 WEBSOCKET DELETED! Schedule changes will show up in SSE stream
-    
+
     response = {
         "status": "success",
         "config": config.to_dict()
     }
-    
+
     if reschedule_info:
         response["schedule_update"] = reschedule_info
-    
+
     return response
 
 
@@ -2103,33 +775,18 @@ async def delete_config(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Delete a configuration and clean up associated scheduler jobs."""
-    # Clean up all scheduler jobs for this config before deleting from database
-    removed_jobs = []
-    all_jobs = scheduler.get_jobs()
-    job_prefix = f"bot:{current_user.user_id}:{config_id}:"
-
-    for job in all_jobs:
-        if job.id.startswith(job_prefix):
-            try:
-                scheduler.remove_job(job.id)
-                removed_jobs.append(job.id)
-                logger.info(f"Removed scheduler job {job.id} for deleted config")
-            except Exception as e:
-                logger.warning(f"Failed to remove job {job.id}: {e}")
-
-    # Delete config from database
+    """Delete a configuration. Scheduler reconcile loop auto-removes orphaned jobs."""
+    # Delete config from database — scheduler detects and removes job within 10s
     success = await config_service.delete_config(config_id, current_user.user_id)
 
     if not success:
         raise HTTPException(status_code=404, detail="Configuration not found")
 
-    logger.info(f"Deleted config {config_id} and removed {len(removed_jobs)} scheduler jobs")
+    logger.info(f"Deleted config {config_id}")
 
     return {
         "status": "success",
-        "message": "Configuration deleted successfully",
-        "removed_jobs": len(removed_jobs)
+        "message": "Configuration deleted successfully"
     }
 
 
@@ -2167,9 +824,7 @@ async def run_orchestration(
         raise
     except Exception as e:
         # Log any unexpected exceptions
-        logger.error(f"Unexpected error in orchestration endpoint for config {config_id}: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Unexpected error in orchestration endpoint for config {config_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -2204,9 +859,7 @@ async def run_signal_validation(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in signal validation for config {config_id}: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Unexpected error in signal validation for config {config_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -2268,9 +921,7 @@ async def test_signal_publishing(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Signal publishing test failed: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Signal publishing test failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Signal publishing test failed: {str(e)}")
 
 
@@ -2931,7 +1582,6 @@ async def setup_symphony_account(
             )
 
         # Validate smart account format
-        import re
         if not re.match(r"^0x[a-fA-F0-9]{40}$", smart_account):
             raise HTTPException(
                 status_code=400,
@@ -3056,7 +1706,6 @@ async def setup_aster_account(
         private_key = request.get("private_key", "").strip()
 
         # Validate user wallet format
-        import re
         if not re.match(r"^0x[a-fA-F0-9]{40}$", user_wallet):
             raise HTTPException(
                 status_code=400,
@@ -3200,7 +1849,6 @@ async def setup_hyperliquid_account(
         wallet_address = request.get("wallet_address", "").strip()
 
         # Validate wallet address format
-        import re
         if not re.match(r"^0x[a-fA-F0-9]{40}$", wallet_address):
             raise HTTPException(
                 status_code=400,
@@ -3779,7 +2427,7 @@ async def get_live_account_metrics(
             # Return default empty metrics
             return {
                 'config_id': config_id,
-                'current_balance': 10000.0,
+                'current_balance': PAPER_INITIAL_BALANCE,
                 'total_pnl': 0,
                 'total_trades': 0,
                 'win_trades': 0,
@@ -3868,7 +2516,7 @@ async def get_bot_metrics(
                         "status": "success",
                         "config_id": config_id,
                         "account": {
-                            "balance": 10000.0,
+                            "balance": PAPER_INITIAL_BALANCE,
                             "total_pnl": 0.0
                         },
                         "performance": {
@@ -4181,14 +2829,14 @@ async def get_bot_account(
                 "status": "success",
                 "config_id": config_id,
                 "account": {
-                    "initial_balance": 10000.0,
-                    "current_balance": 10000.0,
-                    "available_balance": 10000.0,
+                    "initial_balance": PAPER_INITIAL_BALANCE,
+                    "current_balance": PAPER_INITIAL_BALANCE,
+                    "available_balance": PAPER_INITIAL_BALANCE,
                     "margin_used": 0.0,
                     "total_pnl": 0.0,
                     "unrealized_pnl": 0.0,
                     "realized_pnl": 0.0,
-                    "total_equity": 10000.0,
+                    "total_equity": PAPER_INITIAL_BALANCE,
                     "performance_percent": 0.0,
                     "open_positions": 0,
                     "total_trades": 0,
@@ -4199,8 +2847,8 @@ async def get_bot_account(
             }
 
         # Extract base metrics
-        initial_balance = Decimal(str(account_summary.get("initial_balance", 10000.0)))
-        current_balance = Decimal(str(account_summary.get("current_balance", 10000.0)))
+        initial_balance = Decimal(str(account_summary.get("initial_balance", PAPER_INITIAL_BALANCE)))
+        current_balance = Decimal(str(account_summary.get("current_balance", PAPER_INITIAL_BALANCE)))
         total_pnl = Decimal(str(account_summary.get("total_pnl", 0.0)))
 
         # Get unrealized P&L and margin from open positions
@@ -4545,29 +3193,16 @@ async def start_bot(
         config_dict = config.to_jsonb()
         timeframe = extract_timeframe_from_config(config_dict)
 
-        # Handle signal_driven bots differently - they don't get scheduled jobs
+        # Set state to active — scheduler process detects within 10s and adds job
+        success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update bot state")
+
+        # Calculate next run for API response (no scheduler needed)
         if timeframe == "signal_driven":
-            # Update state to active (but don't schedule)
-            success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
-            if not success:
-                raise HTTPException(status_code=500, detail="Failed to update bot state")
-
-            next_run = None  # Signal-driven bots don't have scheduled runs
+            next_run = None
         else:
-            # Schedule the bot job for time-based bots
-            add_bot_job(current_user.user_id, config_id, timeframe)
-
-            # Update state to active
-            success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
-            if not success:
-                # Remove the job if state update failed
-                remove_bot_job(current_user.user_id, config_id, timeframe)
-                raise HTTPException(status_code=500, detail="Failed to update bot state")
-
-            # Get next run time for response
-            job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
-            job = scheduler.get_job(job_id)
-            next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
+            next_run = calculate_next_run(timeframe)
         
         # 🔥 WEBSOCKET DELETED! Bot state changes will show up in SSE stream
         
@@ -4591,13 +3226,13 @@ async def stop_bot(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Stop a bot by removing its scheduled job and updating state."""
+    """Stop a bot by setting state to inactive. Scheduler detects within 10s."""
     try:
         # Get bot configuration
         config = await config_service.get_config(config_id, current_user.user_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
-        
+
         # Check if already inactive
         current_state = await config_service.get_bot_state(config_id, current_user.user_id)
         if current_state == 'inactive':
@@ -4606,30 +3241,20 @@ async def stop_bot(
                 "message": "Bot is already stopped",
                 "config_id": config_id
             }
-        
-        # Extract timeframe from config
+
+        # Extract timeframe for response
         config_dict = config.to_jsonb()
         timeframe = extract_timeframe_from_config(config_dict)
 
-        # Handle signal_driven bots differently - they don't have scheduled jobs to remove
-        if timeframe == "signal_driven":
-            job_removed = True  # No job to remove, so consider it successful
-        else:
-            # Remove the scheduled job for time-based bots
-            job_removed = remove_bot_job(current_user.user_id, config_id, timeframe)
-
-        # Update state to inactive
+        # Set state to inactive — scheduler process detects and removes job within 10s
         success = await config_service.set_bot_state(config_id, current_user.user_id, 'inactive')
         if not success:
-            logger.warning(f"Job removed but failed to update state for bot {config_id}")
-        
-        # 🔥 WEBSOCKET DELETED! Bot state changes will show up in SSE stream
-        
+            logger.warning(f"Failed to update state for bot {config_id}")
+
         return {
             "status": "stopped",
             "config_id": config_id,
             "timeframe": timeframe,
-            "job_removed": job_removed,
             "message": "Bot stopped successfully"
         }
         
@@ -4778,7 +3403,7 @@ async def reset_account(
             "status": "success",
             "config_id": config_id,
             "positions_closed": result.get('positions_closed', 0),
-            "new_balance": result.get('new_balance', 10000.0),
+            "new_balance": result.get('new_balance', PAPER_INITIAL_BALANCE),
             "reset_at": result.get('reset_at'),
             "message": result.get('message', 'Account reset successfully')
         }
@@ -5102,39 +3727,45 @@ async def get_user_pledges(
 async def get_scheduler_status(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get scheduler status and active jobs for the current user."""
+    """Get scheduler status from DB (scheduler runs in separate process)."""
     try:
-        # Get all active jobs for the current user
-        user_jobs = [
-            job for job in scheduler.get_jobs() 
-            if job.id.startswith(f"bot:{current_user.user_id}:")
-        ]
-        
-        # Format job information
-        jobs_info = []
-        for job in user_jobs:
-            # Parse job ID to extract config_id and timeframe
-            parts = job.id.split(":")
-            if len(parts) >= 4:
-                config_id = parts[2]
-                timeframe = parts[3]
-                
-                jobs_info.append({
-                    "job_id": job.id,
-                    "config_id": config_id,
-                    "timeframe": timeframe,
-                    "next_run": job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job.next_run_time else None,
-                    "misfire_grace_time": job.misfire_grace_time
-                })
-        
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Count user's active bots
+                cur.execute("""
+                    SELECT config_id, config_data
+                    FROM configurations
+                    WHERE user_id = %s AND state = 'active' AND (config_type = 'scheduled_trading' OR config_type IS NULL)
+                """, (str(current_user.user_id),))
+                rows = cur.fetchall()
+
+                jobs_info = []
+                for config_id, config_data in rows:
+                    tf = extract_timeframe_from_config(config_data)
+                    if tf and tf != 'signal_driven':
+                        jobs_info.append({
+                            "config_id": str(config_id),
+                            "timeframe": tf,
+                            "next_run": calculate_next_run(tf),
+                        })
+
+                # Total active bots across all users
+                cur.execute("""
+                    SELECT COUNT(*) FROM configurations
+                    WHERE state = 'active' AND (config_type = 'scheduled_trading' OR config_type IS NULL)
+                """)
+                total_active = cur.fetchone()[0]
+
         return {
             "status": "success",
-            "scheduler_running": scheduler.state == STATE_RUNNING,
+            "scheduler_running": True,  # Separate process managed by PM2
             "active_jobs": jobs_info,
-            "job_count": len(user_jobs),
-            "total_jobs_in_scheduler": len(scheduler.get_jobs())
+            "job_count": len(jobs_info),
+            "total_active_bots": total_active
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get scheduler status: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get scheduler status: {str(e)}")
@@ -5144,37 +3775,11 @@ async def get_scheduler_status(
 async def manual_reconcile(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Manually trigger scheduler reconciliation (admin function)."""
-    try:
-        if not scheduler.state == STATE_RUNNING:
-            raise HTTPException(status_code=503, detail="Scheduler is not running")
-        
-        # Store counts before reconciliation
-        jobs_before = len(scheduler.get_jobs())
-        user_jobs_before = len([j for j in scheduler.get_jobs() if j.id.startswith(f"bot:{current_user.user_id}:")])
-        
-        # Run reconciliation
-        await reconcile_active_bots()
-        
-        # Check counts after
-        jobs_after = len(scheduler.get_jobs())
-        user_jobs_after = len([j for j in scheduler.get_jobs() if j.id.startswith(f"bot:{current_user.user_id}:")])
-        
-        return {
-            "status": "success",
-            "message": "Reconciliation completed",
-            "jobs_before": jobs_before,
-            "jobs_after": jobs_after,
-            "user_jobs_before": user_jobs_before,
-            "user_jobs_after": user_jobs_after,
-            "change": jobs_after - jobs_before
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Manual reconciliation failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Reconciliation failed: {str(e)}")
+    """Scheduler reconciliation happens automatically every 10s in ggbot_scheduler."""
+    return {
+        "status": "success",
+        "message": "Reconciliation is automatic (10s interval in ggbot_scheduler process)"
+    }
 
 
 @app.get("/api/v2/bot/{config_id}/status")
@@ -5182,32 +3787,27 @@ async def get_bot_status(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get bot status with real scheduler state."""
+    """Get bot status derived from DB state (scheduler runs in separate process)."""
     try:
-        # Get bot state from database
         state = await config_service.get_bot_state(config_id, current_user.user_id)
         config = await config_service.get_config(config_id, current_user.user_id)
-        
+
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
-            
-        # Extract timeframe from config
+
         config_dict = config.to_jsonb()
         timeframe = extract_timeframe_from_config(config_dict)
-        
-        # Check if job exists in scheduler
-        job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
-        job = scheduler.get_job(job_id)
-        next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
-        
+        is_active = state == 'active'
+        next_run = calculate_next_run(timeframe) if is_active and timeframe != 'signal_driven' else None
+
         return {
             "status": "success",
             "config_id": config_id,
-            "bot_status": state or "inactive",  # 'active' or 'inactive'
-            "is_scheduled": job is not None,
+            "bot_status": state or "inactive",
+            "is_scheduled": is_active and timeframe != 'signal_driven',
             "next_run": next_run,
             "timeframe": timeframe,
-            "scheduler_job_exists": job is not None
+            "scheduler_job_exists": is_active
         }
         
     except Exception as e:
@@ -5840,11 +4440,11 @@ async def purchase_credits(
     """
     amount_cents = request.amount_cents
 
-    # Validate amount (min $5, max $500)
-    if amount_cents < 500:
-        raise HTTPException(400, "Minimum credit purchase is $5")
-    if amount_cents > 50000:
-        raise HTTPException(400, "Maximum credit purchase is $500")
+    # Validate amount
+    if amount_cents < CREDIT_PURCHASE_MIN_CENTS:
+        raise HTTPException(400, f"Minimum credit purchase is ${CREDIT_PURCHASE_MIN_CENTS / 100:.0f}")
+    if amount_cents > CREDIT_PURCHASE_MAX_CENTS:
+        raise HTTPException(400, f"Maximum credit purchase is ${CREDIT_PURCHASE_MAX_CENTS / 100:.0f}")
 
     try:
         # Get or create Stripe customer
@@ -5902,11 +4502,11 @@ async def create_crypto_checkout(
 
     amount_cents = request.amount_cents
 
-    # Validate amount (min $5, max $500)
-    if amount_cents < 500:
-        raise HTTPException(400, "Minimum credit purchase is $5")
-    if amount_cents > 50000:
-        raise HTTPException(400, "Maximum credit purchase is $500")
+    # Validate amount
+    if amount_cents < CREDIT_PURCHASE_MIN_CENTS:
+        raise HTTPException(400, f"Minimum credit purchase is ${CREDIT_PURCHASE_MIN_CENTS / 100:.0f}")
+    if amount_cents > CREDIT_PURCHASE_MAX_CENTS:
+        raise HTTPException(400, f"Maximum credit purchase is ${CREDIT_PURCHASE_MAX_CENTS / 100:.0f}")
 
     amount_usd = amount_cents / 100
 
@@ -5927,7 +4527,7 @@ async def create_crypto_checkout(
                     "price_currency": "usd",
                     "order_id": f"credits_{current_user.user_id}_{amount_cents}_{int(datetime.now().timestamp())}",
                     "order_description": f"${amount_usd:.0f} Credit Pack for ggbots",
-                    "ipn_callback_url": "https://ggbots-api.nightingale.business/api/v2/webhooks/nowpayments",
+                    "ipn_callback_url": f"{API_BASE_URL}/api/v2/webhooks/nowpayments",
                     "success_url": f"{os.environ['FRONTEND_URL']}/credits/success",
                     "cancel_url": f"{os.environ['FRONTEND_URL']}/forge"
                 },
@@ -6188,7 +4788,6 @@ async def http_exception_handler(request, exc: HTTPException):
     )
 
 
-import os
 if os.getenv("DEVELOPMENT_MODE", "false").lower() == "true":
     logger.warning("⚠️  DEVELOPMENT MODE ACTIVE: Using mock authentication - DO NOT USE IN PRODUCTION")
     app.dependency_overrides[get_current_user_v2] = get_mock_user_for_dev
