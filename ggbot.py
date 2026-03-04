@@ -102,8 +102,7 @@ class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
     config_type: str = "scheduled_trading"
-    trading_mode: str = "paper"  # 'paper' | 'symphony' | 'aster'
-    symphony_agent_id: Optional[str] = None  # Required when trading_mode='symphony'
+    trading_mode: str = "paper"  # 'paper' | 'hyperliquid'
     selected_pair: Optional[str] = "BTC/USDT"  # Optional for agents
     extraction: Optional[Dict[str, Any]] = None  # Optional for agents and signal_validation
     decision: Optional[Dict[str, Any]] = None  # Optional for agents
@@ -118,7 +117,6 @@ class ConfigUpdateRequest(BaseModel):
     schema_version: Optional[str] = None
     config_type: Optional[str] = None
     trading_mode: Optional[str] = None  # Allow updating trading mode
-    symphony_agent_id: Optional[str] = None  # Allow updating Symphony agent ID
     profile_image_url: Optional[str] = None  # Bot avatar image URL
     selected_pair: Optional[str] = None
     extraction: Optional[Dict[str, Any]] = None
@@ -351,54 +349,17 @@ async def create_config(
 ) -> Dict[str, Any]:
     """Create a new bot configuration with specified trading mode."""
     # Extract fields that go in table columns, not JSONB
-    request_data = request.dict(exclude={"config_name", "trading_mode", "symphony_agent_id"})
+    request_data = request.dict(exclude={"config_name", "trading_mode"})
     config_type = request_data.pop("config_type", "scheduled_trading")
     trading_mode = request.trading_mode
-    symphony_agent_id = request.symphony_agent_id
 
     # Validate trading mode
-    if trading_mode not in ["paper", "symphony", "aster", "hyperliquid"]:
-        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper', 'symphony', 'aster', or 'hyperliquid'")
+    if trading_mode not in ["paper", "hyperliquid"]:
+        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper' or 'hyperliquid'")
 
     # NOTE: No subscription check here — users can CREATE live trading bots on any tier.
     # The real gate is bot ACTIVATION (start_bot endpoint) which checks can_activate_bots.
     # Free users get test runs per bot regardless of trading mode.
-
-    # Symphony-specific validations
-    if trading_mode == "symphony":
-        # Check Symphony credentials
-        from core.auth.vault_utils import VaultManager
-        credentials = await VaultManager.get_symphony_credential(current_user.user_id)
-        if not credentials:
-            raise HTTPException(
-                status_code=400,
-                detail="Symphony account not connected. Please connect in Settings first."
-            )
-
-        # Validate symphony_agent_id is provided
-        if not symphony_agent_id or not symphony_agent_id.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="Symphony Agent ID is required for Symphony live trading."
-            )
-
-        # Validate symphony_agent_id format (UUID)
-        if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", symphony_agent_id, re.IGNORECASE):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid Symphony Agent ID format (should be a UUID)."
-            )
-
-    # Aster-specific validations
-    if trading_mode == "aster":
-        # Check Aster credentials
-        from core.auth.vault_utils import VaultManager
-        credentials = await VaultManager.get_aster_credential(current_user.user_id)
-        if not credentials:
-            raise HTTPException(
-                status_code=400,
-                detail="AsterDEX account not connected. Please connect in Settings first."
-            )
 
     # Hyperliquid: block direct creation — use "Promote to Live" instead
     if trading_mode == "hyperliquid":
@@ -424,24 +385,6 @@ async def create_config(
             )
 
         # Check symbol compatibility with trading mode
-        if trading_mode == "symphony":
-            from core.symbols import UniversalSymbolStandardizer
-            standardizer = UniversalSymbolStandardizer()
-            if not standardizer.is_symphony_compatible(selected_pair, "ccxt"):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Symbol {selected_pair} is not compatible with Symphony live trading."
-                )
-
-        if trading_mode == "aster":
-            from core.symbols import UniversalSymbolStandardizer
-            standardizer = UniversalSymbolStandardizer()
-            if not standardizer.is_aster_compatible(selected_pair, "ccxt"):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Symbol {selected_pair} is not compatible with AsterDEX trading."
-                )
-
         if trading_mode == "hyperliquid":
             from core.symbols import UniversalSymbolStandardizer
             standardizer = UniversalSymbolStandardizer()
@@ -454,13 +397,11 @@ async def create_config(
     # Add config_type back to config_data for BotConfigV2 constructor
     request_data["config_type"] = config_type
 
-    # Use symphony/aster directly - no more 'live' mapping (Schema v2.2+)
     config = await config_service.create_config(
         user_id=current_user.user_id,
         config_name=request.config_name,
         config_data=request_data,
         trading_mode=trading_mode,
-        symphony_agent_id=symphony_agent_id if trading_mode == "symphony" else None
     )
 
     if not config:
@@ -678,7 +619,6 @@ async def update_config(
     config_name = update_data.pop("config_name", None)
     config_type = update_data.pop("config_type", None)
     trading_mode = update_data.pop("trading_mode", None)
-    symphony_agent_id = update_data.pop("symphony_agent_id", None)
     profile_image_url = update_data.pop("profile_image_url", None)
 
     # Validate symbol has real-time price data if changing selected_pair
@@ -712,7 +652,6 @@ async def update_config(
         config_name=config_name,
         config_type=config_type,
         trading_mode=trading_mode,
-        symphony_agent_id=symphony_agent_id,
         profile_image_url=profile_image_url
     )
 
@@ -1557,277 +1496,6 @@ async def get_billing_breakdown(
         raise HTTPException(status_code=500, detail=f"Failed to get billing breakdown: {str(e)}")
 
 
-# Symphony Live Trading Endpoints
-@app.post("/api/v2/symphony/setup")
-async def setup_symphony_account(
-    request: Dict[str, str],
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Store Symphony API credentials for live trading.
-
-    Request body:
-        - api_key: Symphony API key (starts with 'sk_')
-        - smart_account: Ethereum address (0x...)
-    """
-    try:
-        api_key = request.get("api_key", "").strip()
-        smart_account = request.get("smart_account", "").strip()
-
-        # Validate API key format
-        if not api_key or not api_key.startswith("sk_"):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid API key format. Should start with 'sk_'"
-            )
-
-        # Validate smart account format
-        if not re.match(r"^0x[a-fA-F0-9]{40}$", smart_account):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid smart account address. Should be a valid Ethereum address (0x...)"
-            )
-
-        # Store credentials in Vault
-        from core.auth.vault_utils import VaultManager
-        success = await VaultManager.store_symphony_credential(
-            user_id=current_user.user_id,
-            api_key=api_key,
-            smart_account=smart_account
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to store Symphony credentials"
-            )
-
-        logger.bind(user_id=current_user.user_id).info("Symphony account connected successfully")
-
-        return {
-            "status": "success",
-            "message": "Symphony account connected successfully"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to setup Symphony account: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to setup Symphony account: {str(e)}"
-        )
-
-
-@app.get("/api/v2/symphony/status")
-async def get_symphony_status(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Check if user has Symphony account connected."""
-    try:
-        from core.auth.vault_utils import VaultManager
-
-        credentials = await VaultManager.get_symphony_credential(current_user.user_id)
-
-        if credentials:
-            return {
-                "connected": True,
-                "smart_account": credentials.get("smart_account")
-            }
-        else:
-            return {
-                "connected": False,
-                "smart_account": None
-            }
-
-    except Exception as e:
-        logger.error(f"Failed to check Symphony status: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to check Symphony status: {str(e)}"
-        )
-
-
-@app.post("/api/v2/symphony/disconnect")
-async def disconnect_symphony_account(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Disconnect Symphony account and disable all live trading bots.
-
-    This will:
-    - Remove Symphony credentials from Vault
-    - Set all user's live bots to paper mode
-    """
-    try:
-        from core.auth.vault_utils import VaultManager
-
-        success = await VaultManager.delete_symphony_credential(current_user.user_id)
-
-        if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to disconnect Symphony account"
-            )
-
-        logger.bind(user_id=current_user.user_id).info("Symphony account disconnected")
-
-        return {
-            "status": "success",
-            "message": "Symphony account disconnected. All live bots have been disabled."
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to disconnect Symphony account: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to disconnect Symphony account: {str(e)}"
-        )
-
-
-@app.post("/api/v2/aster/setup")
-async def setup_aster_account(
-    request: Dict[str, str],
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Store AsterDEX credentials for live trading.
-
-    Request body:
-        - user_wallet: User's Ethereum wallet address (0x...)
-        - aster_wallet: AsterDEX wallet address (0x...)
-        - private_key: AsterDEX wallet private key (0x... or without 0x prefix)
-    """
-    try:
-        user_wallet = request.get("user_wallet", "").strip()
-        aster_wallet = request.get("aster_wallet", "").strip()
-        private_key = request.get("private_key", "").strip()
-
-        # Validate user wallet format
-        if not re.match(r"^0x[a-fA-F0-9]{40}$", user_wallet):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid user wallet address. Should be a valid Ethereum address (0x...)"
-            )
-
-        # Validate aster wallet format
-        if not re.match(r"^0x[a-fA-F0-9]{40}$", aster_wallet):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid aster wallet address. Should be a valid Ethereum address (0x...)"
-            )
-
-        # Validate private key format (with or without 0x prefix)
-        if not re.match(r"^(0x)?[a-fA-F0-9]{64}$", private_key):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid private key format. Should be 64 hex characters (with or without 0x prefix)"
-            )
-
-        # Store credentials in Vault
-        from core.auth.vault_utils import VaultManager
-        success = await VaultManager.store_aster_credential(
-            user_id=current_user.user_id,
-            user_wallet=user_wallet,
-            aster_wallet=aster_wallet,
-            private_key=private_key
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to store AsterDEX credentials"
-            )
-
-        logger.bind(user_id=current_user.user_id).info("AsterDEX account connected successfully")
-
-        return {
-            "status": "success",
-            "message": "AsterDEX account connected successfully"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to setup AsterDEX account: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to setup AsterDEX account: {str(e)}"
-        )
-
-
-@app.get("/api/v2/aster/status")
-async def get_aster_status(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Check if user has AsterDEX account connected."""
-    try:
-        from core.auth.vault_utils import VaultManager
-
-        credentials = await VaultManager.get_aster_credential(current_user.user_id)
-
-        if credentials:
-            return {
-                "connected": True,
-                "user_wallet": credentials.get("user_wallet"),
-                "aster_wallet": credentials.get("aster_wallet")
-            }
-        else:
-            return {
-                "connected": False,
-                "user_wallet": None,
-                "aster_wallet": None
-            }
-
-    except Exception as e:
-        logger.error(f"Failed to check AsterDEX status: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to check AsterDEX status: {str(e)}"
-        )
-
-
-@app.post("/api/v2/aster/disconnect")
-async def disconnect_aster_account(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Disconnect AsterDEX account and disable all aster trading bots.
-
-    This will:
-    - Remove AsterDEX credentials from Vault
-    - Set all user's aster bots to paper mode
-    """
-    try:
-        from core.auth.vault_utils import VaultManager
-
-        success = await VaultManager.delete_aster_credential(current_user.user_id)
-
-        if not success:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to disconnect AsterDEX account"
-            )
-
-        logger.bind(user_id=current_user.user_id).info("AsterDEX account disconnected")
-
-        return {
-            "status": "success",
-            "message": "AsterDEX account disconnected. All aster bots have been disabled."
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to disconnect AsterDEX account: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to disconnect AsterDEX account: {str(e)}"
-        )
-
-
 # =============================================================================
 # Hyperliquid Live Trading Setup
 # =============================================================================
@@ -2178,181 +1846,6 @@ async def test_hyperliquid_trade(
         )
 
 
-@app.get("/api/v2/positions/live/{config_id}")
-async def get_live_positions(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get open live positions for a bot configuration from Symphony."""
-    try:
-        # Verify user owns this config
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Check if it's a Symphony live trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'symphony':
-            return {
-                "positions": [],
-                "message": "Not a Symphony live trading bot"
-            }
-
-        # Get positions from Symphony service
-        positions = await orchestrator.symphony_trading.get_open_positions(config_id)
-
-        return {
-            "positions": positions,
-            "count": len(positions)
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get live positions: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get live positions: {str(e)}"
-        )
-
-
-@app.post("/api/v2/positions/live/{batch_id}/close")
-async def close_live_position(
-    batch_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Close a live position by batch_id."""
-    try:
-        # Verify user owns this position
-        from core.common.db import get_db_connection
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT lt.config_id
-                    FROM live_trades lt
-                    JOIN configurations c ON lt.config_id = c.config_id
-                    WHERE lt.batch_id = %s AND c.user_id = %s AND lt.closed_at IS NULL
-                """, (batch_id, current_user.user_id))
-
-                result = cur.fetchone()
-                if not result:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="Position not found or already closed"
-                    )
-
-        # Close position via Symphony service
-        close_result = await orchestrator.symphony_trading.close_position(
-            batch_id=batch_id,
-            reason="manual"
-        )
-
-        if close_result.get("status") != "success":
-            raise HTTPException(
-                status_code=500,
-                detail=close_result.get("reason", "Failed to close position")
-            )
-
-        return close_result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to close live position: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to close live position: {str(e)}"
-        )
-
-
-@app.get("/api/v2/positions/aster/{config_id}")
-async def get_aster_positions(
-    config_id: str
-) -> Dict[str, Any]:
-    """Get open Aster positions for a bot configuration (PUBLIC for competition viewing)."""
-    from core.common.db import get_db_connection
-
-    try:
-        # Verify config exists (no auth required for public viewing)
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT config_data FROM configurations WHERE config_id = %s
-                """, (config_id,))
-                row = cur.fetchone()
-
-        if not row:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        config_data = row[0]
-
-        # Check if it's an Aster trading bot
-        if config_data.get('trading_mode', 'paper') != 'aster':
-            return {
-                "positions": [],
-                "message": "Not an Aster trading bot"
-            }
-
-        # Get positions from Aster service
-        positions = await orchestrator.aster_trading.get_open_positions(config_id)
-
-        return {
-            "positions": positions,
-            "count": len(positions)
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get Aster positions: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get Aster positions: {str(e)}"
-        )
-
-
-@app.post("/api/v2/positions/aster/{order_id}/close")
-async def close_aster_position(
-    order_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Close an Aster position by order_id."""
-    try:
-        # Verify user owns this position
-        from core.common.db import get_db_connection
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT lt.config_id, c.user_id
-                    FROM live_trades lt
-                    JOIN configurations c ON lt.config_id = c.config_id
-                    WHERE lt.batch_id = %s AND lt.provider = 'aster'
-                """, (order_id,))
-                result = cur.fetchone()
-
-                if not result:
-                    raise HTTPException(status_code=404, detail="Position not found")
-
-                config_id, user_id = result
-                if user_id != current_user.user_id:
-                    raise HTTPException(status_code=403, detail="Unauthorized")
-
-        # Close position via Aster service
-        close_result = await orchestrator.aster_trading.close_position(order_id)
-
-        return close_result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to close Aster position: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to close Aster position: {str(e)}"
-        )
-
-
 @app.post("/api/v2/positions/hyperliquid/{batch_id}/close")
 async def close_hyperliquid_position(
     batch_id: str,
@@ -2399,94 +1892,6 @@ async def close_hyperliquid_position(
             status_code=500,
             detail=f"Failed to close Hyperliquid position: {str(e)}"
         )
-
-
-@app.get("/api/v2/account/live/{config_id}")
-async def get_live_account_metrics(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get account metrics for live trading bot from Symphony."""
-    try:
-        # Verify user owns this config
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Check if it's a Symphony live trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'symphony':
-            raise HTTPException(
-                status_code=400,
-                detail="Not a Symphony live trading bot"
-            )
-
-        # Get metrics from Symphony service
-        metrics = await orchestrator.symphony_trading.get_account_metrics(config_id)
-
-        if not metrics:
-            # Return default empty metrics
-            return {
-                'config_id': config_id,
-                'current_balance': PAPER_INITIAL_BALANCE,
-                'total_pnl': 0,
-                'total_trades': 0,
-                'win_trades': 0,
-                'loss_trades': 0,
-                'win_rate': 0,
-                'open_positions': 0,
-                'portfolio_return_pct': 0,
-                'updated_at': datetime.now().isoformat()
-            }
-
-        return metrics
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get live account metrics: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get live account metrics: {str(e)}"
-        )
-
-
-@app.get("/api/v2/trades/live/{config_id}")
-async def get_live_trade_history(
-    config_id: str,
-    limit: int = 50,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get closed trade history for live trading bot from Symphony."""
-    try:
-        # Verify user owns this config
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Check if it's a Symphony live trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'symphony':
-            raise HTTPException(
-                status_code=400,
-                detail="Not a Symphony live trading bot"
-            )
-
-        # Get trade history from Symphony service
-        trades = await orchestrator.symphony_trading.get_trade_history(config_id, limit)
-
-        return {
-            'trades': trades,
-            'count': len(trades)
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get live trade history: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get live trade history: {str(e)}"
-        )
-
 
 
 # Bot Data Endpoints for Dashboard
@@ -3058,35 +2463,12 @@ async def agent_execute_trade(
 
         # Route to appropriate trading service based on trading_mode
         trading_mode = getattr(config, 'trading_mode', 'paper')
-        is_live = trading_mode == 'symphony'
-        is_aster = trading_mode == 'aster'
-        is_hyperliquid = trading_mode == 'hyperliquid'
 
-        if is_hyperliquid:
+        if trading_mode == 'hyperliquid':
             result = await orchestrator.hyperliquid_trading.execute_trade_intent(intent)
             return {
                 "status": "success",
                 "message": "Trade executed on Hyperliquid",
-                "trade": {
-                    "batch_id": result.get("batch_id"),
-                    "status": result.get("status")
-                }
-            }
-        elif is_aster:
-            result = await orchestrator.aster_trading.execute_trade_intent(intent)
-            return {
-                "status": "success",
-                "message": "Trade executed on AsterDEX",
-                "trade": {
-                    "batch_id": result.get("batch_id"),
-                    "status": result.get("status")
-                }
-            }
-        elif is_live:
-            result = await orchestrator.symphony_trading.execute_trade_intent(intent)
-            return {
-                "status": "success",
-                "message": "Trade executed on Symphony",
                 "trade": {
                     "batch_id": result.get("batch_id"),
                     "status": result.get("status")

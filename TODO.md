@@ -20,41 +20,15 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🔧 **Orchestrator Refactor - Performance First**
+## ✅ **Orchestrator Refactor - COMPLETE**
 
-**Status**: 🟡 IN PROGRESS - Quick wins done, scheduler separation next
-**Planning Doc**: [DOCS/todo/ORCHESTRATOR_REFACTOR.md](DOCS/todo/ORCHESTRATOR_REFACTOR.md)
-**Priority**: P0 - Blocking user experience
+**Planning Doc**: [DOCS/completed/ORCHESTRATOR_REFACTOR.md](DOCS/completed/ORCHESTRATOR_REFACTOR.md)
 
-**Problem**: API returns 502s and SSE streams disconnect during bot execution.
-Root causes: psycopg2 sync blocking → single process contention → 5,260-line monolith.
-
-### **Phase 1: Quick Wins** ✅ COMPLETE
-- [x] Remove artificial UX delays (13s saved per cycle)
-- [ ] Add timing instrumentation to identify actual bottlenecks
-- [ ] Verify connection pooling is properly configured
-
-### **Phase 2: Scheduler Separation** (~16-24 hours)
-- [ ] Create `ggbot-scheduler.py` (APScheduler, no HTTP)
-- [ ] Create `core/orchestrator/lifecycle.py` (Redis pub/sub)
-- [ ] Update `ggbot.py` (remove scheduler startup)
-- [ ] Update PM2 config (two processes)
-- [ ] Test: API responsive during bot execution
-
-### **Phase 3: Async Database** (~40-60 hours)
-- [ ] Create `core/common/async_db.py` (asyncpg pool)
-- [ ] Migrate hot paths (SSE stream, bot lifecycle)
-- [ ] Feature flag for gradual rollout
-
-### **Phase 4: Code Organization** (Optional)
-- [ ] Extract billing/arena/bot_lifecycle to separate `api/` modules
-- [ ] Move GGBotOrchestrator to `core/orchestrator/`
-
-| Metric | Current | Phase 2 | Phase 3 |
-|--------|---------|---------|---------|
-| API p99 latency | 3-10s | <500ms | <100ms |
-| 502 errors/hour | 10-20 | <5 | 0 |
-| SSE uptime | 95% | 98% | 99.9% |
+- Phase 1 (Quick Wins) + Phase 2 (Scheduler Separation) — shipped 2026-03-01
+- Code quality pass + dead code removal (Symphony/Aster) — 2026-03-04
+- `ggbot.py`: 6204 → 4185 lines (-32%)
+- Frontend hang at hourly candle close: **resolved**
+- Future: async DB (asyncpg), module extraction — both cosmetic/optional, no open issues
 
 ---
 
@@ -172,10 +146,21 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 
 ---
 
-## 🧠 **Market Intelligence - Future Phases**
+## 🧠 **Market Intelligence - Expansion**
 
 **Phase 1 Complete**: 8 Grok sources live ($7-10/week with 4hr TTLs)
+**Planning Doc**: [DOCS/MARKET_INTELLIGENCE_ROADMAP.md](DOCS/MARKET_INTELLIGENCE_ROADMAP.md)
 
+### **Community-Requested: Cross-Asset Context** (from Denis @ Buidler Labs)
+- [ ] **USDT.D (USDT Dominance)** — rising = money exits crypto (bearish), falling = money entering (bullish). CoinGecko/Binance API, ~1-2hr
+- [ ] **MOVE Index** — ICE BofA bond volatility. High MOVE = bond stress = risk-off cascade for crypto. Grok web search, ~1hr
+- Fits existing Phase 1 macro data points. Same adapter pattern, $0 cost.
+
+### **Community-Requested: Order Blocks Preprocessor**
+- [ ] **Order Block Detection** — ICT concept: last opposite candle before impulse move = institutional accumulation zone. Requires swing high/low detection + impulse validation + zone tracking over time. New preprocessor (#22), ~4-6hr
+- [ ] **Enhanced Position Statefulness** — enrich position management prompts with: bars-in-trade, max drawdown during trade, avg entry (for DCA). Extends DecisionEngineV2 position recap, ~2-3hr
+
+### **Existing Roadmap Phases**
 - **Phase 2: Premium On-Chain** ($100-500/mo) — Nansen/Arkham whale tracking, Glassnode flows, token unlocks
 - **Phase 3: Sentiment & Social** ($100-500/mo) — Twitter/Reddit NLP, narrative velocity
 - **Phase 4: Advanced Intelligence** ($200-1000/mo) — order book heatmaps, institutional flows (BTC ETF)

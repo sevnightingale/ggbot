@@ -199,19 +199,36 @@ module.exports = {
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
-    }
-    // Uncomment when ready to add more services
-    /*
+    },
+    // Scheduler process — runs bot cycles independently of API
     {
-      name: 'ccxt-mcp-server',
-      script: '/home/sev/ggbot/core/mcp/servers/ccxt_mcp_server.py',
+      name: 'ggbot-scheduler',
+      script: '/home/sev/ggbot/ggbot_scheduler.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
-      watch: false
+      watch: false,
+      max_memory_restart: '1G',
+      kill_timeout: 5000,
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+        REDIS_URL: process.env.REDIS_URL
+      },
+      error_file: '/dev/null',
+      out_file: '/dev/null',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
     }
-    */
   ]
 };

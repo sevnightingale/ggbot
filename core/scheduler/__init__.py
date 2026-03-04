@@ -10,16 +10,20 @@ from .utils import (
     get_misfire_grace_time,
     format_redis_idempotency_key,
     get_redis_ttl_for_timeframe,
+    calculate_next_run,
+    extract_timeframe_from_config,
     TIMEFRAME_SECONDS,
     MISFIRE_GRACE_TIMES
 )
 
 __all__ = [
     "cron_for",
-    "last_closed_close_ts", 
+    "last_closed_close_ts",
     "get_misfire_grace_time",
     "format_redis_idempotency_key",
     "get_redis_ttl_for_timeframe",
+    "calculate_next_run",
+    "extract_timeframe_from_config",
     "TIMEFRAME_SECONDS",
     "MISFIRE_GRACE_TIMES"
 ]

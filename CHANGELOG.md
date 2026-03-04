@@ -6,6 +6,72 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-04 - Code Quality Fixes + Dead Code Removal
+
+**Dead Code Removal** (`ggbot.py`, -618 lines):
+- Removed all Symphony endpoints (setup/status/disconnect, positions, account metrics, trade history) — integration BLOCKED, API returns 404s
+- Removed all Aster endpoints (setup/status/disconnect, positions) — integration BLOCKED
+- Removed Symphony/Aster branches from agent trade execution, config creation validation, symbol compatibility checks
+- Removed `symphony_agent_id` from ConfigCreateRequest/ConfigUpdateRequest models
+- `ggbot.py`: 4802 → 4185 lines. Total reduction from original monolith: 6204 → 4185 (-32%)
+
+**Bug Fix** (`ggbot.py`):
+- `get_scheduler_status` total active bots query missing `OR config_type IS NULL` — legacy rows invisible in count. Now consistent with reconcile loop and per-user query.
+
+**Import Cleanup** (`ggbot.py:1-98`):
+- Organized imports into stdlib/third-party/local blocks, alphabetized. Removed 4 inline `import re`, 3 inline `import traceback`, 1 duplicate `import os`. Updated module docstring.
+
+**Logging** (`ggbot.py`):
+- Replaced 3x `import traceback; traceback.print_exc()` with `exc_info=True` on logger.error() — tracebacks now route through Loguru pipeline instead of bypassing to stderr.
+
+**Constants** (`ggbot.py:95-98`):
+- `PAPER_INITIAL_BALANCE` (was literal `10000.0` in 10 places), `CREDIT_PURCHASE_MIN_CENTS`/`MAX_CENTS` (was duplicated in 2 endpoints), `API_BASE_URL` (was hardcoded production domain in IPN callback).
+
+**Frontend** (`frontend/app/layout.tsx`):
+- Added Virtual Protocol site verification meta tag.
+
+---
+
+## 2026-03-01 - Orchestrator Refactor Phase 2: Scheduler Separation
+
+**Planning Doc**: [DOCS/completed/ORCHESTRATOR_REFACTOR.md](DOCS/completed/ORCHESTRATOR_REFACTOR.md)
+
+**Problem**: Frontend hung 5-10min at every hourly candle close. Single `ggbot.py` process ran both API server and APScheduler — 13+ bots firing simultaneously starved event loop, blocking all HTTP requests.
+
+**Architecture Change** — split monolith into two PM2 processes:
+- `ggbot` (API-only): HTTP/SSE, "Run Now", fast always
+- `ggbot-scheduler` (scheduler-only): APScheduler, bot execution, Stripe meter cron
+- Database is sole communication channel — no Redis pub/sub, no new infrastructure
+
+**New Files**:
+- `core/orchestrator/orchestrator.py` — GGBotOrchestrator class + OrchestrationResult extracted from ggbot.py (~1000 lines moved)
+- `core/scheduler/bot_runner.py` — `run_once()`, `add_bot_job()`, `remove_bot_job()` + new `reconcile_loop()` (polls DB every 10s, diffs with scheduler jobs)
+- `core/scheduler/utils.py` — added `calculate_next_run()` (computes next fire time without scheduler instance) + `extract_timeframe_from_config()` (moved from ggbot.py)
+- `ggbot_scheduler.py` — thin entry point, creates scheduler + orchestrator, enters reconcile loop
+
+**Modified Files**:
+- `ggbot.py` — removed ~1400 lines (orchestrator class, scheduler code). Start/stop/update/delete endpoints write DB state only. `get_scheduler_status` queries DB instead of APScheduler. 6204→4802 lines
+- `core/sse/dashboard_data.py` — replaced `from ggbot import get_next_run_from_scheduler, has_scheduler_job` with `calculate_next_run()` from utils
+- `ecosystem.config.js` — added `ggbot-scheduler` PM2 entry (1G max memory, same env vars)
+
+**How start/stop works now**: User presses Start → API sets `state='active'` → returns immediately with calculated `next_run` → scheduler detects new active bot within 10s → adds APScheduler job. Stop is reverse. Handles all edge cases: timeframe change, delete, crash recovery.
+
+---
+
+## 2026-03-01 - Virtuals 60 Days Application Draft + NOWPayments Integration Guide
+
+**Virtuals 60 Days** (`NOTE.md`):
+- Platform token application for Virtuals 60 Days framework — Core Idea, What It Does, How It Works, Why, Roadmap, Token Utility, Tokenomics sections
+- Cross-referenced with `ggbots-voice-guide.md` for tone/brand alignment
+- Season 1 data (The Arbiter +45% autonomous, 44 bots, 21 days) integrated as proof point
+- Trade37 Championship in Future Vision (AI vs Human in-person competition)
+
+**NOWPayments Guide** (`DOCS/NOWPAYMENTS_INTEGRATION_GUIDE.md`):
+- Standalone integration guide extracted from production `ggbot.py` implementation
+- Covers: invoice creation, HMAC-SHA512 webhook verification (sorted compact JSON gotcha), idempotency via Redis, order_id encoding pattern, payment status reference
+
+---
+
 ## 2026-02-26 - Cumulative Bot Cost Tracking + Activity Cost Display + Cost Estimation
 
 **Per-Bot Lifetime Cost** (`decision/engine_v2.py`, `api/usage.py`, `ActivationBar.tsx`):

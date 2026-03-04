@@ -277,16 +277,17 @@ def _enhance_bot_with_runtime_data(bot: Dict[str, Any]) -> None:
     # Note: pause_reason is fetched separately in _fetch_pause_reasons_for_bots()
     # because it requires async Redis access
 
-    # Get scheduler info from APScheduler
-    from ggbot import get_next_run_from_scheduler, has_scheduler_job
+    # Derive scheduling info from DB state + config timeframe (no scheduler needed)
+    from core.scheduler.utils import calculate_next_run, extract_timeframe_from_config
 
-    user_id = bot.get('user_id')
-    if user_id and config_id:
-        bot['next_run'] = get_next_run_from_scheduler(user_id, config_id)
-        bot['is_scheduled'] = has_scheduler_job(user_id, config_id)
+    bot_state = bot.get('state', 'inactive')
+    bot['is_scheduled'] = bot_state == 'active'
+    if bot['is_scheduled']:
+        config_data = bot.get('config_data', {})
+        timeframe = extract_timeframe_from_config(config_data)
+        bot['next_run'] = calculate_next_run(timeframe) if timeframe and timeframe != 'signal_driven' else None
     else:
         bot['next_run'] = None
-        bot['is_scheduled'] = bot_state == 'active'
 
 
 async def _fetch_pause_reasons_for_bots(bots: List[Dict[str, Any]]) -> None:

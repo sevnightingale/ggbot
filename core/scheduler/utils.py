@@ -8,7 +8,7 @@ following the SCHEDULDER.md specification.
 from datetime import datetime, timezone
 from apscheduler.triggers.cron import CronTrigger
 from zoneinfo import ZoneInfo
-from typing import Dict
+from typing import Dict, Any, Optional
 
 # Timezone configuration
 UTC = ZoneInfo("UTC")
@@ -171,3 +171,57 @@ def get_redis_ttl_for_timeframe(timeframe: str) -> int:
     max_ttl = 7 * 24 * 3600  # 1 week maximum
     
     return max(min_ttl, min(base_ttl, max_ttl))
+
+
+def calculate_next_run(timeframe: str) -> Optional[str]:
+    """
+    Calculate next run time for a timeframe without needing a scheduler instance.
+
+    Uses the same CronTrigger logic as add_bot_job, so the calculated time
+    matches what APScheduler would schedule.
+
+    Args:
+        timeframe: Timeframe string (5m, 15m, 30m, 1h, 4h, 1d, 1w)
+
+    Returns:
+        Next run time as ISO string (UTC), or None if timeframe is invalid
+    """
+    try:
+        trigger = cron_for(timeframe)
+        next_fire = trigger.get_next_fire_time(None, datetime.now(timezone.utc))
+        return next_fire.strftime('%Y-%m-%dT%H:%M:%SZ') if next_fire else None
+    except (ValueError, AttributeError):
+        return None
+
+
+def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
+    """
+    Extract analysis_frequency (timeframe) from bot config.
+
+    Args:
+        config: Bot configuration dictionary (may be nested)
+
+    Returns:
+        Timeframe string (defaults to "1h"). For signal_driven bots, returns "signal_driven"
+    """
+    # Handle nested config structure from database
+    if "config_data" in config:
+        inner_config = config["config_data"]
+        decision_config = inner_config.get("decision", {})
+        config_type = config.get("config_type", "scheduled_trading")  # Use table field
+    else:
+        # Handle flat config structure
+        decision_config = config.get("decision", {})
+        config_type = config.get("config_type", "scheduled_trading")
+
+    analysis_frequency = decision_config.get("analysis_frequency", "1h")
+
+    # For signal validation bots, respect signal_driven frequency
+    if config_type == "signal_validation" and analysis_frequency == "signal_driven":
+        return "signal_driven"
+
+    # For other bots, default signal_driven to 1h
+    if analysis_frequency == "signal_driven":
+        return "1h"
+
+    return analysis_frequency

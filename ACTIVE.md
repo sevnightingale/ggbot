@@ -1,64 +1,64 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-02-26 20:07:27 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-01 12:04:37 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 322
+- **Total Users**: 325
 - **Prepaid Users**: 20 (20 active subscriptions)
-- **Free Users**: 296
-- **Users with Bots**: 312 (96.9%)
+- **Free Users**: 299
+- **Users with Bots**: 315 (96.9%)
 
 ### Bot Statistics
-- **Total Bots**: 483
-- **Active Bots**: 19 (3.9%)
-  - Paper: 18
+- **Total Bots**: 488
+- **Active Bots**: 21 (4.3%)
+  - Paper: 20
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 1
-- **Inactive Bots**: 464
+- **Inactive Bots**: 467
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,534
-  - Wins: 2,523
-  - Losses: 5,011
-  - Platform Win Rate: 33.49%
-  - Total P&L: $118,480.44
+- **Total Trades (All Time)**: 7,634
+  - Wins: 2,563
+  - Losses: 5,071
+  - Platform Win Rate: 33.57%
+  - Total P&L: $115,278.94
 - **Recent Activity**:
-  - Last 24 hours: 26 trades
-  - Last 7 days: 144 trades
-  - Last 30 days: 2169 trades
+  - Last 24 hours: 21 trades
+  - Last 7 days: 206 trades
+  - Last 30 days: 2186 trades
 
 ### Open Positions
-- **Open Positions**: 5
-- **Unique Symbols**: 3
-- **Total Exposure**: $57,880.67
-- **Unrealized P&L**: $552.37
+- **Open Positions**: 3
+- **Unique Symbols**: 2
+- **Total Exposure**: $27,629.06
+- **Unrealized P&L**: $476.95
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,221.96
+- **Average Balance**: $10,213.10
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
 - **BTC/USDT**: 13 bots
-- **ETH/USDT**: 5 bots
+- **ETH/USDT**: 7 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 701 decisions (avg confidence: 38.1%)
-- **enter**: 22 decisions (avg confidence: 64.3%)
-- **exit**: 14 decisions (avg confidence: 66.7%)
-- **close**: 6 decisions (avg confidence: 76.0%)
-- **long**: 5 decisions (avg confidence: 75.0%)
+- **wait**: 227 decisions (avg confidence: 43.5%)
+- **enter**: 18 decisions (avg confidence: 64.4%)
+- **exit**: 17 decisions (avg confidence: 62.2%)
+- **long**: 3 decisions (avg confidence: 72.7%)
+- **close**: 2 decisions (avg confidence: 78.0%)
 
 ### System Health
-- **Decisions (last hour)**: 15
+- **Decisions (last hour)**: 31
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -67,23 +67,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0.1% | 19MB | 1d 1h | 1 |
-| ggbot | 🟢 online | 1.1% | 267MB | 2m | 9 |
-| account-monitor | 🟢 online | 0.9% | 32MB | 1d 0h | 4 |
-| sebastian-chrome | 🟢 online | 0.3% | 99MB | 1d 1h | 5 |
-| sebastian-bot | 🟢 online | 0.2% | 59MB | 1d 1h | 2 |
-| market-data-ws | 🟢 online | 0.8% | 23MB | 1d 1h | 1 |
-| sebastian-telegram | 🟢 online | 0% | 16MB | 1d 1h | 1 |
+| error-alerts | 🟢 online | 0% | 35MB | 55s | 2 |
+| ggbot | 🟢 online | 0.9% | 248MB | 54s | 12 |
+| account-monitor | 🟢 online | 0.5% | 141MB | 53s | 6 |
+| sebastian-chrome | 🟢 online | 0.3% | 224MB | 53s | 6 |
+| sebastian-bot | 🟢 online | 0.1% | 73MB | 53s | 3 |
+| market-data-ws | 🟢 online | 1.1% | 177MB | 51s | 2 |
+| sebastian-telegram | 🟢 online | 0% | 42MB | 52s | 2 |
 
 ### VM Resources
 
-- **Disk**: 59G / 78G (77%)
-- **Memory**: 1.8Gi / 3.8Gi
-- **CPU Load**: 0.42 / 0.29 / 0.18 (1m/5m/15m)
+- **Disk**: 60G / 78G (78%)
+- **Memory**: 2.3Gi / 3.8Gi
+- **CPU Load**: 1.16 / 0.71 / 0.38 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 18.21M)
+- **Redis**: 🟢 connected (Memory: 17.07M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -235,18 +235,23 @@
 
 ## ⚡ Current Capabilities
 
-### **ggbot Service** (V2 Orchestrator)
-- **Complete E2E Pipeline**: Extraction → Decision → Trading
-- **Autonomous Scheduler**: Zero-drift execution at candle boundaries (5m/15m/30m/1h/4h/1d)
-- **Redis Idempotency**: Prevents duplicate trades across restarts
-- **Real-time Rescheduling**: Auto-updates when users change configurations
-- **Startup Reconciliation**: Restores active bots automatically
+### **ggbot Service** (API Only)
+- **API-Only Process**: HTTP/SSE serving, "Run Now" execution — no scheduler (separated to ggbot-scheduler)
+- **Complete E2E Pipeline**: Extraction → Decision → Trading (for manual runs)
 - **Paper Trading**: $10k isolated accounts per config with 3-second position monitoring
 - **Symphony Live Trading**: Real-money trading via Symphony.io (100 compatible symbols)
 - **AsterDEX Trading**: Decentralized futures with Web3 auth (33 symbols, up to 20x leverage, dynamic position sizing)
 - **Hyperliquid Live Trading**: Non-custodial DEX perps (228 markets, up to 50x, API wallets, retry logic)
 - **Telegram Publishing**: Signal broadcasting to user channels (APPROVED/REJECTED status, "Live on Hyperliquid" tag)
 - **REST API**: 30+ endpoints for bot control, positions, analytics
+
+### **ggbot-scheduler Service** (Bot Execution)
+- **Autonomous Scheduler**: Zero-drift execution at candle boundaries (5m/15m/30m/1h/4h/1d/1w)
+- **DB Reconciliation Loop**: Polls every 10s, syncs APScheduler jobs with active bot state in DB
+- **Redis Idempotency**: Prevents duplicate trades across restarts
+- **Crash Recovery**: Rebuilds all jobs from DB on restart — no state lost
+- **Stripe Meter Reporting**: Daily midnight UTC cron job for usage billing
+- **Separate Event Loop**: Bot execution (LLM calls, 15-340s) cannot block API responses
 
 ### **account-monitor Service**
 - **Universal Account Monitoring**: Unified monitoring for paper, Symphony, Aster, and Hyperliquid trading accounts
@@ -372,7 +377,7 @@ pm2 logs ggbot --lines 50
 ### Application Ports
 | Port | Service | Protocol | Access | Purpose |
 |------|---------|----------|--------|---------|
-| **8000** | V2 Orchestrator (ggbot.py) | HTTP | Public | Complete V2 API server with E2E pipeline |
+| **8000** | V2 API (ggbot.py) | HTTP | Public | API server — bot control, SSE, analytics. Scheduler runs in separate ggbot-scheduler process |
 | **8080** | code-server | HTTP | Public | VSCode in browser (development environment) |
 
 ### Database Ports
@@ -513,7 +518,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-02-26 20:07:28 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-01 12:04:38 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -701,7 +706,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-02-26 20:07:28 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-01 12:04:38 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

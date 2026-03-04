@@ -367,7 +367,7 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 
 ### 🚀 **Phase 1: Free Quick Wins (Week 1-2)** - $0/month
 
-**7 data points across 3 new data sources, ~8-12 hours work**
+**9 data points across 3 new data sources, ~11-15 hours work**
 
 **Implementation Steps Per Data Point**:
 1. Create Universal Data Layer adapter (or use GrokSearchAdapter)
@@ -392,7 +392,7 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 
 ---
 
-**New Data Source: Macro Context** (4 data points)
+**New Data Source: Macro Context** (6 data points)
 
 | # | Data Point | Method | Effort | Database Work |
 |---|-----------|--------|--------|---------------|
@@ -400,10 +400,27 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 | 4 | **DXY (Dollar Index)** | Direct API (FRED) | 30min | Insert: 1 point |
 | 5 | **CPI (Inflation)** | Direct API (FRED) | 30min | Insert: 1 point |
 | 6 | **NFP (Jobs Report)** | Direct API (FRED) | 30min | Insert: 1 point |
+| 8 | **USDT.D (USDT Dominance)** | Direct API (CoinGecko) | 1-2hr | Insert: 1 point |
+| 9 | **MOVE Index (Bond Volatility)** | Grok Search | 1hr | Insert: 1 point |
 
 **Adapter Option A**: `FredApiAdapter` for #4-6 (requires free API key)
-**Adapter Option B**: `GrokSearchAdapter` for all 4 (no API keys)
-**Catalog**: `market_intelligence/catalog/data_types/macro/` (4 YAML files)
+**Adapter Option B**: `GrokSearchAdapter` for #3, #9 (no API keys)
+**Adapter C**: `CoinGeckoAdapter` for #8 (free, no auth, `global` endpoint)
+**Catalog**: `market_intelligence/catalog/data_types/macro/` (6 YAML files)
+
+**#8 USDT.D Details** *(Community-requested by Denis @ Buidler Labs)*:
+- USDT dominance = USDT market cap / total crypto market cap
+- Rising USDT.D = money rotating into stables (risk-off, bearish crypto)
+- Falling USDT.D = money rotating into crypto (risk-on, bullish)
+- API: `https://api.coingecko.com/api/v3/global` → `market_cap_percentage.usdt`
+- Alternative: Binance `USDT.D` chart data or TradingView
+
+**#9 MOVE Index Details** *(Community-requested by Denis @ Buidler Labs)*:
+- ICE BofA MOVE Index = US Treasury bond market implied volatility
+- Analogous to VIX but for bonds. High MOVE (>120) = bond stress = risk-off cascade
+- Crypto correlation: MOVE spike → institutional deleveraging → crypto sells off
+- No free API — use Grok web search (same pattern as VIX)
+- Previously listed as "skip" — reclassified as relevant per community feedback
 
 ---
 
@@ -420,20 +437,68 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 ---
 
 **Total Phase 1 Work**:
-- 3 new adapters (BinanceFunding, Grok/FRED, DefiLlama)
-- 7 catalog YAML files
+- 4 new adapters (BinanceFunding, Grok/FRED, DefiLlama, CoinGecko)
+- 9 catalog YAML files
 - 3 INSERT into data_sources
-- 7 INSERT into data_points
+- 9 INSERT into data_points
 - **0 frontend changes** (UI auto-populates from database)
 
 **Impact**: Decision agent now has:
 - Leverage positioning context (funding rates)
-- Macro regime awareness (VIX, DXY, inflation, jobs)
+- Macro regime awareness (VIX, DXY, inflation, jobs, MOVE)
 - Capital flow visibility (DeFi TVL)
+- Crypto rotation signal (USDT.D)
 
 **Cost**: $0
-**Time**: 8-12 hours
-**Trading Edge**: +30-40% (avoids overleveraged setups, catches macro regime shifts)
+**Time**: 11-15 hours
+**Trading Edge**: +30-40% (avoids overleveraged setups, catches macro regime shifts, detects crypto rotation)
+
+---
+
+### 🔧 **Phase 1.5: Structural Analysis & Decision Enrichment** - $0/month
+
+**Community-requested** (Denis @ Buidler Labs, Telegram, 2026-03-01)
+
+**2 features, ~6-9 hours work**
+
+---
+
+**New Preprocessor: Order Blocks (#22)**
+
+| Feature | Details |
+|---------|---------|
+| **What** | ICT (Inner Circle Trader) concept — last opposite candle before a strong impulse move = institutional accumulation zone. Price tends to react (bounce/rejection) when it revisits these zones. |
+| **Trading Value** | Structured support/resistance derived from real price action, not arbitrary lines. Identifies where large players likely accumulated. |
+| **Implementation** | New preprocessor extending `BasePreprocessor`. Requires: (1) swing high/low detection via pivot points, (2) impulse move validation (magnitude threshold), (3) zone marking (OHLC of last opposite candle), (4) zone tracking across multiple candle updates. |
+| **Statefulness** | Unlike existing preprocessors (stateless, recompute from OHLCV each cycle), order blocks must persist — a zone identified 50 candles ago remains valid until price revisits it. Options: (a) recompute from full candle history each cycle (simplest, ~100 candles sufficient), (b) Redis persistence for zones (faster, more complex). Recommend (a) for MVP. |
+| **Output** | List of active order block zones: `{type: 'bullish'|'bearish', zone_high, zone_low, age_candles, impulse_magnitude, tested: bool}` |
+| **Effort** | 4-6 hours |
+| **File** | `extraction/v2/preprocessors/order_blocks.py` |
+
+**Algorithm Sketch**:
+```
+1. Find swing highs/lows using N-bar pivot detection (e.g., 5-bar)
+2. Identify impulse moves: swing-to-swing move > threshold (e.g., 2× ATR)
+3. Mark order block: last opposite candle before impulse
+   - Bullish OB: last bearish candle before bullish impulse (support zone)
+   - Bearish OB: last bullish candle before bearish impulse (resistance zone)
+4. Track zones: zone remains active until price closes through it
+5. Report: nearest OB above/below current price, zone age, test count
+```
+
+---
+
+**Enhanced Position Statefulness**
+
+| Feature | Details |
+|---------|---------|
+| **What** | Enrich the decision engine's position management prompts with structured trade state data beyond the current position recap. |
+| **Current State** | DecisionEngineV2 switches to `position_management` mode with position recap (entry price, side, unrealized P&L, SL/TP levels). |
+| **Additions** | `bars_in_trade` (candles since entry), `max_drawdown_pct` (worst unrealized P&L during trade), `max_profit_pct` (best unrealized P&L), `time_in_position` (human-readable duration), `entry_context` (market conditions at entry from original decision reasoning). |
+| **Trading Value** | LLM can make better exit decisions with temporal context (holding 2 bars vs 50 bars matters), drawdown awareness (recovering from -5% vs always green), and entry recall (why did we enter?). |
+| **Implementation** | Extend position management prompt template in `decision/prompts/`. Query `paper_trades` for trade metadata, compute bars-in-trade from `opened_at` vs current time and bot frequency. |
+| **Effort** | 2-3 hours |
+| **Files** | `decision/engine_v2.py`, `decision/prompts/position_management.py` |
 
 ---
 
@@ -496,14 +561,15 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 | Phase | Data Points | Cost | Time | Edge Gain | Cumulative Edge |
 |-------|-------------|------|------|-----------|-----------------|
 | **Current** | 22 | $0 | - | Baseline | 100% |
-| **Phase 1** | +7 (29 total) | $0/mo | 8-12hrs | +30-40% | 130-140% |
-| **Phase 2** | +5 (34 total) | $100-500/mo | 10-12hrs | +20-30% | 156-182% |
-| **Phase 3** | +3 (37 total) | $100-500/mo | 12-16hrs | +15-25% | 179-228% |
-| **Phase 4** | +7 (44 total) | $200-1000/mo | 20-25hrs | +10-20% | 197-274% |
+| **Phase 1** | +9 (31 total) | $0/mo | 11-15hrs | +30-40% | 130-140% |
+| **Phase 1.5** | +1 preprocessor + decision enrichment | $0/mo | 6-9hrs | +10-15% | 143-161% |
+| **Phase 2** | +5 (36 total) | $100-500/mo | 10-12hrs | +20-30% | 172-209% |
+| **Phase 3** | +3 (39 total) | $100-500/mo | 12-16hrs | +15-25% | 198-261% |
+| **Phase 4** | +7 (46 total) | $200-1000/mo | 20-25hrs | +10-20% | 218-313% |
 
-**Realistic 6-Month Target**: 44/156 data points (28%), 2-3x trading edge improvement
+**Realistic 6-Month Target**: 46/156 data points (30%), 2-3x trading edge improvement
 
-**Key Insight**: We already have infrastructure + 22 data points. Phase 1 adds context (macro, funding, on-chain), not more technicals.
+**Key Insight**: We already have infrastructure + 22 data points. Phase 1 adds context (macro, funding, on-chain, USDT.D, MOVE), not more technicals. Phase 1.5 adds structural analysis (order blocks) and better exit decisions (position statefulness).
 
 ---
 
@@ -514,7 +580,7 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 - Market Internals/Breadth (A/D line, ticks) - Equity-specific
 - Traditional Options Flow - Crypto has perps, not standard options
 - Earnings/Transcripts - No earnings in crypto
-- Credit Spreads/MOVE Index - Not applicable
+- Credit Spreads - Not applicable (MOVE Index reclassified → Phase 1 macro context)
 - Commodities Detail (refinery, crack spreads) - Indirect at best
 - REITs/Real Estate - Not applicable
 - Corporate Actions (splits, dividends) - Not applicable
@@ -522,7 +588,7 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 - Most Alternative Data (satellite, foot traffic) - Not applicable
 
 **Remaining Addressable**: ~105 data points
-**Phases 1-4 Coverage**: 29/105 = 27.6% of relevant data
+**Phases 1-4 Coverage**: 31/105 = 29.5% of relevant data
 
 ---
 
@@ -530,15 +596,16 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 
 ### **Week 1 Sprint: The "Context Upgrade"**
 
-**Goal**: Add 7 contextual data points to AI decision engine in 8-12 hours
+**Goal**: Add 9 contextual data points to AI decision engine in 11-15 hours
 
 **Day 1-2: Setup (2-3 hours)**
 - Test Grok API with web search tool
 - Set up FRED API key (free, 30 seconds)
 - Create GrokSearchAdapter base class
 - Create FredApiAdapter base class
+- Create CoinGeckoAdapter base class
 
-**Day 3-4: Implementation (6-9 hours)**
+**Day 3-5: Implementation (9-12 hours)**
 
 | Order | Data Point | Adapter | Catalog | Database | Test |
 |-------|-----------|---------|---------|----------|------|
@@ -549,13 +616,15 @@ We will use **three methods** to acquire market intelligence data, chosen based 
 | 5 | CPI Inflation | FredApi | cpi.yaml | INSERT 1 | 20min |
 | 6 | NFP Jobs Report | FredApi | nfp.yaml | INSERT 1 | 20min |
 | 7 | BTC DeFi TVL | DefiLlama | tvl.yaml | INSERT 1+1 | 30min |
+| 8 | USDT Dominance | CoinGecko | usdt_dominance.yaml | INSERT 1 | 1hr |
+| 9 | MOVE Index | GrokSearch | move.yaml | INSERT 1 | 30min |
 
 **Database Seeding Script**:
 ```sql
 -- Create new data sources
 INSERT INTO data_sources (name, display_name, description, requires_premium) VALUES
 ('crypto_derivatives', 'Crypto Derivatives', 'Perpetual futures funding rates and leverage metrics', false),
-('macro_context', 'Macro Context', 'Macroeconomic indicators (VIX, DXY, CPI, NFP)', false);
+('macro_context', 'Macro Context', 'Macroeconomic indicators (VIX, DXY, CPI, NFP, MOVE, USDT.D)', false);
 
 -- Create data points
 INSERT INTO data_points (source_id, name, display_name, description, config_values) VALUES
@@ -583,9 +652,13 @@ CONTEXT_SECTION = """
 
 ### Macro Environment
 - VIX (Fear Index): {vix} ({risk_regime})
+- MOVE (Bond Volatility): {move} ({bond_stress_level})
 - DXY (Dollar Strength): {dxy} ({crypto_impact})
 - CPI (Inflation): {cpi}%
 - NFP (Jobs): {nfp}
+
+### Crypto Rotation
+- USDT Dominance: {usdt_d}% ({rotation_signal})
 
 ### On-Chain Flows
 - BTC DeFi TVL: ${tvl_btc}B ({flow_trend})
@@ -593,7 +666,7 @@ CONTEXT_SECTION = """
 REASONING: How does this context affect the technical setup?
 ```
 
-**Result**: UI automatically shows 3 new data source tabs with 7 toggleable data points. Users configure per bot.
+**Result**: UI automatically shows 3 new data source tabs with 9 toggleable data points. Users configure per bot.
 
 ---
 

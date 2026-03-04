@@ -48,23 +48,24 @@ python -m pytest tests/
 ```bash
 # Status and logs
 pm2 status
-pm2 logs ggbot          # Main V2 orchestrator
-pm2 logs market-data-ws # WebSocket market data cache
-pm2 restart ggbot       # Restart after code changes
+pm2 logs ggbot              # API server (HTTP/SSE only)
+pm2 logs ggbot-scheduler    # Bot execution (APScheduler + reconcile loop)
+pm2 logs market-data-ws     # WebSocket market data cache
+
+# Restart after code changes
+pm2 restart ggbot           # API changes
+pm2 restart ggbot-scheduler # Orchestrator/scheduler/decision/extraction changes
 ```
 
 ---
 
 ## Workflow Orchestration
 
-**From Boris Cherny's Claude Code tips - for heavy dev sessions:**
-
-1. **Plan Mode for Non-Trivial Tasks** - Use plan mode for 3+ step tasks or architectural decisions
-2. **Subagent Strategy** - Offload research/exploration to subagents for parallel work
-3. **Autonomous Bug Fixing** - When given a bug report: just fix it, don't ask for hand-holding
-4. **Verification Before Done** - Never mark complete without proving it works (run tests, check logs)
-5. **Demand Elegance** - Challenge hacky solutions, ask "is there a more elegant way?"
-6. **Self-Improvement Loop** - After corrections, update docs/patterns to prevent repeat mistakes
+1. **Plan Mode for Non-Trivial Tasks** — Use plan mode for 3+ step tasks or architectural decisions. If something goes sideways mid-implementation, STOP and re-plan immediately — don't keep pushing.
+2. **Autonomous Bug Fixing** — When given a bug report: check `pm2 logs`, trace the error, find root cause, fix it. Don't ask Sev to read logs for you. Zero hand-holding.
+3. **Verification Before Done** — Never mark complete without proving it works. Run `npx tsc --noEmit` for frontend, run relevant tests, check `pm2 logs` after restart. Demonstrate correctness.
+4. **Minimal Impact** — Make every change as simple as possible. Touch only what's necessary. Find root causes — no temporary fixes or workarounds.
+5. **Self-Improvement Loop** — After corrections from Sev, update docs via `@OK.md` to prevent the same mistake.
 
 ---
 
@@ -137,9 +138,20 @@ from trading.paper.supabase_service import SupabasePaperTradingService
 service = SupabasePaperTradingService()
 ```
 
+### Two-Process Architecture
+```
+ggbot.py (API only)          ggbot_scheduler.py (bot execution)
+  - HTTP/SSE endpoints          - APScheduler jobs
+  - "Run Now" execution         - Reconcile loop (10s DB poll)
+  - Writes state to DB          - Reads state from DB
+  - Stays fast always           - Handles LLM-heavy bot cycles
+```
+Orchestrator class lives in `core/orchestrator/orchestrator.py`, shared by both processes.
+Start/stop: API writes `state='active'/'inactive'` → scheduler detects within 10s.
+
 ### V2 Data Flow Pattern
 ```python
-# V2 orchestrator sequential execution pattern
+# V2 orchestrator sequential execution pattern (core/orchestrator/orchestrator.py)
 extraction_result = await self._run_extraction_v2(...)
 decision_result = await self._run_decision_v2(config, extraction_result)
 trading_result = await self._run_trading_v2(config, decision_result)
