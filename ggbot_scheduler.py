@@ -54,6 +54,23 @@ async def main():
     except ImportError:
         logger.warning("billing.stripe_meter_reporter not available, skipping")
 
+    # Schedule daily account_snapshots retention (3am UTC, low traffic)
+    try:
+        from core.monitoring.snapshot_retention import run_snapshot_retention
+
+        scheduler.add_job(
+            func=run_snapshot_retention,
+            trigger=CronTrigger(hour=3, minute=0),
+            id="snapshot_retention",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Snapshot retention scheduled (daily at 3am UTC)")
+    except ImportError:
+        logger.warning("snapshot_retention not available, skipping")
+
     logger.info("Entering reconciliation loop (10s interval)")
     await reconcile_loop(scheduler, orchestrator, interval=10)
 

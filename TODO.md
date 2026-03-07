@@ -4,34 +4,6 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🚨 **CRITICAL - CVE-2025-66478 Secret Rotation**
-
-**Status**: 🔴 URGENT - Application was vulnerable for ~11 hours (Dec 4-5, 2025)
-**Planning Doc**: [DOCS/todo/CVE_2025_66478_SECRET_ROTATION.md](DOCS/todo/CVE_2025_66478_SECRET_ROTATION.md)
-
-**Vulnerability**: Next.js/React Server Components RCE (CVSS 10.0)
-- Application ran vulnerable Next.js 15.3.3 during exposure window
-- Upgraded to patched 15.5.7 on Dec 5, 2025
-
-**Action Required**: Follow rotation checklist in priority order
-- [ ] **Day 1**: CRITICAL secrets (Supabase, Auth, Trading APIs)
-- [ ] **Day 1-2**: HIGH PRIORITY secrets (AI APIs, Market Data, Email)
-- [ ] **Week 1**: MEDIUM PRIORITY secrets (Admin, Redis, OAuth)
-
----
-
-## ✅ **Orchestrator Refactor - COMPLETE**
-
-**Planning Doc**: [DOCS/completed/ORCHESTRATOR_REFACTOR.md](DOCS/completed/ORCHESTRATOR_REFACTOR.md)
-
-- Phase 1 (Quick Wins) + Phase 2 (Scheduler Separation) — shipped 2026-03-01
-- Code quality pass + dead code removal (Symphony/Aster) — 2026-03-04
-- `ggbot.py`: 6204 → 4185 lines (-32%)
-- Frontend hang at hourly candle close: **resolved**
-- Future: async DB (asyncpg), module extraction — both cosmetic/optional, no open issues
-
----
-
 ## 🔥 **Hyperliquid - Remaining Phases**
 
 **Phases 1-5 COMPLETE** — see CHANGELOG.md. Single live bot slot, equity tracking, strategy versioning all shipped.
@@ -60,11 +32,15 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 
 ## 🗄️ **Supabase Database Optimizations**
 
-**Status**: 🟡 PARTIAL - Infrastructure upgraded, policy fixes pending
+**Status**: 🟢 MAJOR — IO optimization shipped, policy fixes pending
 
-### **Pending: Drop Deprecated Indexes**
-- [ ] Drop `_deprecated_idx_snapshots_config_time` (10 MB)
-- [ ] Drop `_deprecated_idx_snapshots_heartbeat` (12 MB)
+### ~~IO Optimization~~ ✅ (2026-03-04)
+- [x] paper_trades position prices → Redis (0 UPD/day, was 230K/day)
+- [x] account_snapshots tiered retention (713K → 406K rows, daily cron at 3am UTC)
+- [x] Dashboard CTE: `latest_activities` join fix (1525ms → 7ms)
+- [x] Dashboard CTE: `LATERAL` account_summaries (834ms → 13ms)
+- [x] New indexes: `idx_activities_equity_latest`, `idx_decisions_config_created`
+- [x] Dropped deprecated indexes (127 MB freed)
 
 ### **Pending: RLS Policy Performance**
 6 tables re-evaluate `auth.uid()` per row — change to `(select auth.uid())`:
@@ -78,23 +54,6 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 - [ ] `activities` — `activities_public_access` + `activities_user_access`
 - [ ] `data_points` — `reference_data_points_read` + `service_manages_data_points`
 - [ ] `data_sources` — `reference_data_sources_read` + `service_manages_data_sources`
-
----
-
-## 🎲 **USX Arena Betting**
-
-**Status**: 🟡 IN PROGRESS - Core flow deployed, needs USX tokens for e2e test
-**Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md)
-
-- [ ] Acquire USX tokens for end-to-end test on Scroll mainnet
-- [ ] Verify full approve → deposit → record flow with real tokens
-- [ ] Display "Total Backed" per bot on leaderboard
-- [ ] Show "You bet X on this bot" badge for users with active bets
-- [ ] Prize distribution logic (after competition ends)
-
-**Season 2 Backlog**:
-- [ ] Inline arena bot creation modal
-- [ ] Add "Registered Competitors" section
 
 ---
 
@@ -133,16 +92,6 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 - [ ] Testimonial or tweet embed (when available)
 - [ ] Dynamic stats from API (currently hardcoded)
 - [ ] Scrollytelling redesign (Framer Motion scroll animations) — lower priority
-
----
-
-## ⏸️ **BLOCKED - External Dependencies**
-
-### Symphony Live Trading
-**BLOCKED**: `/agent/all-positions` returns 404 (not implemented). ~2.5 hours once fixed.
-
-### Symphony Spot Trading (Monad)
-**BLOCKED**: Both spot endpoints return 404. See [DOCS/symphony_spot_integration.md].
 
 ---
 

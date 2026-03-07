@@ -2033,6 +2033,13 @@ Take Profit: {take_profit_text}
                         'entry_confidence': float(row[12]) if row[12] else 0.0,
                         'entry_decision_data': row[13] if row[13] else {}
                     }
+
+                    # Enrich with live price from Redis (position monitor writes there)
+                    try:
+                        from trading.paper.supabase_service import enrich_positions_from_redis
+                        enrich_positions_from_redis([position_data])
+                    except Exception:
+                        pass  # Use DB values as fallback
                     
                     logger.bind(config_id=self.config_id, user_id=self.user_id).info(
                         f"Found active position for {symbol}: {position_data['side']} ${position_data['size_usd']:.2f}, P&L: ${position_data['unrealized_pnl']:.2f}"

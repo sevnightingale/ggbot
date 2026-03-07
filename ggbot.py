@@ -2013,33 +2013,41 @@ async def get_bot_positions(
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT symbol, side, entry_price, current_price, size_usd,
+                    SELECT trade_id, symbol, side, entry_price, current_price, size_usd,
                            unrealized_pnl, leverage, opened_at
                     FROM paper_trades
                     WHERE config_id = %s AND user_id = %s AND status = 'open'
                     ORDER BY opened_at DESC
                 """, (config_id, current_user.user_id))
 
-                positions = []
-                for row in cur.fetchall():
-                    # Map database side to display format
-                    side_display = "LONG" if row['side'].lower() == 'buy' else "SHORT"
+                rows = cur.fetchall()
 
-                    positions.append({
-                        "symbol": row['symbol'],
-                        "side": side_display,
-                        "size": float(row['size_usd']),
-                        "entryPrice": float(row['entry_price']),
-                        "currentPrice": float(row['current_price'] or row['entry_price']),
-                        "unrealizedPnL": float(row['unrealized_pnl'] or 0),
-                        "timestamp": row['opened_at'].isoformat() + "Z"
-                    })
+        # Enrich with current prices from Redis (position monitor writes there)
+        if rows:
+            try:
+                from trading.paper.supabase_service import enrich_positions_from_redis
+                enrich_positions_from_redis(rows)
+            except Exception:
+                pass  # Fallback: use DB values
 
-                return {
-                    "status": "success",
-                    "config_id": config_id,
-                    "positions": positions
-                }
+        positions = []
+        for row in rows:
+            side_display = "LONG" if row['side'].lower() == 'buy' else "SHORT"
+            positions.append({
+                "symbol": row['symbol'],
+                "side": side_display,
+                "size": float(row['size_usd']),
+                "entryPrice": float(row['entry_price']),
+                "currentPrice": float(row.get('current_price') or row['entry_price']),
+                "unrealizedPnL": float(row.get('unrealized_pnl') or 0),
+                "timestamp": row['opened_at'].isoformat() + "Z"
+            })
+
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "positions": positions
+        }
 
     except HTTPException:
         raise
@@ -2256,19 +2264,40 @@ async def get_bot_account(
         current_balance = Decimal(str(account_summary.get("current_balance", PAPER_INITIAL_BALANCE)))
         total_pnl = Decimal(str(account_summary.get("total_pnl", 0.0)))
 
-        # Get unrealized P&L and margin from open positions
+        # Get unrealized P&L from Redis (position monitor writes there), margin from DB
+        unrealized_pnl = Decimal('0')
+        margin_used = Decimal('0')
+        try:
+            from trading.paper.supabase_service import get_config_unrealized_pnl
+            redis_pnl = get_config_unrealized_pnl(config_id)
+            if redis_pnl is not None:
+                unrealized_pnl = Decimal(str(redis_pnl))
+        except Exception:
+            pass  # Fall through to DB query
+
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT
-                        COALESCE(SUM(unrealized_pnl), 0) as unrealized_pnl,
-                        COALESCE(SUM(margin_used), 0) as margin_used
-                    FROM paper_trades
-                    WHERE config_id = %s AND status = 'open'
-                """, (config_id,))
-                position_data = cur.fetchone()
-                unrealized_pnl = Decimal(str(position_data[0])) if position_data else Decimal('0')
-                margin_used = Decimal(str(position_data[1])) if position_data else Decimal('0')
+                if unrealized_pnl == Decimal('0'):
+                    # Redis miss — fall back to DB
+                    cur.execute("""
+                        SELECT
+                            COALESCE(SUM(unrealized_pnl), 0) as unrealized_pnl,
+                            COALESCE(SUM(margin_used), 0) as margin_used
+                        FROM paper_trades
+                        WHERE config_id = %s AND status = 'open'
+                    """, (config_id,))
+                    position_data = cur.fetchone()
+                    unrealized_pnl = Decimal(str(position_data[0])) if position_data else Decimal('0')
+                    margin_used = Decimal(str(position_data[1])) if position_data else Decimal('0')
+                else:
+                    # Got PnL from Redis, still need margin_used from DB (static per position)
+                    cur.execute("""
+                        SELECT COALESCE(SUM(margin_used), 0) as margin_used
+                        FROM paper_trades
+                        WHERE config_id = %s AND status = 'open'
+                    """, (config_id,))
+                    margin_data = cur.fetchone()
+                    margin_used = Decimal(str(margin_data[0])) if margin_data else Decimal('0')
 
         # Calculate metrics using centralized calculator
         total_equity = AccountMetricsCalculator.calculate_total_equity(

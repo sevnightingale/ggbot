@@ -109,6 +109,33 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                     # For paper: Calculate total equity using AccountMetricsCalculator formula
                     #   Formula: total_equity = current_balance + unrealized_pnl
                     #   Note: current_balance already includes margin_used
+
+                    # Try Redis for unrealized PnL first (position monitor writes there)
+                    redis_pnl = None
+                    try:
+                        pnl_val = redis_client.get(f"position:pnl:{config_id}")
+                        if pnl_val is not None:
+                            redis_pnl = float(pnl_val)
+                    except Exception:
+                        pass
+
+                    if redis_pnl is not None:
+                        # Got PnL from Redis — only need balance from DB
+                        cur.execute("""
+                            SELECT current_balance, total_pnl
+                            FROM paper_accounts
+                            WHERE config_id = %s
+                            LIMIT 1
+                        """, (config_id,))
+                        fallback = cur.fetchone()
+                        if fallback:
+                            balance = float(fallback[0]) if fallback[0] is not None else 0.0
+                            return {
+                                'current_balance': balance + redis_pnl,
+                                'total_pnl': float(fallback[1]) if fallback[1] is not None else None
+                            }
+
+                    # Redis miss — fall back to paper_trades query
                     cur.execute("""
                         SELECT
                             pa.current_balance + COALESCE(pt.unrealized_pnl, 0) as total_equity,

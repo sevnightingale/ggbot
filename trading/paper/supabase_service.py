@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from psycopg2.extras import execute_values
 
+import redis
+
 from core.common.logger import logger
 from core.common.db import get_db_connection
 from core.symbols.standardizer import UniversalSymbolStandardizer
@@ -28,6 +30,59 @@ from .live_price_service import LivePriceService
 
 # Load environment variables
 load_dotenv()
+
+# Module-level sync Redis client for position price caching (same pattern as activity_logger.py)
+_position_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+POSITION_PRICE_TTL = 30  # seconds — staleness guard; if monitor stops, data expires
+
+
+def enrich_positions_from_redis(positions: list, redis_client=None) -> list:
+    """Enrich position dicts with current_price/unrealized_pnl from Redis.
+
+    Works with any list of dicts that has 'trade_id' or 'position_id'.
+    Falls back gracefully: if Redis miss, existing dict values are kept.
+    """
+    if not positions:
+        return positions
+
+    rc = redis_client or _position_redis
+    pipe = rc.pipeline(transaction=False)
+    for pos in positions:
+        trade_id = pos.get('trade_id') or pos.get('position_id')
+        pipe.hgetall(f"position:prices:{trade_id}")
+    try:
+        results = pipe.execute()
+    except Exception:
+        return positions  # Redis down — return as-is
+
+    for pos, data in zip(positions, results):
+        if data:
+            try:
+                redis_price = float(data.get('current_price', 0))
+                redis_pnl = float(data.get('unrealized_pnl', 0))
+                if redis_price:
+                    pos['current_price'] = redis_price
+                if redis_pnl or redis_pnl == 0:
+                    pos['unrealized_pnl'] = redis_pnl
+            except (ValueError, TypeError):
+                pass  # Malformed Redis data — keep existing values
+    return positions
+
+
+def get_config_unrealized_pnl(config_id: str, redis_client=None) -> Optional[float]:
+    """Read per-config aggregate unrealized PnL from Redis.
+
+    Returns None on miss (caller should fall back to DB query).
+    """
+    rc = redis_client or _position_redis
+    try:
+        val = rc.get(f"position:pnl:{config_id}")
+        if val is not None:
+            return float(val)
+    except Exception:
+        pass
+    return None
 
 
 class ErrorRateLimiter:
@@ -924,6 +979,9 @@ class SupabasePaperTradingService:
         """
         Update current prices and unrealized P&L for open positions.
 
+        Writes ephemeral price data to Redis (not Postgres) to reduce disk IO.
+        Postgres is only written on real state changes (open, close, trigger).
+
         Args:
             config_id: Update positions for specific config (all if None)
 
@@ -932,10 +990,11 @@ class SupabasePaperTradingService:
         """
         try:
             # Get ALL open positions (batch optimization)
+            # Include config_id for per-config PnL aggregation
             if config_id:
-                response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('config_id', config_id).eq('status', 'open').execute()
+                response = self.supabase.table('paper_trades').select("trade_id, config_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('config_id', config_id).eq('status', 'open').execute()
             else:
-                response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('status', 'open').execute()
+                response = self.supabase.table('paper_trades').select("trade_id, config_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('status', 'open').execute()
 
             positions = response.data
             if not positions:
@@ -945,10 +1004,11 @@ class SupabasePaperTradingService:
             symbols = list(set(pos["symbol"] for pos in positions))
             prices = await self.price_service.get_multiple_prices(symbols)
 
-            batch_updates = []
+            redis_updates = []  # (trade_id, current_price, unrealized_pnl)
+            config_pnl = {}  # config_id -> sum of unrealized_pnl
             positions_to_close = []
 
-            # Process each position and collect batch updates
+            # Process each position
             for pos in positions:
                 symbol = pos["symbol"]
                 if symbol not in prices:
@@ -961,7 +1021,6 @@ class SupabasePaperTradingService:
                 entry_price = float(pos["entry_price"])
                 size_usd = float(pos["size_usd"])
                 side = pos["side"]
-                leverage = int(pos.get("leverage", 1))  # Default to 1x if not set
 
                 # Calculate size in contracts
                 size_contracts = size_usd / entry_price
@@ -989,34 +1048,47 @@ class SupabasePaperTradingService:
                 if should_close:
                     positions_to_close.append((pos["trade_id"], should_close, current_price))
                 else:
-                    # Collect update for batch processing
-                    batch_updates.append({
+                    redis_updates.append({
                         'trade_id': pos['trade_id'],
                         'current_price': current_price,
                         'unrealized_pnl': unrealized_pnl
                     })
+                    # Accumulate per-config PnL
+                    cfg = pos['config_id']
+                    config_pnl[cfg] = config_pnl.get(cfg, 0) + unrealized_pnl
 
             # CRITICAL: Always close triggered positions first (trading safety)
             for trade_id, reason, close_price in positions_to_close:
                 await self.close_position(trade_id, reason, close_price)
                 logger.info(f"Auto-closed position {trade_id} due to {reason} trigger")
 
-            # Then batch update remaining positions (performance optimization)
+            # Write ephemeral price data to Redis (not Postgres)
             updated_count = 0
-            if batch_updates:
+            if redis_updates:
                 try:
-                    # Try batch SQL update first (single query for all positions)
-                    updated_count = await self._batch_update_positions_sql(batch_updates)
+                    pipe = _position_redis.pipeline(transaction=False)
+                    for update in redis_updates:
+                        key = f"position:prices:{update['trade_id']}"
+                        pipe.hset(key, mapping={
+                            "current_price": str(update['current_price']),
+                            "unrealized_pnl": str(update['unrealized_pnl'])
+                        })
+                        pipe.expire(key, POSITION_PRICE_TTL)
+                    # Write per-config aggregate PnL
+                    for cfg_id, pnl_sum in config_pnl.items():
+                        pipe.set(f"position:pnl:{cfg_id}", str(pnl_sum), ex=POSITION_PRICE_TTL)
+                    pipe.execute()
+                    updated_count = len(redis_updates)
                 except Exception as e:
-                    logger.warning(f"Batch update failed, falling back to individual updates: {e}")
-                    # Fallback to individual Supabase updates if batch fails
-                    updated_count = await self._fallback_individual_updates(batch_updates)
+                    error_key = f"redis_position_write_{type(e).__name__}"
+                    if self.error_limiter.should_log(error_key):
+                        logger.warning(f"Redis position price write failed: {e}")
 
             if updated_count > 0:
-                logger.debug(f"Updated {updated_count} paper positions, closed {len(positions_to_close)} triggered positions")
+                logger.debug(f"Updated {updated_count} paper positions in Redis, closed {len(positions_to_close)} triggered positions")
 
             return updated_count
-                    
+
         except Exception as e:
             # Rate limit connection errors to prevent log spam
             error_key = f"update_position_prices_{type(e).__name__}"

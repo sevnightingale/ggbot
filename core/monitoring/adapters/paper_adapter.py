@@ -61,18 +61,48 @@ class PaperAccountAdapter(AccountAdapter):
                         total_trades
                     )
 
-                    # Get unrealized P&L from open positions
-                    cur.execute("""
-                        SELECT
-                            COALESCE(SUM(unrealized_pnl), 0) as unrealized_pnl,
-                            COALESCE(SUM(size_usd), 0) as position_value,
-                            COALESCE(SUM(margin_used), 0) as margin_used
-                        FROM paper_trades
-                        WHERE config_id = %s AND status = 'open'
-                    """, (config_id,))
+                    # Get unrealized P&L from Redis (position monitor writes there)
+                    # Fall back to paper_trades query if Redis misses
+                    unrealized_pnl = Decimal('0')
+                    position_value = Decimal('0')
+                    margin_used = Decimal('0')
 
-                    position_data = cur.fetchone()
-                    unrealized_pnl, position_value, margin_used = position_data or (Decimal('0'), Decimal('0'), Decimal('0'))
+                    redis_pnl = None
+                    try:
+                        from trading.paper.supabase_service import get_config_unrealized_pnl
+                        redis_pnl = get_config_unrealized_pnl(config_id)
+                    except Exception:
+                        pass
+
+                    if redis_pnl is not None:
+                        unrealized_pnl = Decimal(str(redis_pnl))
+                        # Still need position_value and margin_used from DB (static per position)
+                        cur.execute("""
+                            SELECT
+                                COALESCE(SUM(size_usd), 0) as position_value,
+                                COALESCE(SUM(margin_used), 0) as margin_used
+                            FROM paper_trades
+                            WHERE config_id = %s AND status = 'open'
+                        """, (config_id,))
+                        static_data = cur.fetchone()
+                        if static_data:
+                            position_value = static_data[0] or Decimal('0')
+                            margin_used = static_data[1] or Decimal('0')
+                    else:
+                        # Redis miss — full fallback to paper_trades
+                        cur.execute("""
+                            SELECT
+                                COALESCE(SUM(unrealized_pnl), 0) as unrealized_pnl,
+                                COALESCE(SUM(size_usd), 0) as position_value,
+                                COALESCE(SUM(margin_used), 0) as margin_used
+                            FROM paper_trades
+                            WHERE config_id = %s AND status = 'open'
+                        """, (config_id,))
+                        position_data = cur.fetchone()
+                        if position_data:
+                            unrealized_pnl = position_data[0] or Decimal('0')
+                            position_value = position_data[1] or Decimal('0')
+                            margin_used = position_data[2] or Decimal('0')
 
                     # Calculate realized P&L using centralized calculator
                     realized_pnl = AccountMetricsCalculator.calculate_realized_pnl(

@@ -176,6 +176,13 @@ class GGBotOrchestrator:
                         detail="No free test runs remaining. Subscribe to run your bot again."
                     )
 
+            # Validate config has a symbol before doing any work
+            if not signal_data and not override_symbol and not config.selected_pair:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Configure a trading pair before running this bot."
+                )
+
             log.debug(f"config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
 
             # Execute the appropriate cycle

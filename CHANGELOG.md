@@ -6,6 +6,32 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-04 - Database IO Optimization: Redis Position Tracking + Dashboard Query Fix
+
+**Problem**: Supabase disk IO hitting limits. Two root causes: (1) `paper_trades` position monitor writing ~230K ephemeral price updates/day to Postgres, (2) dashboard SSE query consuming 98% of total DB execution time due to unfiltered CTEs and seq scans on 406K-row `account_snapshots`.
+
+**Part 1: Position Prices → Redis** (`trading/paper/supabase_service.py`):
+- `update_position_prices()` now writes `current_price`/`unrealized_pnl` to Redis hashes (`position:prices:{trade_id}`, 30s TTL) instead of batch SQL UPDATE
+- Per-config aggregate PnL cached at `position:pnl:{config_id}` for quick equity lookups
+- Added `enrich_positions_from_redis()` helper + `get_config_unrealized_pnl()` — used by 6 reader locations
+- Readers updated: `dashboard_data.py`, `ggbot.py` (positions + account endpoints), `engine_v2.py`, `activity_logger.py`, `paper_adapter.py`
+- All readers fall back gracefully to Postgres values on Redis miss
+- Result: **0 UPDATE/day on paper_trades** (was ~230K/day)
+
+**Part 2: Snapshot Retention** (`core/monitoring/snapshot_retention.py`, `ggbot_scheduler.py`):
+- Tiered retention: 0-7d full resolution, 7-30d hourly, 30d+ daily
+- Batched DELETEs (10K/batch) to avoid long transactions
+- Scheduled daily at 3am UTC via APScheduler
+- Initial cleanup: 713K → 406K rows (307K deleted)
+
+**Part 3: Dashboard Query Optimization** (`core/sse/dashboard_data.py`):
+- `latest_activities` CTE was scanning ALL 97K activities globally — added `INNER JOIN bot_configs` to filter to user's configs only. **1,525ms → 7ms (203x faster)**
+- `account_summaries` CTE rewritten from `DISTINCT ON` (seq scan on 406K rows) to `LATERAL` join — forces `idx_snapshots_latest` index use, one seek per config. **834ms → 13ms (65x faster)**
+- New indexes: `idx_activities_equity_latest` (partial, `WHERE total_equity IS NOT NULL`), `idx_decisions_config_created` (`config_id, created_at DESC`)
+- Full dashboard query: **253ms → 25ms mean (10x faster)**
+
+---
+
 ## 2026-03-04 - Code Quality Fixes + Dead Code Removal
 
 **Dead Code Removal** (`ggbot.py`, -618 lines):

@@ -147,6 +147,10 @@ export function ActivationBar({
   }
 
   const handleActivate = () => {
+    if (!hasStrategy) {
+      alert('Configure a trading pair and strategy before activating this bot.')
+      return
+    }
     if (!canAccess('bot_activation')) {
       // Prepaid users with no credits → show Add Credits modal
       // Free users → show Subscribe/Upgrade modal
@@ -177,7 +181,13 @@ export function ActivationBar({
   const freeRunsRemaining = selectedBot.free_runs_remaining ?? 0
   const canRunOnce = canAccess('bot_activation') || freeRunsRemaining > 0
 
+  const hasStrategy = Boolean(selectedBot.config_data?.selected_pair)
+
   const handleManualTrigger = () => {
+    if (!hasStrategy) {
+      alert('Configure a trading pair and strategy before running this bot.')
+      return
+    }
     if (!canRunOnce) {
       // Prepaid users with no credits → show Add Credits modal
       // Free users → show Subscribe/Upgrade modal

@@ -853,7 +853,8 @@ function ForgeApp() {
         }
 
         // Trigger first run automatically only for the user's very first bot
-        if (isFirstBot && configData) {
+        // Skip if no trading pair configured (e.g. auto-created live bot slots)
+        if (isFirstBot && configData && verifyBot.config_data?.selected_pair) {
           console.log('🚀 Triggering first run for new bot:', verifyBot.config_id)
           try {
             await apiClient.triggerBotManually(verifyBot.config_id)

@@ -47,6 +47,17 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
             # Fetch pause_reason from Redis for inactive bots (async operation)
             await _fetch_pause_reasons_for_bots(db_data['bots'])
 
+        # Enrich paper positions with current prices from Redis
+        # (position monitor writes ephemeral price data to Redis, not Postgres)
+        if db_data.get('positions'):
+            paper_positions = [p for p in db_data['positions'] if p.get('source') == 'paper']
+            if paper_positions:
+                try:
+                    from trading.paper.supabase_service import enrich_positions_from_redis
+                    enrich_positions_from_redis(paper_positions)
+                except Exception as e:
+                    logger.debug(f"Redis position enrichment failed (using DB values): {e}")
+
         # Enrich live positions with exchange API data
         # account_snapshots handles account-level metrics, but individual positions
         # need enrichment because the DB query returns NULL for live position details
@@ -157,41 +168,53 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     ),
     -- NOTE: first_activities CTE removed - initial_equity now stored on configurations table
     latest_activities AS (
-        -- Get latest activity for each bot (for performance calculation)
-        SELECT DISTINCT ON (config_id)
-               config_id,
-               total_equity as current_equity
-        FROM activities
-        WHERE total_equity IS NOT NULL
-        ORDER BY config_id, created_at DESC
+        -- Get latest activity with equity for each of the USER'S bots only
+        -- Uses idx_activities_equity_latest partial index (config_id, created_at DESC WHERE total_equity IS NOT NULL)
+        SELECT DISTINCT ON (a.config_id)
+               a.config_id,
+               a.total_equity as current_equity
+        FROM activities a
+        INNER JOIN bot_configs bc ON a.config_id = bc.config_id
+        WHERE a.total_equity IS NOT NULL
+        ORDER BY a.config_id, a.created_at DESC
     ),
     account_summaries AS (
-        -- Get latest snapshot per config from universal account monitor
-        SELECT DISTINCT ON (asn.config_id)
-               asn.config_id,
-               asn.snapshot_id as account_id,
-               asn.current_balance,
-               asn.available_balance,
-               asn.margin_used,
-               asn.total_pnl,
-               asn.unrealized_pnl,
-               asn.total_trades,
-               asn.win_trades,
-               asn.loss_trades,
-               asn.open_positions,
-               asn.win_rate,
-               asn.timestamp as updated_at,
-               asn.trading_mode as source,
+        -- Get latest snapshot per config using LATERAL join for index-driven lookup
+        -- Forces use of idx_snapshots_latest (config_id, timestamp DESC) — one index seek per config
+        SELECT
+               snap.config_id,
+               snap.snapshot_id as account_id,
+               snap.current_balance,
+               snap.available_balance,
+               snap.margin_used,
+               snap.total_pnl,
+               snap.unrealized_pnl,
+               snap.total_trades,
+               snap.win_trades,
+               snap.loss_trades,
+               snap.open_positions,
+               snap.win_rate,
+               snap.timestamp as updated_at,
+               snap.trading_mode as source,
                -- Calculate performance percentage using denormalized initial_equity
                CASE
                    WHEN bc.initial_equity IS NOT NULL AND bc.initial_equity > 0 AND la.current_equity IS NOT NULL
                    THEN ((la.current_equity - bc.initial_equity) / bc.initial_equity * 100)
                    ELSE 0
                END as performance_pct
-        FROM account_snapshots asn
-        INNER JOIN bot_configs bc ON asn.config_id = bc.config_id
-        LEFT JOIN latest_activities la ON asn.config_id = la.config_id
-        ORDER BY asn.config_id, asn.timestamp DESC
+        FROM bot_configs bc
+        LEFT JOIN latest_activities la ON bc.config_id = la.config_id
+        LEFT JOIN LATERAL (
+            SELECT asn.config_id, asn.snapshot_id, asn.current_balance, asn.available_balance,
+                   asn.margin_used, asn.total_pnl, asn.unrealized_pnl, asn.total_trades,
+                   asn.win_trades, asn.loss_trades, asn.open_positions, asn.win_rate,
+                   asn.timestamp, asn.trading_mode
+            FROM account_snapshots asn
+            WHERE asn.config_id = bc.config_id
+            ORDER BY asn.timestamp DESC
+            LIMIT 1
+        ) snap ON true
+        WHERE snap.config_id IS NOT NULL
     )
     SELECT json_build_object(
         'bots', COALESCE((SELECT json_agg(
