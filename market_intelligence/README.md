@@ -364,6 +364,23 @@ All marked `global: True` in `catalog_mapping.py` — shared cache across all bo
 
 ---
 
+#### **Type 6: AccountPerformanceAdapter** (`adapters/internal/account_performance.py`)
+**Purpose**: Bot's own trading history and account performance from internal DB
+
+**Per-Config Routing**: Uses `{config_id}` template in params (third routing mode, alongside global and symbol-specific). Orchestrator passes `config_id` + `trading_mode` to `_replace_param_templates`.
+
+**Capabilities**:
+- Account equity, drawdown from peak, win rate, avg win/loss %
+- Last 10 closed trades with P&L %, side, symbol, close reason, time ago
+- Paper path: queries `paper_accounts` + `paper_trades`
+- Hyperliquid path: queries `live_trades` + `account_snapshots`
+
+**Use Case**: Strategy-aware decisions. User can write "If drawdown >20%, reduce size" or "After 3 consecutive losses, wait one cycle." LLM has facts, user strategy dictates interpretation.
+
+**Cost**: $0 (internal DB queries only). 5-min Redis cache per config.
+
+---
+
 ### **5. Storage Layer**
 
 #### **Redis Cache** (`cache/redis_cache.py`)
@@ -1049,6 +1066,8 @@ market_intelligence/
 │       │   └── ggshot_signals.yaml    # ggShot trading signals
 │       ├── macro/
 │       │   └── coingecko_global.yaml  # USDT dominance (CoinGecko)
+│       ├── internal/
+│       │   └── account_performance.yaml  # Bot account performance
 │       └── market_data/
 │           └── ohlcv.yaml             # OHLCV candle data
 ├── adapters/                           # Data source adapters
@@ -1061,6 +1080,8 @@ market_intelligence/
 │   │   └── coingecko_global.py        # CoinGecko global market data
 │   ├── signals/
 │   │   └── ggshot_adapter.py          # ggShot signal queries
+│   ├── internal/
+│   │   └── account_performance.py     # Bot trading history (internal DB)
 │   └── market_data/
 │       └── redis_websocket.py         # WebSocket price cache
 └── cache/
