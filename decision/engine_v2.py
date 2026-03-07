@@ -473,21 +473,39 @@ class DecisionEngineV2:
     async def _get_fresh_market_data(self, symbol: str) -> Dict[str, Any]:
         """
         Get fresh market data for this config from the database.
-        
-        Retrieves data for all timeframes and consolidates into timeframe-organized structure.
+
+        Retrieves data only for configured timeframes, consolidated into
+        timeframe-organized structure. Filters out stale rows from previous
+        configs to prevent wrong/outdated data reaching the LLM.
         NOTE: Orchestrator is responsible for ensuring fresh data exists.
         DecisionEngine just retrieves and organizes it from database.
         """
         try:
+            # Extract configured timeframes to filter query
+            configured_timeframes = None
+            if self.config and self.config.extraction:
+                ta_config = self.config.extraction.get('selected_data_sources', {}).get('technical_analysis', {})
+                if isinstance(ta_config, dict) and ta_config.get('timeframes'):
+                    configured_timeframes = ta_config['timeframes']
+
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Get all market data for this config and symbol across all timeframes
-                    cur.execute("""
-                        SELECT timeframe, data_points, raw_data, updated_at 
-                        FROM market_data 
-                        WHERE config_id = %s AND symbol = %s 
-                        ORDER BY timeframe ASC, updated_at DESC
-                    """, (self.config_id, symbol))
+                    if configured_timeframes:
+                        # Filter to only configured timeframes
+                        cur.execute("""
+                            SELECT timeframe, data_points, raw_data, updated_at
+                            FROM market_data
+                            WHERE config_id = %s AND symbol = %s AND timeframe = ANY(%s)
+                            ORDER BY timeframe ASC, updated_at DESC
+                        """, (self.config_id, symbol, configured_timeframes))
+                    else:
+                        # Fallback: no timeframe config available, fetch all
+                        cur.execute("""
+                            SELECT timeframe, data_points, raw_data, updated_at
+                            FROM market_data
+                            WHERE config_id = %s AND symbol = %s
+                            ORDER BY timeframe ASC, updated_at DESC
+                        """, (self.config_id, symbol))
                     
                     rows = cur.fetchall()
                     if not rows:
@@ -789,12 +807,15 @@ class DecisionEngineV2:
     
     def _format_position_data_for_llm(self, position_data: Dict, current_price: Decimal) -> str:
         """Format position data for LLM consumption with performance context."""
-        
+
         # Calculate performance metrics
         entry_price = position_data['entry_price']
         unrealized_pnl = position_data['unrealized_pnl']
         size_usd = position_data['size_usd']
-        side = position_data['side']
+        raw_side = position_data['side']
+
+        # Normalize side: paper uses 'buy'/'sell', HL uses 'long'/'short'
+        side = {'buy': 'long', 'sell': 'short'}.get(raw_side, raw_side)
 
         # Calculate percentage gain/loss (with safety check for division by zero)
         if entry_price == 0 or entry_price is None:
@@ -802,11 +823,11 @@ class DecisionEngineV2:
                 f"Invalid entry_price ({entry_price}) in position data. Cannot calculate P&L percentage."
             )
             pnl_percentage = 0.0  # Safe fallback
-        elif side == 'buy' or side == 'long':
+        elif side == 'long':
             pnl_percentage = ((float(current_price) - entry_price) / entry_price) * 100
-        else:  # sell/short
+        else:  # short
             pnl_percentage = ((entry_price - float(current_price)) / entry_price) * 100
-        
+
         # Calculate position duration
         from datetime import datetime, timezone
         opened_at = position_data['opened_at']
@@ -818,7 +839,18 @@ class DecisionEngineV2:
 
         duration = datetime.now(timezone.utc) - opened_at
         hours_held = duration.total_seconds() / 3600
-        
+
+        # Calculate bars_in_trade from duration and bot interval
+        from core.scheduler.utils import TIMEFRAME_SECONDS
+        decision_config = self.config.decision if isinstance(self.config.decision, dict) else {}
+        analysis_freq = decision_config.get('analysis_frequency', '1h')
+        interval_secs = TIMEFRAME_SECONDS.get(analysis_freq, 3600)
+        bars_in_trade = max(1, int(duration.total_seconds() / interval_secs))
+
+        # Track max drawdown during trade via Redis
+        trade_id = str(position_data.get('trade_id') or position_data.get('batch_id'))
+        max_drawdown = self._track_max_drawdown(trade_id, pnl_percentage)
+
         # Format performance status
         if pnl_percentage > 5:
             performance_status = "Strong Winner"
@@ -830,20 +862,23 @@ class DecisionEngineV2:
             performance_status = "Losing"
         else:
             performance_status = "Strong Loser"
-        
+
         # Format the position summary
-        stop_loss_text = f"${position_data['stop_loss']:,.2f}" if position_data['stop_loss'] else 'None set'
-        take_profit_text = f"${position_data['take_profit']:,.2f}" if position_data['take_profit'] else 'None set'
-        
+        leverage = position_data.get('leverage', 1)
+        leverage_text = f" ({leverage}x leverage)" if leverage and leverage > 1 else ""
+        stop_loss_text = f"${position_data['stop_loss']:,.2f}" if position_data.get('stop_loss') else 'None set'
+        take_profit_text = f"${position_data['take_profit']:,.2f}" if position_data.get('take_profit') else 'None set'
+        max_dd_text = f" (worst: {max_drawdown:+.1f}%)" if max_drawdown < pnl_percentage - 0.1 else ""
+
         position_summary = f"""
 CURRENT POSITION DETAILS:
-Position Type: {side.upper()} {position_data['symbol']}
+Position Type: {side.upper()} {position_data['symbol']}{leverage_text}
 Entry Price: ${entry_price:,.2f}
 Current Price: ${current_price:,.2f}
 Position Size: ${size_usd:,.2f}
-Unrealized P&L: ${unrealized_pnl:+.2f} ({pnl_percentage:+.1f}%)
+Unrealized P&L: ${unrealized_pnl:+.2f} ({pnl_percentage:+.1f}%){max_dd_text}
 Performance: {performance_status}
-Duration: {hours_held:.1f} hours
+Duration: {hours_held:.1f} hours ({bars_in_trade} bars at {analysis_freq})
 
 ORIGINAL TRADE CONTEXT:
 Entry Reasoning: {position_data['entry_reasoning']}
@@ -851,8 +886,26 @@ Entry Confidence: {position_data['entry_confidence']:.1%}
 Stop Loss: {stop_loss_text}
 Take Profit: {take_profit_text}
 """
-        
+
         return position_summary
+
+    def _track_max_drawdown(self, trade_id: str, current_pnl_pct: float) -> float:
+        """
+        Track max drawdown (worst P&L %) for a trade via Redis.
+        Updates if current P&L is worse than stored worst. Returns worst seen.
+        """
+        key = f"trade:max_drawdown:{trade_id}"
+        try:
+            rc = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+            stored = rc.get(key)
+            worst = float(stored) if stored is not None else current_pnl_pct
+            if current_pnl_pct < worst:
+                worst = current_pnl_pct
+            # Set with 7-day TTL (auto-cleanup after trade is long closed)
+            rc.set(key, str(worst), ex=604800)
+            return worst
+        except Exception:
+            return current_pnl_pct
     
     async def _save_decision_to_db(self, symbol: str, decision_data: Dict[str, Any],
                                    market_data: Dict[str, Any], current_price: Decimal,
@@ -1949,6 +2002,18 @@ Take Profit: {take_profit_text}
                                     from datetime import timezone as tz
                                     opened_at_raw = opened_at_raw.replace(tzinfo=tz.utc)
 
+                                # Compute SL/TP prices from config risk_management
+                                trading_config = self.config.trading if hasattr(self.config, 'trading') else {}
+                                risk_config = trading_config.get('risk_management', {}) if isinstance(trading_config, dict) else {}
+                                sl_pct = risk_config.get('default_stop_loss_percent', 2.0) / 100.0
+                                tp_pct = risk_config.get('default_take_profit_percent', 3.0) / 100.0
+                                if side == 'long':
+                                    sl_price = entry_px * (1 - sl_pct)
+                                    tp_price = entry_px * (1 + tp_pct)
+                                else:
+                                    sl_price = entry_px * (1 + sl_pct)
+                                    tp_price = entry_px * (1 - tp_pct)
+
                                 position_data = {
                                     'trade_id': batch_id,
                                     'batch_id': batch_id,
@@ -1959,8 +2024,8 @@ Take Profit: {take_profit_text}
                                     'size_usd': notional,
                                     'unrealized_pnl': unrealized_pnl,
                                     'opened_at': opened_at_raw,
-                                    'stop_loss': None,  # HL manages SL/TP as separate orders
-                                    'take_profit': None,
+                                    'stop_loss': sl_price,
+                                    'take_profit': tp_price,
                                     'confidence_score': entry_confidence,
                                     'entry_reasoning': entry_reasoning,
                                     'entry_confidence': entry_confidence,
@@ -2002,7 +2067,8 @@ Take Profit: {take_profit_text}
                                 pt.confidence_score,
                                 d.reasoning as entry_reasoning,
                                 d.confidence as entry_confidence,
-                                d.decision_data as entry_decision_data
+                                d.decision_data as entry_decision_data,
+                                pt.leverage
                             FROM paper_trades pt
                             LEFT JOIN decisions d ON pt.decision_id = d.decision_id
                             WHERE pt.config_id = %s
@@ -2031,7 +2097,8 @@ Take Profit: {take_profit_text}
                         'confidence_score': float(row[10]) if row[10] else 0.0,
                         'entry_reasoning': row[11] if row[11] else 'No reasoning available',
                         'entry_confidence': float(row[12]) if row[12] else 0.0,
-                        'entry_decision_data': row[13] if row[13] else {}
+                        'entry_decision_data': row[13] if row[13] else {},
+                        'leverage': int(row[14]) if row[14] else 1
                     }
 
                     # Enrich with live price from Redis (position monitor writes there)

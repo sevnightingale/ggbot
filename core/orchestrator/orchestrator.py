@@ -762,6 +762,24 @@ class GGBotOrchestrator:
                 self._log.warning(f"Failed to fetch market intelligence (non-critical): {e}")
                 overall_result["market_intelligence"] = {}
 
+            # Clean up stale market_data rows for timeframes no longer in config.
+            # Old rows linger after config changes and pollute LLM prompts.
+            try:
+                from core.common.db import get_db_connection
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            DELETE FROM market_data
+                            WHERE config_id = %s AND symbol = %s
+                              AND timeframe != ALL(%s)
+                        """, (config.config_id, symbol, timeframes))
+                        deleted = cur.rowcount
+                        if deleted > 0:
+                            conn.commit()
+                            self._log.info(f"Cleaned up {deleted} stale market_data rows for removed timeframes")
+            except Exception as e:
+                self._log.warning(f"Failed to clean stale market_data (non-critical): {e}")
+
             self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(timeframes)} successful")
             return overall_result
 

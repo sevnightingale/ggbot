@@ -82,6 +82,20 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
         'global': True,
     },
 
+    ('macro_economics', 'usdt_dominance'): {
+        'data_type': 'coingecko_global',
+        'params_template': {'query_type': 'usdt_dominance'},
+        'cache_ttl': 14400,  # 4 hours
+        'global': True,
+    },
+
+    ('macro_economics', 'move_index'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'move_index'},
+        'cache_ttl': 14400,  # 4 hours
+        'global': True,
+    },
+
     # ========================================================================
     # ON-CHAIN ANALYTICS (Grok-Powered - Premium)
     # ========================================================================
@@ -138,6 +152,18 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'symbol': '{symbol}'
         },
         'cache_ttl': 14400  # 4 hours - breaking news is rarely actionable in minutes; reduced from 2h to cut API costs
+    },
+
+    # ========================================================================
+    # ACCOUNT PERFORMANCE (Internal - Free)
+    # ========================================================================
+    ('account_performance', 'trading_history'): {
+        'data_type': 'account_performance',
+        'params_template': {
+            'config_id': '{config_id}',
+            'trading_mode': '{trading_mode}',
+        },
+        'cache_ttl': 300,  # 5 minutes
     },
 
     # ========================================================================

@@ -281,6 +281,8 @@ class MarketIntelligence:
         import re
         # Special case for WebSocket to avoid redis_web_socket
         name_without_suffix = name_without_suffix.replace('WebSocket', 'Websocket')
+        # Special case for CoinGecko to avoid coin_gecko
+        name_without_suffix = name_without_suffix.replace('CoinGecko', 'Coingecko')
         snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', name_without_suffix).lower()
 
         # Determine category from name patterns
@@ -294,7 +296,7 @@ class MarketIntelligence:
             category = 'onchain'
         elif 'edgar' in snake_case or 'alpha_vantage' in snake_case:
             category = 'fundamentals'
-        elif 'fred' in snake_case or 'bls' in snake_case or 'treasury' in snake_case:
+        elif 'fred' in snake_case or 'bls' in snake_case or 'treasury' in snake_case or 'coingecko' in snake_case:
             category = 'macro'
         elif 'grok' in snake_case or 'agentic' in snake_case:
             category = 'agentic'
@@ -302,6 +304,8 @@ class MarketIntelligence:
             category = 'signals'
         elif 'funding' in snake_case or 'derivatives' in snake_case:
             category = 'derivatives'
+        elif 'account_performance' in snake_case:
+            category = 'internal'
         else:
             # Default to market_data
             category = 'market_data'

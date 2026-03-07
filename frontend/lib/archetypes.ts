@@ -54,15 +54,15 @@ export const ARCHETYPES: Record<string, ArchetypeConfig> = {
       selected_data_sources: {
         technical_analysis: {
           data_points: ['RSI', 'Stochastic', 'CCI', 'BB', 'EMA', 'ATR', 'MACD', 'OBV', 'ADX', 'Aroon', 'VWAP'],
-          timeframes: ['1h']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         sentiment_social: {
           data_points: ['twitter_sentiment'],
-          timeframes: ['1h']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         derivatives_leverage: {
           data_points: ['btc_funding_rate', 'eth_funding_rate'],
-          timeframes: ['1h']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         }
       }
     },
@@ -186,19 +186,19 @@ The crowd overdoes it. You're there for the correction.`
       selected_data_sources: {
         technical_analysis: {
           data_points: ['EMA', 'SMA', 'ADX', 'Aroon', 'MACD', 'RSI', 'BB', 'OBV', 'ATR'],
-          timeframes: ['1d']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         macro_economics: {
           data_points: ['vix', 'dxy'],
-          timeframes: ['1d']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         sentiment_social: {
           data_points: ['twitter_sentiment'],
-          timeframes: ['1d']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         derivatives_leverage: {
           data_points: ['btc_funding_rate', 'eth_funding_rate'],
-          timeframes: ['1d']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         }
       }
     },
@@ -322,15 +322,15 @@ The macro compass points the way. You follow it.`
       selected_data_sources: {
         technical_analysis: {
           data_points: ['ADX', 'Aroon', 'EMA', 'SMA', 'PSAR', 'MACD', 'RSI', 'Stochastic', 'CCI', 'BB', 'ATR', 'OBV', 'VWAP'],
-          timeframes: ['4h']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         sentiment_social: {
           data_points: ['twitter_sentiment'],
-          timeframes: ['4h']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         },
         derivatives_leverage: {
           data_points: ['btc_funding_rate', 'eth_funding_rate'],
-          timeframes: ['4h']
+          timeframes: ['5m', '15m', '30m', '1h', '4h', '1d', '1w']
         }
       }
     },

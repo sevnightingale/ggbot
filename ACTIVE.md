@@ -1,20 +1,20 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-03-04 10:28:25 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-07 07:18:55 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 330
-- **Prepaid Users**: 20 (20 active subscriptions)
+- **Total Users**: 331
+- **Prepaid Users**: 21 (21 active subscriptions)
 - **Free Users**: 304
-- **Users with Bots**: 320 (97.0%)
+- **Users with Bots**: 321 (97.0%)
 
 ### Bot Statistics
-- **Total Bots**: 499
-- **Active Bots**: 14 (2.8%)
-  - Paper: 13
+- **Total Bots**: 506
+- **Active Bots**: 21 (4.2%)
+  - Paper: 20
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 1
@@ -22,42 +22,43 @@
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,716
-  - Wins: 2,598
-  - Losses: 5,118
-  - Platform Win Rate: 33.67%
-  - Total P&L: $114,585.01
+- **Total Trades (All Time)**: 7,770
+  - Wins: 2,614
+  - Losses: 5,156
+  - Platform Win Rate: 33.64%
+  - Total P&L: $111,797.94
 - **Recent Activity**:
-  - Last 24 hours: 20 trades
-  - Last 7 days: 233 trades
-  - Last 30 days: 2083 trades
+  - Last 24 hours: 21 trades
+  - Last 7 days: 180 trades
+  - Last 30 days: 1855 trades
 
 ### Open Positions
-- **Open Positions**: 7
+- **Open Positions**: 9
 - **Unique Symbols**: 3
-- **Total Exposure**: $83,937.26
-- **Unrealized P&L**: $1,764.72
+- **Total Exposure**: $92,105.50
+- **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,207.00
+- **Average Balance**: $10,199.01
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 13 bots
-- **SOL/USDT**: 1 bots
+- **BTC/USDT**: 12 bots
+- **ETH/USDT**: 7 bots
+- **SOL/USDT**: 2 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 321 decisions (avg confidence: 40.3%)
-- **enter**: 21 decisions (avg confidence: 67.3%)
-- **exit**: 12 decisions (avg confidence: 66.3%)
+- **wait**: 567 decisions (avg confidence: 36.1%)
+- **enter**: 20 decisions (avg confidence: 70.1%)
+- **exit**: 8 decisions (avg confidence: 64.3%)
+- **short**: 3 decisions (avg confidence: 64.0%)
 - **close**: 2 decisions (avg confidence: 62.5%)
-- **long**: 1 decisions (avg confidence: 75.0%)
 
 ### System Health
-- **Decisions (last hour)**: 27
+- **Decisions (last hour)**: 12
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -66,24 +67,24 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 5MB | 2d 22h | 2 |
-| ggbot | 🟢 online | 0.5% | 264MB | 1m | 14 |
-| account-monitor | 🟢 online | 0.7% | 24MB | 2d 22h | 6 |
-| sebastian-chrome | 🟢 online | 0.6% | 121MB | 2d 22h | 6 |
-| sebastian-bot | 🟢 online | 0.2% | 24MB | 2d 22h | 3 |
-| market-data-ws | 🟢 online | 1.2% | 12MB | 2d 22h | 2 |
-| sebastian-telegram | 🟢 online | 0% | 13MB | 2d 22h | 2 |
-| ggbot-scheduler | 🟢 online | 0.1% | 133MB | 2d 13h | 0 |
+| error-alerts | 🟢 online | 0% | 2MB | 2d 19h | 3 |
+| ggbot | 🟢 online | 1.6% | 229MB | 2d 19h | 16 |
+| account-monitor | 🟢 online | 1% | 25MB | 2d 19h | 7 |
+| sebastian-chrome | 🟢 online | 0.3% | 38MB | 2d 19h | 7 |
+| sebastian-bot | 🟢 online | 0.1% | 26MB | 23h 19m | 4 |
+| market-data-ws | 🟢 online | 1% | 12MB | 2d 19h | 3 |
+| sebastian-telegram | 🟢 online | 0% | 12MB | 2d 19h | 3 |
+| ggbot-scheduler | 🟢 online | 0.1% | 209MB | 2d 19h | 2 |
 
 ### VM Resources
 
-- **Disk**: 60G / 78G (77%)
-- **Memory**: 1.8Gi / 3.8Gi
-- **CPU Load**: 0.57 / 0.57 / 0.61 (1m/5m/15m)
+- **Disk**: 61G / 78G (79%)
+- **Memory**: 2.1Gi / 3.8Gi
+- **CPU Load**: 0.47 / 0.54 / 0.56 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 23.34M)
+- **Redis**: 🟢 connected (Memory: 24.11M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -518,7 +519,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-04 10:28:27 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-07 07:18:56 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -573,16 +574,17 @@ source_id uuid, name varchar(50), display_name varchar(100), description text?, 
 requires_premium bool?, sort_order int?, created_at timestamptz?, updated_at timestamptz?
 
 ### decisions (13 cols) | PK: decision_id | FK: config_id→configurations, parent_decision_id→decisions
-Idx: idx_decisions_action_status(action, status), idx_decisions_confidence(confidence), idx_decisions_created_by(created_by), idx_decisions_parent(parent_decision_id), idx_decisions_symbol_created(...
+Idx: idx_decisions_action_status(action, status), idx_decisions_config_created(config_id, created_at), idx_decisions_created_by(created_by), idx_decisions_parent(parent_decision_id), idx_decisions_...
 decision_id uuid, user_id uuid, config_id uuid?, symbol varchar(20), action varchar(20), status varchar(20)?
 confidence numeric, reasoning text?, prompt text?, decision_data jsonb?, parent_decision_id uuid?
 created_at timestamptz, created_by text?=decision_engine_v2
 
-### live_trades (9 cols) | PK: batch_id | FK: config_id→configurations, decision_id→decisions | UQ: decision_id
+### live_trades (15 cols) | PK: batch_id | FK: config_id→configurations, decision_id→decisions | UQ: decision_id
 Idx: idx_live_trades_config(config_id), idx_live_trades_open(config_id, closed_at), idx_live_trades_provider(config_id, provider), idx_live_trades_provider_open(config_id, closed_at, provider), idx...
 batch_id varchar(255), config_id uuid, decision_id uuid?, created_at timestamp, closed_at timestamp?
 provider varchar(20)=symphony' varying, stop_loss_order_id varchar(50)?, take_profit_order_id varchar(50)?
-symbol varchar(20)?
+symbol varchar(20)?, side varchar(10)?, entry_price numeric?, exit_price numeric?, size_usd numeric?, leverage int?=1
+realized_pnl numeric?
 
 ### llm_models (16 cols) | PK: model_id | UQ: openrouter_model_id
 Idx: idx_llm_models_enabled(enabled, sort_order), idx_llm_models_provider(provider), llm_models_openrouter_model_id_key(openrouter_model_id)
@@ -706,7 +708,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-03-04 10:28:27 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-07 07:18:56 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

@@ -358,7 +358,7 @@ function MarketQueryContent({ activity }: { activity: Activity }) {
           <InfoCard label="Mode" value={String(details.query_mode).replace(/_/g, ' ')} />
         )}
         {metadata.timeframes_analyzed != null && (
-          <InfoCard label="Timeframes" value={String((metadata.timeframes_analyzed as string[]).length)} />
+          <InfoCard label="Timeframes" value={(metadata.timeframes_analyzed as string[]).join(', ')} />
         )}
         {metadata.indicators_count != null && (
           <InfoCard label="Indicators" value={String(metadata.indicators_count)} />

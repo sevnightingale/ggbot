@@ -6,6 +6,167 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-07 - Account Performance as MI Data Source (Statefulness Phase 2a)
+
+Community-requested (Denis @ Buidler Labs). Bots now see their own trading history — win rate, drawdown, recent trades — as market intelligence data. User checks "Trading History" checkbox → adapter queries internal DB → data flows into LLM prompt alongside VIX, funding rates, etc. No new toggles or concepts.
+
+**New Adapter** (`market_intelligence/adapters/internal/account_performance.py`):
+- `AccountPerformanceAdapter` — queries `paper_accounts`/`paper_trades` (paper) or `live_trades`/`account_snapshots` (HL)
+- Returns: equity, drawdown from peak, win rate, avg win/loss %, last 10 trades with P&L % and close reason
+- Per-config routing via `{config_id}` template in `_replace_param_templates` (new, alongside `{symbol}`)
+- 5-min Redis cache (`intel:account_perf:{config_id}`), $0/query (internal DB only)
+
+**Pipeline Integration** (`orchestrator.py`, `catalog_mapping.py`, `gateway.py`):
+- Orchestrator passes `config_id` + `trading_mode` to template replacement (~5 lines)
+- Gateway routes `account_performance` adapter to `internal` category (1 line)
+- Catalog YAML auto-discovered via `rglob` in `catalog/data_types/internal/`
+- DB seed: `data_sources` + `data_points` rows (free tier, auto-populates in frontend)
+
+**LLM sees**: `ACCOUNT PERFORMANCE: Account down 15.5% from peak. 5W 7L (41.7% win rate). Last 5: SHORT BTC -2.3% (SL, 4h ago)...`
+User strategy can reference: "If drawdown >20%, reduce size by half" or "After 3 consecutive losses, wait one cycle."
+
+---
+
+## 2026-03-07 - Position Management: Statefulness Phase 1 + HL Fixes
+
+Enriched position management prompt with statefulness fields and fixed 3 data gaps for Hyperliquid live trading. All changes in `decision/engine_v2.py`.
+
+**Phase 1 Statefulness** (`_format_position_data_for_llm`):
+- `bars_in_trade` — derived from `duration / TIMEFRAME_SECONDS[analysis_frequency]`. LLM sees "4.2 hours (1 bars at 4h)" vs "80.5 hours (20 bars at 4h)" — distinguishes fresh from stale positions
+- `max_drawdown` — Redis key `trade:max_drawdown:{trade_id}` (7-day TTL). Each cycle compares current P&L% to stored worst, updates if lower. Rendered as `(worst: -8.3%)` only when meaningfully different from current P&L — gives LLM recovery context
+
+**HL Position Management Fixes** (`_get_active_position` HL builder + formatter):
+- SL/TP computed from `entry_price * (1 ± risk_management.default_stop_loss_percent)` — was `None` ("None set") even though orders exist on exchange
+- Leverage rendered as `(10x leverage)` after position type — was invisible to LLM for both paper and HL
+- Side normalized: `buy→long`, `sell→short` mapping — paper used `BUY`, HL used `LONG`, now consistent
+- Paper query now includes `pt.leverage` column
+
+---
+
+## 2026-03-07 - Configurable Timeframes + Strategy Advisor Fix
+
+Timeframes now explicitly configurable. Previously: archetypes set 1 TF, toggling any indicator in MarketDataSelector silently reset to all 7, Strategy Advisor could collapse TFs via `deep_merge()` list replacement. 407/506 bots had 1 TF, 75 had 7 — jump was accidental.
+
+**Timeframe Picker UI** (`frontend/.../MarketDataSelector.tsx`):
+- Collapsible "Timeframes" section below indicator grid, shows count or "All (7)"
+- 8 toggle buttons: All + 7 individual TFs. Min 1 TF enforced (last one disabled)
+- Only applies to `technical_analysis` — MI categories (sentiment, funding, macro) are Grok-based and don't use timeframes
+- Indicator toggle now preserves existing category timeframes instead of overwriting with all 7
+
+**Backend Defaults** (`frontend/lib/archetypes.ts`, `api/assistant.py`):
+- All 3 archetypes (Contrarian, Compass, Arbiter) default to all 7 TFs (was single TF each)
+- AI config creation (`CONFIG_CREATION_PROMPT_TEMPLATE`) example + guideline #7: always use all 7 unless user requests fewer
+- Strategy Advisor rule #9: preserve existing timeframes unless intentionally changing, state changes explicitly
+
+**Activity Modal** (`frontend/components/activity-modal.tsx`):
+- Market query activities show TF list ("5m, 15m, 1h, 4h") instead of just count ("4")
+
+---
+
+## 2026-03-07 - Market Intelligence: USDT Dominance + MOVE Index
+
+Community-requested by Denis @ Buidler Labs. Two new macro data points under Macro Economics category.
+
+**USDT Dominance** — New `CoinGeckoGlobalAdapter` (`market_intelligence/adapters/macro/coingecko_global.py`):
+- Fetches `data.market_cap_percentage.usdt` from CoinGecko `/global` endpoint. $0/query (free tier)
+- Thresholds: >10% risk-off (bearish), 6-10% neutral, <6% risk-on (bullish)
+- Also captures total crypto market cap and 24h change
+- New catalog YAML (`catalog/data_types/macro/coingecko_global.yaml`), 4hr cache
+
+**MOVE Index (Bond Volatility)** — New Grok prompt template (`grok_agentic.py`):
+- ICE BofA MOVE Index via web search. ~$0.005/query, 4hr cache
+- Thresholds: <80 low stress (bullish), 80-120 moderate, >120 high stress (bearish), >150 extreme
+
+**Wiring**: Gateway routing added `CoinGecko` → `Coingecko` special case + `'coingecko'` macro category detection (`gateway.py`). Two catalog mapping entries (`catalog_mapping.py`). Two DB rows in `data_points` (both free, enabled). Total: 35 data points across 6 categories.
+
+---
+
+## 2026-03-07 - Fix: Stale Market Data in LLM Prompts
+
+**Bug**: Config changes (timeframe removal, indicator edits) left orphaned `market_data` rows in DB. Decision engine (`engine_v2.py:485-490`) queried `WHERE config_id AND symbol` with no timeframe filter — stale rows from previous configs injected into LLM prompts. ROBBOT had 42-hour-old 5m data with 9 wrong indicators reaching LLM every cycle. 14/312 bots affected, 26 stale rows total.
+
+**Fix A — Decision engine filter** (`decision/engine_v2.py:484-508`): `_get_fresh_market_data()` now extracts configured timeframes from `self.config.extraction` and adds `AND timeframe = ANY(%s)` to query. Falls back to unfiltered for bots without timeframe config.
+
+**Fix B — Extraction cleanup** (`core/orchestrator/orchestrator.py:765-781`): After extraction completes, `DELETE FROM market_data WHERE timeframe != ALL(configured_timeframes)` removes orphaned rows. Logged as info when rows deleted, wrapped in try/except (non-critical).
+
+**One-time cleanup**: Deleted 26 stale rows across 14 bots.
+
+---
+
+## 2026-03-07 - Audit: Live Trading Integration (4 Bug Fixes)
+
+Full audit of Sev's live Hyperliquid bot (config `b9d9bf00`, 18 days, 11 trades). Found and fixed 4 bugs across dual close-logging paths.
+
+**Schema Migration** (`live_trades`):
+- Added 6 columns: `side`, `entry_price`, `exit_price`, `size_usd`, `leverage`, `realized_pnl`
+- Backfilled all 11 trades from Hyperliquid `user_fills_by_time` API
+- P&L now stored per-trade (same pattern as `paper_trades`) — snapshot reads `SUM(realized_pnl)` instead of recomputing from fills API
+
+**Bug 1: Duplicate Close Activities** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- Two independent paths logged `trade_exit`: `hyperliquid_service.close_position()` (decision-triggered) AND `hyperliquid_adapter._detect_and_log_closes()` (fill-scan safety net)
+- Fix: cross-source dedup — adapter checks `activities` table for recent service-logged exit before logging its own
+
+**Bug 2: Partial Fill P&L** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- `market_close()` produces multiple fills at same timestamp. Adapter processed individual fills, logging P&L for one partial instead of aggregate
+- Fix: group fills by `(coin, fill_time)`, sum quantities and compute weighted-average exit price before logging
+
+**Bug 3: Fill Window Drift** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- `get_current_snapshot()` called `user_fills_by_time()` with hardcoded 7-day window — trades older than 7 days disappeared from stats, pre-bot fills polluted P&L
+- Fix: replaced fills API call with `SELECT SUM(realized_pnl) FROM live_trades WHERE config_id = %s`. Eliminated one API call per 5s snapshot cycle. Win/loss/total/avg stats also from `live_trades`
+
+**Bug 4: Duration Timezone** (`trading/live/hyperliquid_service.py`):
+- `live_trades.created_at` is naive `timestamp`, `datetime.now(timezone.utc)` is aware — subtraction raises `TypeError` caught silently by bare `except`, duration always 0.0s
+- Fix: `.replace(tzinfo=timezone.utc)` for naive datetimes before arithmetic
+
+**Adapter Rewrite** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- `_detect_and_log_closes()`: complete rewrite — fill aggregation, cross-source dedup, writes `exit_price`/`realized_pnl` to `live_trades`
+- `get_current_snapshot()`: trade stats section reads from `live_trades` table (total/wins/losses/pnl/avg_win/avg_loss/largest)
+
+**Service Updates** (`trading/live/hyperliquid_service.py`):
+- `_save_trade_record()`: expanded to store entry data (side, entry_price, size_usd, leverage)
+- `_mark_trade_closed()`: expanded to store exit data (exit_price, realized_pnl)
+
+**Verified**: `live_trades` SUM ($-9.06) matches Hyperliquid fills exactly. $1.57 gap to balance delta ($-10.63) = expected funding fees over 18 days.
+
+---
+
+## 2026-03-07 - Credits vs Trading Funds UX Redesign
+
+Pre-$GG launch UX fix: new users confused Hyperliquid deposit (trading funds) with LLM credits (bot decision costs). Redesigned billing UX across 6 frontend components.
+
+**UserProfile Dropdown** (`frontend/app/forge/components/layout/UserProfile.tsx`):
+- "Credits" section renamed "AI Credits" with subtitle "Powers your bot decisions"
+- "Hyperliquid" section renamed "Trading Funds" with subtitle "Your capital on Hyperliquid"
+- "Manage Billing" removed from dropdown (moved into Settings Modal)
+- "Add Credits" button renamed "Add AI Credits". Dropdown widened `w-56` to `w-64`
+
+**Settings Modal** (`frontend/components/SettingsModal.tsx`):
+- Full redesign as billing hub. Two sections: "AI Credits" (required for all bots) + "Live Trading" (optional, labeled separate from credits)
+- AI Credits section: plan badge, usage/balance breakdown, inline "Add AI Credits" + "Open Stripe" buttons
+- Free users see subscribe CTA with "$1/week" anchor. Live Trading section labeled "(Optional)"
+
+**ActivationBar** (`frontend/app/forge/components/monitor/ActivationBar.tsx`):
+- Credit exhaustion banner: "AI credits depleted" + live traders see "Your Hyperliquid trading funds are safe"
+
+**LiveTradingModalContent** (`frontend/components/hyperliquid/LiveTradingModalContent.tsx`):
+- After HL connection, info card for users without subscription: "Almost ready to trade live — you also need AI credits for decisions"
+
+**UpgradeModal** (`frontend/components/UpgradeModal.tsx`):
+- HL-connected users see callout: "This covers AI decisions only. Your Hyperliquid trading funds are separate."
+
+**AddCreditsModal** (`frontend/components/AddCreditsModal.tsx`):
+- Title: "Add AI Credits". Description: "AI credits pay for your bot's decisions."
+
+---
+
+## 2026-03-07 - Fix: Live Config 404 on Update
+
+**Bug**: PUT `/api/v2/config/{id}` returned 404 for Hyperliquid live bot configs. Live slot auto-created with empty `config_data={}` during HL setup (`ggbot.py:1590`). `validate()` in `config_service.py:156` rejected empty `selected_pair` → `update_config()` returned `None` → 404. Blocked all direct edits on unconfigured live bots.
+
+**Fix** (`core/services/config_service.py:155-159`): Early return in `validate()` when `trading_mode == 'hyperliquid'` and no `selected_pair` — treats unconfigured live bots as "setup mode". Activation already gated separately by ActivationBar (requires `selected_pair` before activate/run). Same pattern as existing agent config early-return.
+
+---
+
 ## 2026-03-04 - Database IO Optimization: Redis Position Tracking + Dashboard Query Fix
 
 **Problem**: Supabase disk IO hitting limits. Two root causes: (1) `paper_trades` position monitor writing ~230K ephemeral price updates/day to Postgres, (2) dashboard SSE query consuming 98% of total DB execution time due to unfiltered CTEs and seq scans on 406K-row `account_snapshots`.

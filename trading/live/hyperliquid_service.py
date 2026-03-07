@@ -689,17 +689,21 @@ class HyperliquidLiveTradingService:
             await self._close_stale_trades(config_id, platform_symbol)
 
             # Step 13: Save audit trail
+            notional_value = filled_sz * entry_price
             await self._save_trade_record(
                 batch_id=batch_id,
                 config_id=config_id,
                 decision_id=decision_id,
                 symbol=platform_symbol,
                 sl_order_id=sl_order_id,
-                tp_order_id=tp_order_id
+                tp_order_id=tp_order_id,
+                side='long' if is_buy else 'short',
+                entry_price=entry_price,
+                size_usd=notional_value,
+                leverage=leverage
             )
 
             # Step 14: Log activity
-            notional_value = filled_sz * entry_price
             try:
                 activity_type = 'trade_entry'
                 log_activity_safe(
@@ -915,12 +919,14 @@ class HyperliquidLiveTradingService:
                     from datetime import datetime, timezone
                     if isinstance(created_at, str):
                         created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    if hasattr(created_at, 'tzinfo') and created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
                     duration_seconds = (datetime.now(timezone.utc) - created_at).total_seconds()
             except Exception:
                 pass
 
-            # Step 7: Mark trade as closed
-            await self._mark_trade_closed(batch_id)
+            # Step 7: Mark trade as closed with P&L data
+            await self._mark_trade_closed(batch_id, exit_price=exit_price, realized_pnl=realized_pnl)
             self._log.info(
                 f"Position closed for {hl_symbol} (batch_id={batch_id}): "
                 f"entry=${entry_price:,.2f} exit=${exit_price:,.2f} P&L=${realized_pnl:+.2f}"
@@ -1109,7 +1115,11 @@ class HyperliquidLiveTradingService:
         decision_id: Optional[str],
         symbol: str,
         sl_order_id: Optional[str],
-        tp_order_id: Optional[str]
+        tp_order_id: Optional[str],
+        side: Optional[str] = None,
+        entry_price: Optional[float] = None,
+        size_usd: Optional[float] = None,
+        leverage: Optional[int] = None
     ) -> None:
         """Save audit trail to live_trades table with provider='hyperliquid'."""
         try:
@@ -1117,9 +1127,11 @@ class HyperliquidLiveTradingService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         INSERT INTO live_trades
-                        (batch_id, config_id, decision_id, provider, stop_loss_order_id, take_profit_order_id, symbol, created_at)
-                        VALUES (%s, %s, %s, 'hyperliquid', %s, %s, %s, NOW())
-                    """, (batch_id, config_id, decision_id, sl_order_id, tp_order_id, symbol))
+                        (batch_id, config_id, decision_id, provider, stop_loss_order_id,
+                         take_profit_order_id, symbol, side, entry_price, size_usd, leverage, created_at)
+                        VALUES (%s, %s, %s, 'hyperliquid', %s, %s, %s, %s, %s, %s, %s, NOW())
+                    """, (batch_id, config_id, decision_id, sl_order_id, tp_order_id,
+                          symbol, side, entry_price, size_usd, leverage))
                     conn.commit()
                     self._log.info(f"Saved Hyperliquid trade record: {batch_id} for {symbol}")
         except Exception as e:
@@ -1179,17 +1191,22 @@ class HyperliquidLiveTradingService:
         except Exception as e:
             self._log.warning(f"Failed to close stale trades (non-critical): {e}")
 
-    async def _mark_trade_closed(self, batch_id: str) -> None:
-        """Update live_trades record with closed_at timestamp."""
+    async def _mark_trade_closed(
+        self,
+        batch_id: str,
+        exit_price: Optional[float] = None,
+        realized_pnl: Optional[float] = None
+    ) -> None:
+        """Update live_trades record with closed_at timestamp and P&L data."""
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
                         UPDATE live_trades
-                        SET closed_at = NOW()
+                        SET closed_at = NOW(), exit_price = %s, realized_pnl = %s
                         WHERE batch_id = %s AND provider = 'hyperliquid'
-                    """, (batch_id,))
+                    """, (exit_price, realized_pnl, batch_id))
                     conn.commit()
-                    self._log.info(f"Marked trade {batch_id} as closed")
+                    self._log.info(f"Marked trade {batch_id} as closed (pnl=${realized_pnl})")
         except Exception as e:
             self._log.error(f"Error marking trade closed: {e}")

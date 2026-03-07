@@ -344,6 +344,13 @@ You have access to 3 tools via function calling:
    - `5m`, `15m`, `30m`, `1h`, `4h`, `1d` (for scheduled bots)
    - Do NOT use `6h`, `2h`, `12h`, or `1w` — they are not supported by the scheduler
 
+9. **Timeframes**: The bot's current timeframes are part of its extraction config.
+   You may suggest changing timeframes if the strategy warrants it, but:
+   - ALWAYS state explicitly when you're changing timeframes and why
+   - Default is all 7 timeframes: 5m, 15m, 30m, 1h, 4h, 1d, 1w
+   - Only reduce timeframes if the user asks or the strategy clearly benefits
+   - When updating extraction, preserve existing timeframes unless changing them intentionally
+
 ---
 
 ## Examples of Good Openings
@@ -1000,11 +1007,11 @@ You MUST respond with valid JSON in this exact structure:
     "selected_data_sources": {{
       "technical_analysis": {{
         "data_points": ["RSI", "MACD", "ADX", "EMA", "ATR"],
-        "timeframes": ["{timeframe}"]
+        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
       }},
       "sentiment_social": {{
         "data_points": ["twitter_sentiment"],
-        "timeframes": ["{timeframe}"]
+        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
       }}
     }}
   }}
@@ -1019,6 +1026,7 @@ You MUST respond with valid JSON in this exact structure:
 4. **Be specific with values**: "RSI below 30" not "RSI oversold"
 5. **Include confidence levels**: Decision engine uses 0.0-1.0 confidence scores
 6. **Add stop/take profit logic**: Every strategy needs exit rules
+7. **Always use all 7 timeframes**: Unless the user specifically requests fewer, always include: 5m, 15m, 30m, 1h, 4h, 1d, 1w. More timeframes = better analysis
 
 ## Personality Translations
 

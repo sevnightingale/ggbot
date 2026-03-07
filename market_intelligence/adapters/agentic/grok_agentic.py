@@ -282,6 +282,32 @@ Context for trading_implication:
 
 Return ONLY the JSON object, no markdown formatting.""",
 
+        'move_index': """Get the current MOVE Index (ICE BofA MOVE Index) value.
+
+The MOVE Index measures US Treasury bond implied volatility — it is the bond market's equivalent of the VIX.
+
+Search reliable financial data sources (FRED, Bloomberg, Yahoo Finance, MarketWatch, CNBC) for the most recent MOVE Index value.
+
+Return a JSON object with this EXACT structure:
+{{
+    "value": <number>,
+    "timestamp": "<ISO 8601 datetime>",
+    "interpretation": "<brief interpretation for crypto traders>",
+    "signal": "<bullish|bearish|neutral>",
+    "risk_regime": "<low_stress|moderate|high_stress|extreme_stress>",
+    "bond_stress_level": "<low|moderate|elevated|high|extreme>"
+}}
+
+Interpretation guidelines:
+- MOVE < 80: Low bond volatility, stable rates environment, risk-on (bullish for crypto)
+- MOVE 80-120: Moderate bond volatility (neutral)
+- MOVE 120-150: High bond stress, rate uncertainty, risk-off pressure (bearish for crypto)
+- MOVE > 150: Extreme bond stress, potential crisis conditions (very bearish for crypto)
+
+Context: When MOVE spikes, it signals Treasury market instability which cascades into crypto via risk-off flows, margin calls, and liquidity withdrawal.
+
+Return ONLY the JSON object, no markdown formatting.""",
+
         'mercury_status': """Get the current Mercury retrograde status and its trading implications.
 
 Tasks:
@@ -402,6 +428,7 @@ Return ONLY the JSON object, no markdown formatting.""",
             'whale_activity': 180.0,  # 3 minutes - blockchain analysis
             'twitter_sentiment': 180.0,  # 3 minutes - X search + sentiment analysis + code execution
             'crypto_news': 180.0,  # 3 minutes - news aggregation (uses both web + X search)
+            'move_index': 120.0,  # 2 minutes - financial index lookup
         }
         timeout = query_timeouts.get(query_type, 180.0)  # Default 3 minutes
 
@@ -571,7 +598,8 @@ Return ONLY the JSON object, no markdown formatting.""",
             'twitter_sentiment': ['sentiment_score', 'sample_size'],
             'crypto_news': ['headlines'],
             'btc_tvl': ['tvl_usd'],
-            'whale_activity': ['large_transfers_count']
+            'whale_activity': ['large_transfers_count'],
+            'move_index': ['value']
         }
 
         if query_type in required_fields:

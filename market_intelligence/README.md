@@ -4,7 +4,7 @@
 **Version**: Phase 1 Complete (33 data points live, cost-optimized)
 **Last Updated**: 2026-01-13
 
-The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **33 data points** across **6 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
+The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **35 data points** across **6 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
 
 ---
 
@@ -44,8 +44,8 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 **Intelligence Orchestrator** → Config-driven routing, parallel execution, permission system, agent support
 
 ### **Current Capabilities**
-- ✅ **33 data points** across 6 categories (all FREE tier)
-- ✅ **4 adapter types** handling diverse data sources (Grok agentic, Binance, WebSocket, ggShot)
+- ✅ **36 data points** across 7 categories (all FREE tier)
+- ✅ **6 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB)
 - ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
 - ✅ **Agent dynamic queries** (query without modifying config)
@@ -320,19 +320,23 @@ Adapters are specialized modules that fetch data from specific sources.
 
 ---
 
-#### **Macro Data (VIX, DXY, CPI, NFP)**
+#### **Macro Data (VIX, DXY, CPI, NFP, USDT.D, MOVE)**
 
-Macro economic indicators are handled by the **GrokAgenticAdapter** using `grok-4-1-fast` with web search.
-These are marked as `global: True` in `catalog_mapping.py` so they share a single cache entry across all bots
-(rather than duplicating per trading pair).
+Macro economic indicators use two adapter types:
+- **GrokAgenticAdapter** (`grok-4-1-fast` + web search) for indices requiring real-time web lookup
+- **CoinGeckoGlobalAdapter** (`adapters/macro/coingecko_global.py`) for deterministic API data
 
-**4 Query Types**:
-1. `vix_index` - VIX volatility index (4h cache)
-2. `dxy_index` - US Dollar strength (4h cache)
-3. `cpi_inflation` - Latest CPI inflation data (24h cache)
-4. `nfp_jobs` - Nonfarm payrolls report (24h cache)
+All marked `global: True` in `catalog_mapping.py` — shared cache across all bots.
 
-**Cost Per Query**: ~$0.003-0.006 (grok-4-1-fast tokens + web search)
+**6 Query Types**:
+1. `vix_index` - VIX volatility index (4h cache, Grok)
+2. `dxy_index` - US Dollar strength (4h cache, Grok)
+3. `cpi_inflation` - Latest CPI inflation data (24h cache, Grok)
+4. `nfp_jobs` - Nonfarm payrolls report (24h cache, Grok)
+5. `usdt_dominance` - USDT market cap % of total crypto (4h cache, CoinGecko, **FREE**)
+6. `move_index` - ICE BofA MOVE bond volatility index (4h cache, Grok)
+
+**Cost Per Query**: $0 (CoinGecko) to ~$0.003-0.006 (Grok)
 
 ---
 
@@ -402,11 +406,13 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | **Derivatives & Leverage** (2 rates) |
 | | BTC Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
 | | ETH Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
-| **Macro Economics** (4 indicators) |
+| **Macro Economics** (6 indicators) |
 | | VIX Volatility Index | GrokAgentic | ~$0.025 | 4 hours | 🆓 |
 | | DXY Dollar Index | GrokAgentic | ~$0.025 | 4 hours | 🆓 |
 | | CPI Inflation | GrokAgentic | ~$0.025 | 24 hours | 🆓 |
 | | NFP Jobs Report | GrokAgentic | ~$0.025 | 24 hours | 🆓 |
+| | USDT Dominance | CoinGeckoGlobal | FREE | 4 hours | 🆓 |
+| | MOVE Index (Bond Vol) | GrokAgentic | ~$0.005 | 4 hours | 🆓 |
 | **On-Chain Analytics** (2 sources) |
 | | BTC TVL in DeFi | GrokAgentic | ~$0.025 | 6 hours | 🆓 |
 | | Whale Activity | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
@@ -416,8 +422,10 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | | Mercury Retrograde Status | GrokAgentic | ~$0.001 | 24 hours | 🆓 |
 | **News & Regulatory** (1 source) |
 | | Crypto News Headlines | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
+| **Account Performance** (1 source) |
+| | Trading History | AccountPerformance (DB) | FREE | 5 min | 🆓 |
 
-**Total**: 33 data points (all FREE tier)
+**Total**: 36 data points (all FREE tier)
 
 *Note: ggShot (Premium) disabled 2026-01-23 due to stale signals. Astrology data points (lunar_phase, mercury_status) added same date.*
 
@@ -1039,6 +1047,8 @@ market_intelligence/
 │       │   └── grok_agentic.yaml      # Universal Grok intelligence
 │       ├── signals/
 │       │   └── ggshot_signals.yaml    # ggShot trading signals
+│       ├── macro/
+│       │   └── coingecko_global.yaml  # USDT dominance (CoinGecko)
 │       └── market_data/
 │           └── ohlcv.yaml             # OHLCV candle data
 ├── adapters/                           # Data source adapters
@@ -1047,6 +1057,8 @@ market_intelligence/
 │   │   └── binance_funding.py         # Binance funding rates
 │   ├── agentic/
 │   │   └── grok_agentic.py            # XAI Grok (all agentic sources)
+│   ├── macro/
+│   │   └── coingecko_global.py        # CoinGecko global market data
 │   ├── signals/
 │   │   └── ggshot_adapter.py          # ggShot signal queries
 │   └── market_data/
@@ -1150,6 +1162,6 @@ print(f"Fetched {sum(len(cat) for cat in result.values())} data points")
 
 ---
 
-**The Market Data System represents ggbots' complete data pipeline - from user configuration to AI-driven trading decisions, orchestrating 33 data points across 6 categories with production-proven performance, cost efficiency, and extensibility.** 🚀
+**The Market Data System represents ggbots' complete data pipeline - from user configuration to AI-driven trading decisions, orchestrating 35 data points across 6 categories with production-proven performance, cost efficiency, and extensibility.** 🚀
 
 **Phase 1 Status**: ✅ **PRODUCTION DEPLOYED** (2025-10-28, cost-optimized 2026-01-13)

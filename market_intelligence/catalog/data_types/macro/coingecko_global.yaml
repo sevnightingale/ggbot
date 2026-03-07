@@ -1,0 +1,21 @@
+name: coingecko_global
+category: macro
+description: Crypto market dominance and global metrics via CoinGecko API
+
+query_params:
+  query_type:
+    type: string
+    required: true
+    description: "Type of global data: usdt_dominance"
+
+sources:
+  - adapter: CoinGeckoGlobalAdapter
+    priority: 1
+    cost: free
+    rate_limit: 30  # CoinGecko free tier ~10-30 calls/min
+    notes: Public CoinGecko API endpoint, no auth required
+
+cache:
+  backend: redis
+  ttl: 14400  # 4 hours
+  key_pattern: "intel:coingecko:{query_type}"

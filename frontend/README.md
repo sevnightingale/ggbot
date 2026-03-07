@@ -79,9 +79,10 @@ Legacy/Archive (Moved to /archive/):
 ├── BotImageUpload.tsx      # Bot profile image uploader - drag-drop, auto-resize to 1024×1024, Supabase Storage
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
+├── SettingsModal.tsx       # Billing hub: AI Credits (plan/usage/add credits/Open Stripe) + Live Trading (HL status/setup)
 ├── UpgradeModal.tsx        # Payment chooser: "Pay as you go" vs "Prepay credits" with Stripe checkout
 ├── CreditPicker.tsx        # Credit amount selector ($10-$100) with Card/Crypto payment toggle
-├── AddCreditsModal.tsx     # Modal wrapper for CreditPicker (for existing subscribers)
+├── AddCreditsModal.tsx     # "Add AI Credits" modal wrapper for CreditPicker
 └── ValidationMessage.tsx   # Error/warning message component with icons
 
 /components/ui/              # UI components
@@ -460,42 +461,22 @@ apiClient.createPortalSession() // For subscription management
 
 ### **UserProfile Dropdown**
 
-Adaptive display based on billing model:
+Two-section adaptive display separating AI costs from trading capital (progressive disclosure):
 
-```typescript
-// Credit pack users (credits > 0): Full breakdown
-🪙 Credits    $50.00
-   Used       -$12.34
-   ─────────────────
-   Balance    $37.66  // amber if < $5
+```
+AI CREDITS                    <- only for paid users
+Powers your bot decisions
+Balance         $37.66        <- prepaid: balance, metered: "This week $X"
 
-// Metered users (credits = 0): Simple usage
-🪙 This week  $12.34
+TRADING FUNDS                 <- only for HL-connected users
+Your capital on Hyperliquid
+Equity          $50.00
 ```
 
-**Implementation** (`UserProfile.tsx`):
-```typescript
-// Fetch usage summary on mount
-const [usageSummary, setUsageSummary] = useState<{
-  usage_usd: number
-  credits_usd: number | null
-  net_balance_usd: number | null
-} | null>(null)
-
-useEffect(() => {
-  if (userProfile?.subscription_tier === 'usage_based') {
-    const summary = await apiClient.getUsageSummary()
-    setUsageSummary(summary)
-  }
-}, [userProfile?.subscription_tier])
-
-// Adaptive display
-{usageSummary.credits_usd > 0 ? (
-  // Credit pack user - show full breakdown
-) : (
-  // Metered user - show just weekly usage
-)}
-```
+- **AI Credits** section: shown for `usage_based` and `prepaid` tiers. Prepaid shows balance; metered shows weekly usage.
+- **Trading Funds** section: shown only when `userProfile.hyperliquid_connected`. Separate from credits.
+- **"Manage Billing"** moved to Settings Modal. Dropdown has "Add AI Credits" quick-action instead.
+- Width: `w-64` (was `w-56`) to accommodate purpose subtitles.
 
 ### **ActivationBar Daily Cost**
 

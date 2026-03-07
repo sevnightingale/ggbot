@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { User, LogOut, Crown, CreditCard, Settings, Plus, Coins, AlertTriangle, Zap } from 'lucide-react'
+import { User, LogOut, Crown, Settings, Plus, Coins, AlertTriangle, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/permissions'
@@ -122,17 +122,6 @@ export function UserProfile({}: UserProfileProps) {
     }
   }
 
-  // Billing portal handler
-  const handleManageBilling = async () => {
-    try {
-      const { portal_url } = await apiClient.createPortalSession()
-      window.location.href = portal_url
-    } catch (error) {
-      console.error('Error opening billing portal:', error)
-      alert('Failed to open billing portal. Please try again.')
-    }
-  }
-
   // Check if user has paid subscription
   const hasPaidTier = userProfile?.can_activate_bots || false
   const isPro = userProfile?.subscription_tier === 'pro'
@@ -198,7 +187,7 @@ export function UserProfile({}: UserProfileProps) {
           />
 
           {/* Dropdown */}
-          <div className="absolute right-0 top-10 z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-2 shadow-lg">
+          <div className="absolute right-0 top-10 z-50 w-64 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-2 shadow-lg">
             {/* User Info */}
             <div className="border-b border-[var(--border)] px-3 py-2 mb-2">
               <div className="text-sm font-medium text-[var(--text-primary)]">{getDisplayName()}</div>
@@ -227,59 +216,52 @@ export function UserProfile({}: UserProfileProps) {
                 )}
               </div>
 
-              {/* Usage & Credit Info (usage_based and prepaid users) */}
-              {showCredits && usageSummary && (
-                <div className="mt-2 space-y-1 text-xs">
+            </div>
+
+            {/* AI Credits Section (usage_based and prepaid users) */}
+            {showCredits && usageSummary && (
+              <div className="border-b border-[var(--border)] px-3 py-2 mb-2">
+                <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  <Coins className="h-2.5 w-2.5" />
+                  AI Credits
+                </div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1.5">Powers your bot decisions</div>
+                <div className="space-y-1 text-xs">
                   {usageSummary.credits_usd && usageSummary.credits_usd > 0 ? (
-                    // Credit pack user - show full breakdown
+                    // Prepaid user - show balance
                     <>
-                      <div className="flex items-center justify-between text-[var(--text-secondary)]">
-                        <span className="flex items-center gap-1">
-                          <Coins className="h-3 w-3" />
-                          Credits
-                        </span>
-                        <span>${usageSummary.credits_usd.toFixed(2)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[var(--text-muted)]">
-                        <span className="pl-4">Used</span>
-                        <span>-${usageSummary.usage_usd.toFixed(2)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[var(--text-primary)] font-medium border-t border-[var(--border)] pt-1 mt-1">
-                        <span className="pl-4">Balance</span>
+                      <div className="flex items-center justify-between text-[var(--text-primary)] font-medium">
+                        <span>Balance</span>
                         <span className={usageSummary.net_balance_usd && usageSummary.net_balance_usd < 5 ? 'text-amber-500' : ''}>
                           ${usageSummary.net_balance_usd?.toFixed(2) ?? '0.00'}
                         </span>
                       </div>
-                      {/* Depleted credits warning for prepaid users */}
                       {isPrepaid && usageSummary.net_balance_usd !== null && usageSummary.net_balance_usd <= 0 && (
-                        <div className="mt-2 flex items-center gap-1 text-xs text-red-500">
+                        <div className="flex items-center gap-1 text-xs text-red-500">
                           <AlertTriangle className="h-3 w-3" />
-                          <span>Credits depleted — bots paused</span>
+                          <span>Depleted — bots paused</span>
                         </div>
                       )}
                     </>
                   ) : (
-                    // Metered user - show just usage
+                    // Metered user - show this week's usage
                     <div className="flex items-center justify-between text-[var(--text-secondary)]">
-                      <span className="flex items-center gap-1">
-                        <Coins className="h-3 w-3" />
-                        This week
-                      </span>
+                      <span>This week</span>
                       <span>${usageSummary.usage_usd.toFixed(2)}</span>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+            )}
 
-            </div>
-
-            {/* Hyperliquid Account Overview — separate section */}
+            {/* Trading Funds — Hyperliquid account overview */}
             {userProfile?.hyperliquid_connected && hlStatus && (
               <div className="border-b border-[var(--border)] px-3 py-2 mb-2">
-                <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+                <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">
                   <Zap className="h-2.5 w-2.5" />
-                  Hyperliquid
+                  Trading Funds
                 </div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1.5">Your capital on Hyperliquid</div>
                 <div className="space-y-1 text-xs">
                   <div className="flex items-center justify-between text-[var(--text-secondary)]">
                     <span>Equity</span>
@@ -308,23 +290,16 @@ export function UserProfile({}: UserProfileProps) {
                 }}
               />
               {hasPaidTier ? (
-                <>
-                  {(isUsageBased || isPrepaid) && (
-                    <MenuButton
-                      icon={Plus}
-                      label="Add Credits"
-                      onClick={() => {
-                        setIsOpen(false)
-                        setAddCreditsOpen(true)
-                      }}
-                    />
-                  )}
+                (isUsageBased || isPrepaid) && (
                   <MenuButton
-                    icon={CreditCard}
-                    label="Manage Billing"
-                    onClick={handleManageBilling}
+                    icon={Plus}
+                    label="Add AI Credits"
+                    onClick={() => {
+                      setIsOpen(false)
+                      setAddCreditsOpen(true)
+                    }}
                   />
-                </>
+                )
               ) : (
                 <MenuButton
                   icon={Crown}

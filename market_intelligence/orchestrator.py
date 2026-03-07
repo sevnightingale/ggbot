@@ -137,9 +137,13 @@ async def fetch_market_intelligence(
                     _log.warning(f"No catalog mapping for {source_name}.{point_name}")
                     continue
 
-                # Prepare query params (replace {symbol} template)
+                # Prepare query params (replace {symbol}, {config_id}, {trading_mode} templates)
                 params = mapping['params_template'].copy()
-                params = _replace_param_templates(params, symbol=symbol)
+                config_id = getattr(config, 'config_id', None) or ''
+                trading_mode = 'paper'
+                if hasattr(config, 'trading_mode'):
+                    trading_mode = getattr(config, 'trading_mode', 'paper') or 'paper'
+                params = _replace_param_templates(params, symbol=symbol, config_id=config_id, trading_mode=trading_mode)
 
                 # Include symbol in params for cache key generation
                 # Global data (VIX, DXY, CPI, NFP, btc_tvl, lunar_phase, mercury_status)

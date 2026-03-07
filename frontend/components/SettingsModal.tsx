@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Crown, CheckCircle2, Settings, Loader2, Zap } from 'lucide-react'
+import { Crown, CheckCircle2, Settings, Loader2, Zap, Coins, ExternalLink, Plus, AlertTriangle } from 'lucide-react'
 import {
   Modal,
   ModalHeader,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/modal'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
 import { apiClient } from '@/lib/api'
 
@@ -29,7 +30,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const getTierName = () => {
     if (isPro) return 'Pro Plan'
     if (isPrepaid) return 'Prepaid'
-    if (isUsageBased) return 'Usage-Based'
+    if (isUsageBased) return 'Pay as you go'
     return 'Free Plan'
   }
 
@@ -48,6 +49,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   // Upgrade modal state
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  // Add Credits modal state
+  const [addCreditsOpen, setAddCreditsOpen] = useState(false)
+
+  // Usage summary
+  const [usageSummary, setUsageSummary] = useState<{
+    usage_usd: number
+    credits_usd: number | null
+    net_balance_usd: number | null
+  } | null>(null)
 
   // Error state
   const [error, setError] = useState('')
@@ -56,8 +66,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   useEffect(() => {
     if (open) {
       fetchHlStatus()
+      fetchUsageSummary()
     }
-  }, [open])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchHlStatus = async () => {
     try {
@@ -69,6 +80,22 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       setHlStatus(null)
     } finally {
       setHlLoading(false)
+    }
+  }
+
+  const fetchUsageSummary = async () => {
+    const tier = userProfile?.subscription_tier
+    if (tier === 'usage_based' || tier === 'prepaid') {
+      try {
+        const summary = await apiClient.getUsageSummary()
+        setUsageSummary({
+          usage_usd: summary.usage_usd,
+          credits_usd: summary.credits_usd,
+          net_balance_usd: summary.net_balance_usd
+        })
+      } catch (err) {
+        console.error('Failed to fetch usage summary:', err)
+      }
     }
   }
 
@@ -99,57 +126,132 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
         <ModalBody>
           <div className="space-y-6">
-            {/* Subscription Section */}
+
+            {/* ── AI Credits Section ── */}
             <section>
-              <h3 className="text-sm font-semibold mb-3 text-[var(--text-primary)]">Subscription</h3>
-              <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-lg bg-[var(--bg-secondary)]">
-                <div>
-                  <p className="font-medium text-[var(--text-primary)] mb-1">Current Plan</p>
-                  <div className="mt-1">
-                    {isPro ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-500">
-                        <Crown className="h-3 w-3" />
-                        {getTierName()}
-                      </span>
-                    ) : isPrepaid ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/20 px-2 py-1 text-xs font-medium text-orange-400">
-                        {getTierName()}
-                      </span>
-                    ) : isUsageBased ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-medium text-emerald-500">
-                        {getTierName()}
-                      </span>
+              <div className="flex items-center gap-2 mb-1">
+                <Coins className="h-4 w-4 text-[var(--accent)]" />
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">AI Credits</h3>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mb-3">
+                Powers your bot&apos;s AI decisions. Required to run any bot (paper or live).
+              </p>
+
+              {hasPaidTier ? (
+                <div className="border border-[var(--border)] rounded-lg bg-[var(--bg-secondary)] overflow-hidden">
+                  {/* Plan header */}
+                  <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+                    <div className="flex items-center gap-2">
+                      {isPro ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-500">
+                          <Crown className="h-3 w-3" />
+                          {getTierName()}
+                        </span>
+                      ) : isPrepaid ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
+                          {getTierName()}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-500">
+                          {getTierName()}
+                        </span>
+                      )}
+                      {isUsageBased && (
+                        <span className="text-xs text-[var(--text-muted)]">Billed weekly for actual usage</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Usage / balance info */}
+                  <div className="p-4">
+                    {usageSummary ? (
+                      <div className="space-y-2">
+                        {usageSummary.credits_usd && usageSummary.credits_usd > 0 ? (
+                          // Prepaid user — show balance breakdown
+                          <>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-[var(--text-secondary)]">Credits purchased</span>
+                              <span className="font-mono text-[var(--text-primary)]">${usageSummary.credits_usd.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-[var(--text-muted)]">Used</span>
+                              <span className="font-mono text-[var(--text-muted)]">-${usageSummary.usage_usd.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm font-medium border-t border-[var(--border)] pt-2">
+                              <span className="text-[var(--text-primary)]">Balance</span>
+                              <span className={`font-mono ${usageSummary.net_balance_usd && usageSummary.net_balance_usd < 5 ? 'text-amber-500' : 'text-[var(--text-primary)]'}`}>
+                                ${usageSummary.net_balance_usd?.toFixed(2) ?? '0.00'}
+                              </span>
+                            </div>
+                            {isPrepaid && usageSummary.net_balance_usd !== null && usageSummary.net_balance_usd <= 0 && (
+                              <div className="flex items-center gap-1 text-xs text-red-500 pt-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span>Credits depleted — bots are paused</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          // Usage-based user — show this period's usage
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-[var(--text-secondary)]">This week</span>
+                            <span className="font-mono text-[var(--text-primary)]">${usageSummary.usage_usd.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-tertiary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">
-                        {getTierName()}
-                      </span>
+                      <div className="text-sm text-[var(--text-muted)]">Loading usage...</div>
                     )}
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2 mt-4">
+                      {(isUsageBased || isPrepaid) && (
+                        <button
+                          onClick={() => setAddCreditsOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add AI Credits
+                        </button>
+                      )}
+                      <button
+                        onClick={handleManageBilling}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Open Stripe
+                      </button>
+                    </div>
                   </div>
                 </div>
-                {hasPaidTier ? (
-                  <button
-                    onClick={handleManageBilling}
-                    className="text-sm text-blue-500 hover:text-blue-600 font-medium transition-colors"
-                  >
-                    Manage Billing →
-                  </button>
-                ) : (
+              ) : (
+                // Free user — subscribe CTA
+                <div className="border border-dashed border-[var(--border)] rounded-lg p-6 text-center">
+                  <p className="text-sm text-[var(--text-secondary)] mb-3">
+                    Subscribe to activate your bots. Most bots cost less than $1/week.
+                  </p>
                   <button
                     onClick={() => {
                       onOpenChange(false)
                       setUpgradeModalOpen(true)
                     }}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] rounded-lg text-sm font-medium transition-colors"
                   >
                     Subscribe
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </section>
 
-            {/* Live Trading Section */}
+            {/* ── Live Trading Section ── */}
             <section>
-              <h3 className="text-sm font-semibold mb-3 text-[var(--text-primary)]">Live Trading</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="h-4 w-4 text-[var(--accent)]" />
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Live Trading</h3>
+                <span className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border)]">Optional</span>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mb-3">
+                Trade real money on Hyperliquid. Your trading capital is separate from AI credits.
+              </p>
 
               {hlLoading ? (
                 <div className="flex items-center justify-center p-8 border border-dashed border-[var(--border)] rounded-lg">
@@ -177,7 +279,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
                       <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Equity</div>
                       <div className="text-sm font-mono font-medium text-[var(--accent)]">
-                        {hlStatus.account_value !== null ? `$${hlStatus.account_value.toFixed(2)}` : '—'}
+                        {hlStatus.account_value !== null ? `$${hlStatus.account_value.toFixed(2)}` : '\u2014'}
                       </div>
                     </div>
                     <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
@@ -189,11 +291,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     <div className="rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] p-2.5 text-center">
                       <div className="text-[10px] text-[var(--text-muted)] mb-0.5">Positions</div>
                       <div className="text-sm font-mono font-medium text-[var(--text-primary)]">
-                        {hlStatus.positions_count ?? '—'}
+                        {hlStatus.positions_count ?? '\u2014'}
                       </div>
                     </div>
                   </div>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-2">Powered by Hyperliquid</p>
                 </div>
               ) : (
                 /* Not connected state */
@@ -237,6 +338,13 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
       {/* Upgrade Modal */}
       <UpgradeModal open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen} />
+
+      {/* Add Credits Modal */}
+      <AddCreditsModal
+        open={addCreditsOpen}
+        onOpenChange={setAddCreditsOpen}
+        currentBalance={usageSummary?.net_balance_usd ?? undefined}
+      />
     </>
   )
 }

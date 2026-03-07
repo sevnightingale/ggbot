@@ -209,13 +209,16 @@ export function ActivationBar({
           <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-500">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-              <span>Bot paused — your prepaid credits have run out</span>
+              <span>
+                AI credits depleted — bot paused
+                {isLiveTrading && '. Your Hyperliquid trading funds are safe.'}
+              </span>
             </div>
             <button
               onClick={() => setAddCreditsOpen(true)}
               className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-black hover:bg-amber-400 whitespace-nowrap"
             >
-              Add Credits
+              Add AI Credits
             </button>
           </div>
         )}

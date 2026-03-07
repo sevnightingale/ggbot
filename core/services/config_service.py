@@ -152,6 +152,12 @@ class BotConfigV2:
             # extraction/decision/llm_config are optional for agents
             return errors
 
+        # Hyperliquid live bots start unconfigured (empty slot created during HL setup).
+        # Allow incremental saves while being configured — activation is gated separately
+        # by ActivationBar (requires selected_pair before activate/run).
+        if self.trading_mode == 'hyperliquid' and not self.selected_pair:
+            return errors
+
         # For non-agent configs, selected_pair is required
         if not self.selected_pair:
             errors.append("selected_pair is required")

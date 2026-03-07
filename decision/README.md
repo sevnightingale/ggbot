@@ -25,7 +25,7 @@ The Decision Module operates in three primary modes with V2 template-based archi
 3. **Position Management Mode** (`position_management`) - Managing active trades
    - **Template**: `/decision/prompts/position_management.py`
    - **Purpose**: Reviews and manages existing positions
-   - **Performance Context**: Includes P&L, duration, and original entry reasoning
+   - **Performance Context**: P&L, duration, bars_in_trade, max_drawdown, leverage, SL/TP, entry reasoning
    - **Strategy Continuity**: Applies user's exit rules to current market conditions
    - **Output**: close/hold/wait with confidence and reasoning
 

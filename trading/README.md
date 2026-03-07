@@ -146,10 +146,20 @@ ggbots API Wallet (generated keypair)
 
 **live_trades Table** (Shared with Symphony/Aster):
 ```sql
--- Provider='hyperliquid', batch_id is UUID (not exchange order ID)
-INSERT INTO live_trades (batch_id, config_id, decision_id, provider, symbol, ...)
-VALUES ('uuid', 'config-uuid', 'decision-uuid', 'hyperliquid', 'BTC-USDT', ...);
+-- Key columns for Hyperliquid trades (provider='hyperliquid', batch_id is UUID)
+-- Entry data written by hyperliquid_service._save_trade_record()
+-- Exit data written by hyperliquid_service._mark_trade_closed() OR hyperliquid_adapter._detect_and_log_closes()
+batch_id, config_id, decision_id, provider, symbol,
+side,           -- 'long' | 'short'
+entry_price,    -- fill price at entry
+exit_price,     -- fill price at exit (NULL while open)
+size_usd,       -- notional value
+leverage,       -- 1-50x
+realized_pnl,   -- per-trade P&L (NULL while open, set on close)
+closed_at       -- NULL while open
 ```
+
+**P&L Architecture**: Snapshot `total_pnl` = `SUM(realized_pnl) FROM live_trades`. Same pattern as `paper_trades`. No external API dependency for historical stats.
 
 ### Single Live Bot Slot (Phase 5)
 
@@ -168,8 +178,10 @@ VALUES ('uuid', 'config-uuid', 'decision-uuid', 'hyperliquid', 'BTC-USDT', ...);
 - Queries `Info.user_state()` for account data (118ms avg latency)
 - Single live bot model: account balance = bot balance (`current_balance = account_value`)
 - `total_equity = current_balance + unrealized_pnl` (same as paper mode)
-- Trade stats from `user_fills_by_time()` matched to `live_trades` by symbol
-- Position close detection via fill monitoring (logs `trade_exit` activities)
+- Trade stats (total/wins/losses/pnl/averages) from `live_trades` table — no fills API dependency
+- Position close detection via fill monitoring with two safety paths:
+  - **Primary**: `hyperliquid_service.close_position()` writes exit data to `live_trades` + logs activity
+  - **Safety net**: `_detect_and_log_closes()` scans fills, aggregates partials by `(coin, fill_time)`, cross-source dedup checks `activities` table before logging
 
 ### API Endpoints
 

@@ -24,9 +24,36 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 - [ ] `hybrid_price_service.py` — Hyperliquid `allMids` fallback for HIP-3 prices
 - [ ] `hyperliquid_service.py` — isolated-margin-only, dynamic rounding, $10 min notional
 
+### ~~Audit: Live Trading Integration~~ ✅ (2026-03-07)
+- [x] 4 bugs found and fixed: duplicate close activities, partial fill P&L, fill window drift, duration timezone
+- [x] `live_trades` schema expanded (side, entry/exit price, size_usd, leverage, realized_pnl) — P&L now per-trade, same pattern as paper_trades
+- [x] Adapter snapshot reads `SUM(realized_pnl) FROM live_trades` instead of Hyperliquid fills API — eliminates drift and pre-bot attribution
+- [x] Cross-source dedup between `hyperliquid_service` and `hyperliquid_adapter` close paths
+- [x] See CHANGELOG for full details
+
+### ~~Bug: Live Config 404~~ ✅ (2026-03-07)
+- [x] Fixed — `validate()` now skips validation for unconfigured HL bots (`config_service.py:155-159`). See CHANGELOG.
+
 ### **Remaining HL Items**
 - [ ] Agent bot support (`trading_mode='hyperliquid'` for agents) — deferred
 - [ ] Strategy Marketplace / copy trading — design tables, trade fan-out, Stripe Connect, legal review
+
+---
+
+## 🏟️ **ggArena Season 2 + $GG Launch** (March 10)
+
+**Status**: 🟡 PLANNING — needs design before implementation
+**Context**: $GG token launches on Virtuals March 10. Season 2 launches simultaneously.
+
+### **Season 2 Design** (FLUSH OUT)
+- [ ] Define Season 2 format — training grounds period concept, scoring, duration
+- [ ] Determine how training grounds differs from Season 1 (open registration + immediate competition)
+- [ ] Define entry requirements, prize structure, $GG token integration (if any)
+- [ ] Timeline: training grounds duration → competition start → season end
+
+### **Arena Page Updates**
+- [ ] Update arena page for Season 2 (new format, rules, registration flow)
+- [ ] Season 1 → Season 2 transition (archive S1 results, reset leaderboard)
 
 ---
 
@@ -80,6 +107,12 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 
 ## ⚡ **Frontend Improvements**
 
+### ~~Bug: Strategy Advisor Timeframe Collapse~~ ✅ (2026-03-07)
+- [x] Configurable timeframes with picker UI (MarketDataSelector)
+- [x] Strategy Advisor prompt guardrail (rule #9), AI config creation defaults to all 7
+- [x] Archetypes default to all 7 timeframes
+- See CHANGELOG for details
+
 ### React Query Completion
 - [ ] Integrate SSE updates with React Query cache
 - [ ] Create `useUserProfile()` hook
@@ -100,14 +133,31 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 **Phase 1 Complete**: 8 Grok sources live ($7-10/week with 4hr TTLs)
 **Planning Doc**: [DOCS/MARKET_INTELLIGENCE_ROADMAP.md](DOCS/MARKET_INTELLIGENCE_ROADMAP.md)
 
-### **Community-Requested: Cross-Asset Context** (from Denis @ Buidler Labs)
-- [ ] **USDT.D (USDT Dominance)** — rising = money exits crypto (bearish), falling = money entering (bullish). CoinGecko/Binance API, ~1-2hr
-- [ ] **MOVE Index** — ICE BofA bond volatility. High MOVE = bond stress = risk-off cascade for crypto. Grok web search, ~1hr
-- Fits existing Phase 1 macro data points. Same adapter pattern, $0 cost.
+### ~~Community-Requested: Cross-Asset Context~~ ✅ (2026-03-07)
+- [x] USDT.D (USDT Dominance) — CoinGeckoGlobalAdapter, $0 cost, 4hr cache
+- [x] MOVE Index — Grok web search, ~$0.005/query, 4hr cache
+- See CHANGELOG for full details
 
 ### **Community-Requested: Order Blocks Preprocessor**
 - [ ] **Order Block Detection** — ICT concept: last opposite candle before impulse move = institutional accumulation zone. Requires swing high/low detection + impulse validation + zone tracking over time. New preprocessor (#22), ~4-6hr
-- [ ] **Enhanced Position Statefulness** — enrich position management prompts with: bars-in-trade, max drawdown during trade, avg entry (for DCA). Extends DecisionEngineV2 position recap, ~2-3hr
+
+### ~~Community-Requested: Position Statefulness Phase 1~~ ✅ (2026-03-07)
+- [x] `bars_in_trade` — derived from `opened_at` + `analysis_frequency`, no persistence needed
+- [x] `max_drawdown_during_trade` — Redis `trade:max_drawdown:{trade_id}`, 7-day TTL, updates each cycle
+- [x] HL position management fixes: SL/TP computed from config, leverage shown, side normalized
+- See CHANGELOG for details
+
+### ~~Community-Requested: Account Performance as MI Data Source (Phase 2a)~~ ✅ (2026-03-07)
+- [x] `AccountPerformanceAdapter` — internal DB adapter, paper + HL paths, 5-min cache
+- [x] Per-config routing via `{config_id}` template in orchestrator
+- [x] DB seed (free tier), frontend auto-populates "Account Performance" category
+- See CHANGELOG for details
+
+### **Community-Requested: Position Statefulness Phase 2b** [COMMUNITY_FIXES_MAR2026.md §4]
+- [ ] `bot_state` JSONB persistence across cycles (PeakEquity, ConsecutiveLosses, CooldownRemaining)
+- [ ] Toggle: `enable_persistent_state: true` in config_data (not default — avoids altering existing bot behavior)
+- [ ] System-computed state (not LLM-written) for deterministic counters
+- Requested by denisigin for deterministic state-machine strategies
 
 ### **Existing Roadmap Phases**
 - **Phase 2: Premium On-Chain** ($100-500/mo) — Nansen/Arkham whale tracking, Glassnode flows, token unlocks

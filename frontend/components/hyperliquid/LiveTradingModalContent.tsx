@@ -22,6 +22,7 @@ import {
   HYPERLIQUID_SIGNATURE_CHAIN_ID_HEX,
 } from '@/lib/hyperliquid-config'
 import { apiClient } from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
 
 const web3QueryClient = new QueryClient()
 
@@ -41,6 +42,7 @@ type SetupStep = 'idle' | 'generating' | 'signing' | 'submitting' | 'storing' | 
 function ModalContent({ onComplete }: LiveTradingModalContentProps) {
   const { address, isConnected } = useAccount()
   const { signTypedDataAsync } = useSignTypedData()
+  const { canAccess } = usePermissions()
 
   // Hyperliquid connection state (from backend)
   const [hlStatus, setHlStatus] = useState<{
@@ -428,6 +430,16 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
             </div>
           </div>
         </div>
+
+        {/* AI Credits Nudge — only shown when user can't activate bots yet */}
+        {!canAccess('bot_activation') && (
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">Almost ready to trade live</p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Your trading funds are set up. To run your bot, you also need AI credits for decisions (~$0.01&ndash;$0.09 per decision).
+            </p>
+          </div>
+        )}
 
         {/* Deposit & Withdraw (requires wallet) */}
         {isConnected ? (

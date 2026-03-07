@@ -12,7 +12,7 @@ export interface ConfigData {
     selected_data_sources: {
       technical_analysis?: {
         data_points: string[]  // Indicator names like ["RSI", "MACD"]
-        timeframes: string[]   // Always all 7: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+        timeframes: string[]   // Configurable: defaults to all 7, user can select fewer
       }
       signals_group_chats?: {
         data_points: string[]  // e.g., ["ggShot"]

@@ -1,0 +1,25 @@
+name: account_performance
+category: internal
+description: Bot trading history and account performance metrics
+
+query_params:
+  config_id:
+    type: string
+    required: true
+    description: Bot configuration ID
+  trading_mode:
+    type: string
+    required: false
+    default: paper
+    description: "Trading mode: paper or hyperliquid"
+
+sources:
+  - adapter: AccountPerformanceAdapter
+    priority: 1
+    cost: free
+    notes: Internal database query, no external API
+
+cache:
+  backend: redis
+  ttl: 300
+  key_pattern: "intel:account_perf:{config_id}"

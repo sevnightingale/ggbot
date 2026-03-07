@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Crown } from 'lucide-react'
+import { Crown, ChevronDown } from 'lucide-react'
 import { ConfigData } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
+
+const ALL_TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
 
 // Types based on database schema
 interface DataPoint {
@@ -53,6 +55,7 @@ export function MarketDataSelector({
   className = ''
 }: MarketDataSelectorProps) {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [showTimeframes, setShowTimeframes] = useState(false)
   const { hasPaidDataPoint } = usePermissions()
 
   // Get selected data points from config (derived state)
@@ -92,11 +95,8 @@ export function MarketDataSelector({
     const category = activeDataSource.name as keyof typeof currentConfig
     const categoryData = currentConfig[category] || {
       data_points: [],
-      timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+      timeframes: ALL_TIMEFRAMES
     }
-
-    // Always use all 7 timeframes for technical analysis
-    const allTimeframes = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
 
     const isSelected = categoryData.data_points.includes(dataPoint.name)
 
@@ -117,7 +117,7 @@ export function MarketDataSelector({
           ...currentConfig,
           [category]: updatedDataPoints.length > 0 ? {
             data_points: updatedDataPoints,
-            timeframes: allTimeframes
+            timeframes: categoryData.timeframes
           } : undefined
         }
       }
@@ -131,6 +131,36 @@ export function MarketDataSelector({
     // Update via parent's batched save handler
     // (no direct API call - parent handles debounced save)
     onUpdate(update)
+  }
+
+  // Get current timeframes from technical_analysis config
+  // Only TA uses timeframes (preprocessor-based candle fetching).
+  // MI categories (sentiment, funding, macro) are Grok-based and ignore timeframes.
+  const currentTimeframes = configData?.extraction?.selected_data_sources?.technical_analysis?.timeframes || ALL_TIMEFRAMES
+
+  const isAllTimeframes = ALL_TIMEFRAMES.every(tf => currentTimeframes.includes(tf))
+
+  const applyTimeframes = (timeframes: string[]) => {
+    const sources = configData?.extraction?.selected_data_sources
+    if (!sources?.technical_analysis || !onUpdate) return
+    onUpdate({
+      extraction: {
+        ...(configData?.extraction || {}),
+        selected_data_sources: {
+          ...sources,
+          technical_analysis: { ...sources.technical_analysis, timeframes }
+        }
+      }
+    })
+  }
+
+  const handleTimeframeToggle = (tf: string) => {
+    if (currentTimeframes.includes(tf)) {
+      if (currentTimeframes.length <= 1) return
+      applyTimeframes(ALL_TIMEFRAMES.filter(t => currentTimeframes.includes(t) && t !== tf))
+    } else {
+      applyTimeframes(ALL_TIMEFRAMES.filter(t => currentTimeframes.includes(t) || t === tf))
+    }
   }
 
   return (
@@ -258,6 +288,53 @@ export function MarketDataSelector({
           )}
         </div>
       </div>
+
+      {/* Timeframe Selector - only shown when TA indicators are selected (MI sources don't use timeframes) */}
+      {configData?.extraction?.selected_data_sources?.technical_analysis?.data_points?.length && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+          <button
+            onClick={() => setShowTimeframes(!showTimeframes)}
+            className="w-full flex items-center justify-between text-sm font-medium text-[var(--text-primary)]"
+          >
+            <span>
+              Timeframes: {isAllTimeframes ? `All (${ALL_TIMEFRAMES.length})` : `${currentTimeframes.length} selected`}
+            </span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${showTimeframes ? 'rotate-180' : ''}`} />
+          </button>
+          {showTimeframes && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={() => applyTimeframes([...ALL_TIMEFRAMES])}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  isAllTimeframes
+                    ? 'bg-[var(--agent-extraction)] text-white'
+                    : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                }`}
+              >
+                All
+              </button>
+              {ALL_TIMEFRAMES.map(tf => {
+                const isActive = currentTimeframes.includes(tf)
+                const isLastOne = isActive && currentTimeframes.length === 1
+                return (
+                  <button
+                    key={tf}
+                    onClick={() => handleTimeframeToggle(tf)}
+                    disabled={isLastOne}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]/30'
+                        : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                    } ${isLastOne ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {tf}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Upgrade Modal */}
       <UpgradeModal

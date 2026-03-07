@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/modal'
 import { apiClient, BotConfiguration } from '@/lib/api'
 import { CreditPicker } from '@/components/CreditPicker'
+import { usePermissions } from '@/lib/permissions'
 
 interface UpgradeModalProps {
   open: boolean
@@ -35,6 +36,7 @@ const FREQUENCY_LABELS: Record<string, string> = {
 }
 
 export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProps) {
+  const { userProfile } = usePermissions()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('choose')
@@ -206,6 +208,13 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
                 <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
                 <span>No base fee, cancel anytime</span>
               </div>
+              {userProfile?.hyperliquid_connected && (
+                <div className="mt-2 pt-2 border-t border-[var(--border)]">
+                  <p className="text-xs text-[var(--text-tertiary)]">
+                    This covers AI decisions only. Your Hyperliquid trading funds are separate.
+                  </p>
+                </div>
+              )}
             </div>
           </>
         )}

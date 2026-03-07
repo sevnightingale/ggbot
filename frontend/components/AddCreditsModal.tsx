@@ -22,10 +22,10 @@ export function AddCreditsModal({ open, onOpenChange, currentBalance }: AddCredi
       <ModalHeader onClose={() => onOpenChange(false)}>
         <ModalTitle className="flex items-center gap-2">
           <Coins size={20} className="text-[var(--accent)]" />
-          Add Credits
+          Add AI Credits
         </ModalTitle>
         <ModalDescription>
-          Buy credits to prepay for usage. Never expires.
+          AI credits pay for your bot&apos;s decisions. Never expires.
         </ModalDescription>
       </ModalHeader>
 
