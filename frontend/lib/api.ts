@@ -13,6 +13,7 @@ export interface ConfigData {
       technical_analysis?: {
         data_points: string[]  // Indicator names like ["RSI", "MACD"]
         timeframes: string[]   // Configurable: defaults to all 7, user can select fewer
+        per_indicator_timeframes?: Record<string, string[]>  // Optional per-indicator TF overrides
       }
       signals_group_chats?: {
         data_points: string[]  // e.g., ["ggShot"]

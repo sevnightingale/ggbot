@@ -232,12 +232,14 @@ class GGBotOrchestrator:
             extraction_config = config.extraction or {}
             requested_indicators = self._extract_indicators_from_config(extraction_config)
             timeframes = self._extract_timeframes_from_config(extraction_config)
+            tf_indicator_groups = self._build_timeframe_indicator_groups(extraction_config)
 
             from core.sse import set_execution_phase
             await set_execution_phase(config_id, "extracting", f"Gathering market data for {config.selected_pair}...")
 
             extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id, requested_indicators, timeframes, run_id=run_id
+                extraction_engine, config, user_id, requested_indicators, timeframes,
+                run_id=run_id, tf_indicator_groups=tf_indicator_groups or None
             )
 
             await set_execution_phase(config_id, "deciding", "Analyzing market conditions for trading opportunities...")
@@ -325,6 +327,7 @@ class GGBotOrchestrator:
             extraction_config = config.extraction or {}
             signal_indicators = self._extract_indicators_from_config(extraction_config)
             timeframes = self._extract_timeframes_from_config(extraction_config)
+            tf_indicator_groups = self._build_timeframe_indicator_groups(extraction_config)
 
             extraction_engine = await self._get_extraction_engine(user_id)
 
@@ -334,7 +337,8 @@ class GGBotOrchestrator:
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id,
                 signal_indicators, timeframes,
-                override_symbol=symbol, run_id=run_id
+                override_symbol=symbol, run_id=run_id,
+                tf_indicator_groups=tf_indicator_groups or None
             )
 
             await set_execution_phase(config_id, "deciding", "Analyzing signal against current market conditions...")
@@ -421,6 +425,33 @@ class GGBotOrchestrator:
             requested_indicators = ["rsi", "macd", "ema"]
 
         return requested_indicators
+
+    def _build_timeframe_indicator_groups(self, extraction_config: Dict) -> Dict[str, List[str]]:
+        """Build {timeframe: [indicators]} mapping, respecting per-indicator overrides.
+
+        If per_indicator_timeframes is set, indicators with overrides use their
+        custom timeframe list; all others fall back to the global timeframes array.
+        Returns empty dict if no TA config exists (caller uses legacy path).
+        """
+        ta_config = extraction_config.get('selected_data_sources', {}).get('technical_analysis', {})
+        if not isinstance(ta_config, dict):
+            return {}
+
+        all_indicators = ta_config.get('data_points', [])
+        if not all_indicators:
+            return {}
+
+        global_tfs = ta_config.get('timeframes', ['1h'])
+        per_indicator = ta_config.get('per_indicator_timeframes', {})
+
+        # Build reverse mapping: timeframe -> list of indicators for that TF
+        tf_to_indicators: Dict[str, List[str]] = {}
+        for indicator in all_indicators:
+            tfs = per_indicator.get(indicator, global_tfs)
+            for tf in tfs:
+                tf_to_indicators.setdefault(tf, []).append(indicator)
+
+        return tf_to_indicators
 
     def _extract_timeframes_from_config(self, extraction_config: Dict) -> List[str]:
         """Extract timeframes from user's extraction config."""
@@ -642,32 +673,59 @@ class GGBotOrchestrator:
         indicators: List[str],
         timeframes: List[str] = ["1h"],
         override_symbol: Optional[str] = None,
-        run_id: Optional[str] = None
+        run_id: Optional[str] = None,
+        tf_indicator_groups: Optional[Dict[str, List[str]]] = None
     ) -> Dict[str, Any]:
-        """Run V2 extraction engine for multiple timeframes with proper integration."""
+        """Run V2 extraction engine for multiple timeframes with proper integration.
+
+        If tf_indicator_groups is provided, each timeframe gets only the indicators
+        assigned to it (per-indicator timeframe customization). Otherwise falls back
+        to running all indicators on all timeframes.
+        """
         try:
             symbol = override_symbol or config.selected_pair or "BTC/USDT"
 
-            self._log.debug(f"Extracting {len(indicators)} indicators for {symbol} across {len(timeframes)} timeframes in parallel")
-
-            tasks = [
-                extraction_engine.extract_for_symbol(
-                    symbol=symbol,
-                    indicators=indicators,
-                    timeframe=timeframe,
-                    limit=200,
-                    connector="kucoin",
-                    config_id=config.config_id
+            if tf_indicator_groups:
+                # Per-indicator timeframe mode: each TF gets its own indicator subset
+                self._log.debug(
+                    f"Extracting with per-indicator TFs for {symbol}: "
+                    f"{len(tf_indicator_groups)} timeframes, "
+                    f"{sum(len(v) for v in tf_indicator_groups.values())} total indicator-TF pairs"
                 )
-                for timeframe in timeframes
-            ]
+                tasks = [
+                    extraction_engine.extract_for_symbol(
+                        symbol=symbol,
+                        indicators=indicators_for_tf,
+                        timeframe=tf,
+                        limit=200,
+                        connector="kucoin",
+                        config_id=config.config_id
+                    )
+                    for tf, indicators_for_tf in tf_indicator_groups.items()
+                ]
+                effective_timeframes = list(tf_indicator_groups.keys())
+            else:
+                # Legacy mode: all indicators on all timeframes
+                self._log.debug(f"Extracting {len(indicators)} indicators for {symbol} across {len(timeframes)} timeframes in parallel")
+                tasks = [
+                    extraction_engine.extract_for_symbol(
+                        symbol=symbol,
+                        indicators=indicators,
+                        timeframe=timeframe,
+                        limit=200,
+                        connector="kucoin",
+                        config_id=config.config_id
+                    )
+                    for timeframe in timeframes
+                ]
+                effective_timeframes = timeframes
 
             results = await asyncio.gather(*tasks)
 
             timeframe_results = {}
             successful_extractions = 0
 
-            for timeframe, result in zip(timeframes, results):
+            for timeframe, result in zip(effective_timeframes, results):
                 timeframe_results[timeframe] = result
 
                 if result.get("status") == "success":
@@ -681,9 +739,9 @@ class GGBotOrchestrator:
                 "symbol": symbol,
                 "timeframes": timeframe_results,
                 "summary": {
-                    "total_timeframes": len(timeframes),
+                    "total_timeframes": len(effective_timeframes),
                     "successful_extractions": successful_extractions,
-                    "failed_extractions": len(timeframes) - successful_extractions,
+                    "failed_extractions": len(effective_timeframes) - successful_extractions,
                     "indicators": indicators
                 }
             }
@@ -764,6 +822,7 @@ class GGBotOrchestrator:
 
             # Clean up stale market_data rows for timeframes no longer in config.
             # Old rows linger after config changes and pollute LLM prompts.
+            # Use effective_timeframes (which accounts for per-indicator TF overrides).
             try:
                 from core.common.db import get_db_connection
                 with get_db_connection() as conn:
@@ -772,7 +831,7 @@ class GGBotOrchestrator:
                             DELETE FROM market_data
                             WHERE config_id = %s AND symbol = %s
                               AND timeframe != ALL(%s)
-                        """, (config.config_id, symbol, timeframes))
+                        """, (config.config_id, symbol, effective_timeframes))
                         deleted = cur.rowcount
                         if deleted > 0:
                             conn.commit()
@@ -780,7 +839,7 @@ class GGBotOrchestrator:
             except Exception as e:
                 self._log.warning(f"Failed to clean stale market_data (non-critical): {e}")
 
-            self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(timeframes)} successful")
+            self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(effective_timeframes)} successful")
             return overall_result
 
         except Exception as e:

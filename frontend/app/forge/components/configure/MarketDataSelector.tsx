@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Crown, ChevronDown } from 'lucide-react'
+import { Crown, ChevronDown, ChevronRight } from 'lucide-react'
 import { ConfigData } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
@@ -56,6 +56,7 @@ export function MarketDataSelector({
 }: MarketDataSelectorProps) {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [showTimeframes, setShowTimeframes] = useState(false)
+  const [expandedIndicator, setExpandedIndicator] = useState<string | null>(null)
   const { hasPaidDataPoint } = usePermissions()
 
   // Get selected data points from config (derived state)
@@ -77,6 +78,20 @@ export function MarketDataSelector({
     point.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     point.description.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
+
+  // Get current global timeframes from technical_analysis config
+  const currentTimeframes = configData?.extraction?.selected_data_sources?.technical_analysis?.timeframes || ALL_TIMEFRAMES
+  const perIndicatorTimeframes = configData?.extraction?.selected_data_sources?.technical_analysis?.per_indicator_timeframes || {}
+
+  // Check if an indicator has custom timeframe overrides
+  const hasCustomTimeframes = (indicatorName: string): boolean => {
+    return indicatorName in perIndicatorTimeframes
+  }
+
+  // Get effective timeframes for a specific indicator
+  const getIndicatorTimeframes = (indicatorName: string): string[] => {
+    return perIndicatorTimeframes[indicatorName] || currentTimeframes
+  }
 
   // Handle data point toggle - batched save handled by parent
   const handleToggleDataPoint = (dataPointId: string) => {
@@ -104,21 +119,37 @@ export function MarketDataSelector({
     if (isSelected) {
       // Remove data point
       updatedDataPoints = categoryData.data_points.filter(name => name !== dataPoint.name)
+      // Collapse if this indicator was expanded
+      if (expandedIndicator === dataPoint.name) {
+        setExpandedIndicator(null)
+      }
     } else {
       // Add data point
       updatedDataPoints = [...categoryData.data_points, dataPoint.name]
     }
 
+    // Clean up per_indicator_timeframes when removing an indicator
+    let updatedPerIndicator = { ...perIndicatorTimeframes }
+    if (isSelected && dataPoint.name in updatedPerIndicator) {
+      delete updatedPerIndicator[dataPoint.name]
+    }
+    // Remove per_indicator_timeframes key if empty
+    const hasOverrides = Object.keys(updatedPerIndicator).length > 0
+
+    // Build the category update
+    const categoryUpdate = updatedDataPoints.length > 0 ? {
+      data_points: updatedDataPoints,
+      timeframes: categoryData.timeframes,
+      ...(hasOverrides ? { per_indicator_timeframes: updatedPerIndicator } : {})
+    } : undefined
+
     // Create update object
     const update: Partial<ConfigData> = {
       extraction: {
-        ...(configData?.extraction || {}),  // Guard: fallback to empty object
+        ...(configData?.extraction || {}),
         selected_data_sources: {
           ...currentConfig,
-          [category]: updatedDataPoints.length > 0 ? {
-            data_points: updatedDataPoints,
-            timeframes: categoryData.timeframes
-          } : undefined
+          [category]: categoryUpdate
         }
       }
     }
@@ -128,27 +159,26 @@ export function MarketDataSelector({
       delete update.extraction!.selected_data_sources[category]
     }
 
-    // Update via parent's batched save handler
-    // (no direct API call - parent handles debounced save)
     onUpdate(update)
   }
-
-  // Get current timeframes from technical_analysis config
-  // Only TA uses timeframes (preprocessor-based candle fetching).
-  // MI categories (sentiment, funding, macro) are Grok-based and ignore timeframes.
-  const currentTimeframes = configData?.extraction?.selected_data_sources?.technical_analysis?.timeframes || ALL_TIMEFRAMES
 
   const isAllTimeframes = ALL_TIMEFRAMES.every(tf => currentTimeframes.includes(tf))
 
   const applyTimeframes = (timeframes: string[]) => {
     const sources = configData?.extraction?.selected_data_sources
     if (!sources?.technical_analysis || !onUpdate) return
+    const ta = sources.technical_analysis
     onUpdate({
       extraction: {
         ...(configData?.extraction || {}),
         selected_data_sources: {
           ...sources,
-          technical_analysis: { ...sources.technical_analysis, timeframes }
+          technical_analysis: {
+            ...ta,
+            timeframes,
+            // Keep per_indicator_timeframes if they exist
+            ...(ta.per_indicator_timeframes ? { per_indicator_timeframes: ta.per_indicator_timeframes } : {})
+          }
         }
       }
     })
@@ -161,6 +191,79 @@ export function MarketDataSelector({
     } else {
       applyTimeframes(ALL_TIMEFRAMES.filter(t => currentTimeframes.includes(t) || t === tf))
     }
+  }
+
+  // Toggle a timeframe for a specific indicator
+  const handleIndicatorTimeframeToggle = (indicatorName: string, tf: string) => {
+    if (!onUpdate) return
+    const sources = configData?.extraction?.selected_data_sources
+    if (!sources?.technical_analysis) return
+
+    const currentIndicatorTfs = getIndicatorTimeframes(indicatorName)
+    let newTfs: string[]
+
+    if (currentIndicatorTfs.includes(tf)) {
+      // Don't allow removing the last timeframe
+      if (currentIndicatorTfs.length <= 1) return
+      newTfs = ALL_TIMEFRAMES.filter(t => currentIndicatorTfs.includes(t) && t !== tf)
+    } else {
+      newTfs = ALL_TIMEFRAMES.filter(t => currentIndicatorTfs.includes(t) || t === tf)
+    }
+
+    // If the new set matches global timeframes, remove the override
+    const matchesGlobal = newTfs.length === currentTimeframes.length &&
+      newTfs.every(t => currentTimeframes.includes(t))
+
+    const updatedPerIndicator = { ...perIndicatorTimeframes }
+    if (matchesGlobal) {
+      delete updatedPerIndicator[indicatorName]
+    } else {
+      updatedPerIndicator[indicatorName] = newTfs
+    }
+
+    const hasOverrides = Object.keys(updatedPerIndicator).length > 0
+    const ta = sources.technical_analysis
+
+    onUpdate({
+      extraction: {
+        ...(configData?.extraction || {}),
+        selected_data_sources: {
+          ...sources,
+          technical_analysis: {
+            data_points: ta.data_points,
+            timeframes: ta.timeframes,
+            ...(hasOverrides ? { per_indicator_timeframes: updatedPerIndicator } : {})
+          }
+        }
+      }
+    })
+  }
+
+  // Reset indicator to use global timeframes
+  const handleResetIndicatorTimeframes = (indicatorName: string) => {
+    if (!onUpdate) return
+    const sources = configData?.extraction?.selected_data_sources
+    if (!sources?.technical_analysis) return
+
+    const updatedPerIndicator = { ...perIndicatorTimeframes }
+    delete updatedPerIndicator[indicatorName]
+
+    const hasOverrides = Object.keys(updatedPerIndicator).length > 0
+    const ta = sources.technical_analysis
+
+    onUpdate({
+      extraction: {
+        ...(configData?.extraction || {}),
+        selected_data_sources: {
+          ...sources,
+          technical_analysis: {
+            data_points: ta.data_points,
+            timeframes: ta.timeframes,
+            ...(hasOverrides ? { per_indicator_timeframes: updatedPerIndicator } : {})
+          }
+        }
+      }
+    })
   }
 
   return (
@@ -221,19 +324,22 @@ export function MarketDataSelector({
         )}
 
         {/* Data Points Grid */}
-        <div className="space-y-2 max-h-64 overflow-y-auto">
+        <div className="space-y-2 max-h-80 overflow-y-auto">
           {filteredDataPoints.length > 0 ? (
             filteredDataPoints.map(dataPoint => {
               const isSelected = selectedDataPoints.includes(dataPoint.name)
               const isPremium = dataPoint.requires_premium
               const hasAccess = !isPremium || hasPaidDataPoint(dataPoint.name)
               const isLocked = isPremium && !hasAccess
+              const isExpanded = expandedIndicator === dataPoint.name
+              const isTA = activeTab === 'technical_analysis'
+              const hasCustom = isTA && hasCustomTimeframes(dataPoint.name)
+              const indicatorTfs = isTA ? getIndicatorTimeframes(dataPoint.name) : []
 
               return (
                 <div key={dataPoint.data_point_id} className="relative">
-                  <button
-                    onClick={() => handleToggleDataPoint(dataPoint.data_point_id)}
-                    className={`w-full text-left p-3 border transition-all rounded-xl ${
+                  <div
+                    className={`border transition-all rounded-xl overflow-hidden ${
                       isSelected
                         ? 'bg-[var(--agent-extraction)]/10 border-[var(--agent-extraction)] text-[var(--text-primary)]'
                         : isLocked
@@ -241,9 +347,14 @@ export function MarketDataSelector({
                           : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--agent-extraction)] hover:bg-[var(--agent-extraction)]/5'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                    {/* Main card row */}
+                    <div className="flex items-center p-3">
+                      {/* Checkbox + label area — toggles indicator */}
+                      <button
+                        onClick={() => handleToggleDataPoint(dataPoint.data_point_id)}
+                        className="flex items-center gap-3 flex-1 text-left"
+                      >
+                        <div className={`w-4 h-4 border-2 rounded flex-shrink-0 flex items-center justify-center ${
                           isSelected
                             ? 'bg-[var(--agent-extraction)] border-[var(--agent-extraction)]'
                             : 'border-[var(--border)]'
@@ -254,16 +365,77 @@ export function MarketDataSelector({
                             </svg>
                           )}
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium flex items-center gap-2">
                             {dataPoint.display_name}
                             {isLocked && <Crown className="h-3 w-3" />}
+                            {isSelected && hasCustom && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)]">
+                                {indicatorTfs.length} TF{indicatorTfs.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-[var(--text-muted)] mt-1">{dataPoint.description}</div>
                         </div>
-                      </div>
+                      </button>
+
+                      {/* Expand chevron — only for selected TA indicators */}
+                      {isSelected && isTA && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExpandedIndicator(isExpanded ? null : dataPoint.name)
+                          }}
+                          className="ml-2 p-1.5 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors flex-shrink-0"
+                          title="Customize timeframes for this indicator"
+                        >
+                          {isExpanded
+                            ? <ChevronDown className="h-4 w-4 text-[var(--agent-extraction)]" />
+                            : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
+                          }
+                        </button>
+                      )}
                     </div>
-                  </button>
+
+                    {/* Expanded per-indicator timeframe selector */}
+                    {isSelected && isTA && isExpanded && (
+                      <div className="px-3 pb-3 pt-1 border-t border-[var(--border)]/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                            {hasCustom ? 'Custom Timeframes' : 'Using Default Timeframes'}
+                          </span>
+                          {hasCustom && (
+                            <button
+                              onClick={() => handleResetIndicatorTimeframes(dataPoint.name)}
+                              className="text-[10px] text-[var(--agent-extraction)] hover:underline"
+                            >
+                              Reset to Default
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {ALL_TIMEFRAMES.map(tf => {
+                            const isActive = indicatorTfs.includes(tf)
+                            const isLastOne = isActive && indicatorTfs.length === 1
+                            return (
+                              <button
+                                key={tf}
+                                onClick={() => handleIndicatorTimeframeToggle(dataPoint.name, tf)}
+                                disabled={isLastOne}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+                                  isActive
+                                    ? 'bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]/30'
+                                    : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                                } ${isLastOne ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                {tf}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )
             })
@@ -297,41 +469,48 @@ export function MarketDataSelector({
             className="w-full flex items-center justify-between text-sm font-medium text-[var(--text-primary)]"
           >
             <span>
-              Timeframes: {isAllTimeframes ? `All (${ALL_TIMEFRAMES.length})` : `${currentTimeframes.length} selected`}
+              Default Timeframes: {isAllTimeframes ? `All (${ALL_TIMEFRAMES.length})` : `${currentTimeframes.length} selected`}
             </span>
             <ChevronDown className={`h-4 w-4 transition-transform ${showTimeframes ? 'rotate-180' : ''}`} />
           </button>
           {showTimeframes && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              <button
-                onClick={() => applyTimeframes([...ALL_TIMEFRAMES])}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isAllTimeframes
-                    ? 'bg-[var(--agent-extraction)] text-white'
-                    : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
-                }`}
-              >
-                All
-              </button>
-              {ALL_TIMEFRAMES.map(tf => {
-                const isActive = currentTimeframes.includes(tf)
-                const isLastOne = isActive && currentTimeframes.length === 1
-                return (
-                  <button
-                    key={tf}
-                    onClick={() => handleTimeframeToggle(tf)}
-                    disabled={isLastOne}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      isActive
-                        ? 'bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]/30'
-                        : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
-                    } ${isLastOne ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {tf}
-                  </button>
-                )
-              })}
-            </div>
+            <>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  onClick={() => applyTimeframes([...ALL_TIMEFRAMES])}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    isAllTimeframes
+                      ? 'bg-[var(--agent-extraction)] text-white'
+                      : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                  }`}
+                >
+                  All
+                </button>
+                {ALL_TIMEFRAMES.map(tf => {
+                  const isActive = currentTimeframes.includes(tf)
+                  const isLastOne = isActive && currentTimeframes.length === 1
+                  return (
+                    <button
+                      key={tf}
+                      onClick={() => handleTimeframeToggle(tf)}
+                      disabled={isLastOne}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]/30'
+                          : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                      } ${isLastOne ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {tf}
+                    </button>
+                  )
+                })}
+              </div>
+              {Object.keys(perIndicatorTimeframes).length > 0 && (
+                <div className="mt-2 text-[10px] text-[var(--text-muted)]">
+                  Some indicators have custom timeframes. Expand them to see details.
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

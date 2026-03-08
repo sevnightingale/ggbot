@@ -228,11 +228,16 @@ You'll be configuring these sections using the `update_full_config` tool:
   "selected_data_sources": {{
     "technical_analysis": {{
       "data_points": ["RSI", "MACD", "Volume"],
-      "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+      "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"],
+      "per_indicator_timeframes": {{
+        "RSI": ["5m", "15m"],
+        "MACD": ["4h", "1d"]
+      }}
     }}
   }}
 }}
 ```
+Note: `per_indicator_timeframes` is optional. Indicators not listed use the global `timeframes`.
 
 **llm_config** (which model to use)
 ```json
@@ -344,12 +349,13 @@ You have access to 3 tools via function calling:
    - `5m`, `15m`, `30m`, `1h`, `4h`, `1d` (for scheduled bots)
    - Do NOT use `6h`, `2h`, `12h`, or `1w` — they are not supported by the scheduler
 
-9. **Timeframes**: The bot's current timeframes are part of its extraction config.
-   You may suggest changing timeframes if the strategy warrants it, but:
+9. **Timeframes**: The bot supports per-indicator timeframe customization.
+   - Global timeframes (the `timeframes` array) apply to all indicators by default
+   - Individual indicators can override with `per_indicator_timeframes` (e.g., RSI on 5m/15m only, MACD on 4h/1d)
+   - If you suggest per-indicator timeframes, add `per_indicator_timeframes` to the technical_analysis config
    - ALWAYS state explicitly when you're changing timeframes and why
    - Default is all 7 timeframes: 5m, 15m, 30m, 1h, 4h, 1d, 1w
    - Only reduce timeframes if the user asks or the strategy clearly benefits
-   - When updating extraction, preserve existing timeframes unless changing them intentionally
 
 ---
 
@@ -967,6 +973,7 @@ Generate ONLY the strategy text (no JSON, no code blocks around the whole thing)
 - "Patient/sniper" → Multiple confirmations required, higher confidence thresholds
 - "Aggressive/scalper" → Lower timeframes, quick entries, tight stops
 - "Macro-aware" → Include VIX/DXY, longer timeframes, regime-based decisions
+- "Multi-timeframe" → Use per_indicator_timeframes: RSI/Stochastic on lower TFs (5m, 15m), ADX/EMA on higher TFs (4h, 1d)
 
 Generate the strategy now based on the user's description."""
 
@@ -1007,7 +1014,11 @@ You MUST respond with valid JSON in this exact structure:
     "selected_data_sources": {{
       "technical_analysis": {{
         "data_points": ["RSI", "MACD", "ADX", "EMA", "ATR"],
-        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"],
+        "per_indicator_timeframes": {{
+          "RSI": ["5m", "15m", "1h"],
+          "MACD": ["4h", "1d"]
+        }}
       }},
       "sentiment_social": {{
         "data_points": ["twitter_sentiment"],
@@ -1026,7 +1037,7 @@ You MUST respond with valid JSON in this exact structure:
 4. **Be specific with values**: "RSI below 30" not "RSI oversold"
 5. **Include confidence levels**: Decision engine uses 0.0-1.0 confidence scores
 6. **Add stop/take profit logic**: Every strategy needs exit rules
-7. **Always use all 7 timeframes**: Unless the user specifically requests fewer, always include: 5m, 15m, 30m, 1h, 4h, 1d, 1w. More timeframes = better analysis
+7. **Always use all 7 timeframes**: Unless the user specifically requests fewer, always include: 5m, 15m, 30m, 1h, 4h, 1d, 1w. More timeframes = better analysis. Use `per_indicator_timeframes` when specific indicators benefit from targeted TFs (e.g., RSI on low TFs for entries, ADX on high TFs for trend)
 
 ## Personality Translations
 
@@ -1034,6 +1045,7 @@ You MUST respond with valid JSON in this exact structure:
 - "Trend follower" → ADX, Aroon, EMA alignment + MACD momentum
 - "Patient/sniper" → Multiple confirmations, higher thresholds
 - "Macro-aware" → vix, dxy + longer timeframes
+- "Multi-timeframe" → per_indicator_timeframes: RSI/Stochastic on 5m/15m, ADX/EMA on 4h/1d
 - "Funding-aware" → btc_funding_rate, eth_funding_rate
 
 Create the complete config now. Respond ONLY with the JSON object, no other text."""

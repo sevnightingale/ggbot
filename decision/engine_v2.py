@@ -1439,6 +1439,14 @@ Take Profit: {take_profit_text}
             if news_section:
                 sections.append(news_section)
 
+        # Format Account Performance (trading history, win rate, drawdown)
+        if 'account_performance' in self.market_intelligence:
+            acct_section = self._format_account_performance_data(
+                self.market_intelligence['account_performance']
+            )
+            if acct_section:
+                sections.append(acct_section)
+
         return "\n\n".join(sections) if sections else None
 
     def _format_derivatives_data(self, derivatives: Dict[str, Any]) -> str:
@@ -1536,6 +1544,54 @@ Take Profit: {take_profit_text}
                         if key not in ['metadata', 'raw_data', '_meta']:
                             lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
+
+        return "\n".join(lines)
+
+    def _format_account_performance_data(self, account_perf: Dict[str, Any]) -> str:
+        """Format account performance data for LLM prompt."""
+        lines = ["## ACCOUNT PERFORMANCE", ""]
+
+        for point_name, data in account_perf.items():
+            if not isinstance(data, dict):
+                continue
+
+            # Summary stats
+            equity = data.get('account_equity', 0)
+            initial = data.get('initial_balance', 0)
+            change_pct = data.get('equity_change_pct', 0)
+            drawdown_pct = data.get('drawdown_from_peak_pct', 0)
+            total = data.get('total_trades', 0)
+            wins = data.get('win_trades', 0)
+            losses = data.get('loss_trades', 0)
+            win_rate = data.get('win_rate_pct', 0)
+            avg_win = data.get('avg_win_pct', 0)
+            avg_loss = data.get('avg_loss_pct', 0)
+
+            lines.append(f"**Account**: ${equity:,.2f} (started ${initial:,.2f}, {change_pct:+.1f}%)")
+            lines.append(f"**Drawdown from peak**: {drawdown_pct:.1f}%")
+            lines.append(f"**Record**: {total} trades — {wins}W/{losses}L ({win_rate:.1f}% win rate)")
+            lines.append(f"**Avg win**: {avg_win:+.1f}% | **Avg loss**: {avg_loss:.1f}%")
+
+            # Recent trades
+            recent = data.get('recent_trades', [])
+            if recent:
+                lines.append("")
+                lines.append("**Recent trades**:")
+                for trade in recent[:5]:
+                    side = trade.get('side', '?').upper()
+                    pnl = trade.get('pnl_pct', 0)
+                    reason = trade.get('close_reason', 'unknown')
+                    hours = trade.get('closed_ago_hours', 0)
+                    result = "WIN" if pnl > 0 else "LOSS" if pnl < 0 else "FLAT"
+                    lines.append(f"  - {side} {pnl:+.1f}% ({result}) — {reason}, {hours:.0f}h ago")
+
+            # Interpretation
+            interp = data.get('interpretation')
+            if interp:
+                lines.append("")
+                lines.append(f"**Summary**: {interp}")
+
+            lines.append("")
 
         return "\n".join(lines)
 
