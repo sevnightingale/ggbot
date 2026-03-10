@@ -908,6 +908,57 @@ export class ApiClient {
   }
 
   // =============================================================================
+  // Arena Season 2 Registration
+  // =============================================================================
+
+  async registerForArena(seasonId: number, configId: string): Promise<{
+    status: string
+    registration_id?: string
+    config_id: string
+    season_id: number
+    message: string
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/arena/season/${seasonId}/register`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_id: configId })
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to register for arena')
+    }
+
+    return await response.json()
+  }
+
+  async unregisterFromArena(seasonId: number, configId: string): Promise<{
+    status: string
+    config_id: string
+    season_id: number
+    message: string
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/arena/season/${seasonId}/unregister`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_id: configId })
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to unregister from arena')
+    }
+
+    return await response.json()
+  }
+
+  // =============================================================================
   // Arena Pledges (USX Staking on Bot Competition)
   // =============================================================================
 

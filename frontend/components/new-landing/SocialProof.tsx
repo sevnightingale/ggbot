@@ -1,19 +1,19 @@
 'use client'
 
-import { Bot, TrendingUp, Brain, Trophy } from 'lucide-react'
+import { Bot, TrendingUp, Brain, Trophy, ExternalLink } from 'lucide-react'
 
 export default function SocialProof() {
-  // Stats - these could be fetched dynamically in the future
+  // Stats sourced from Virtuals launch page (NOTE.md)
   const stats = [
     {
       icon: Bot,
-      value: "470+",
-      label: "Bots Created",
-      subtext: "by traders worldwide"
+      value: "322+",
+      label: "Active Users",
+      subtext: "building AI agents"
     },
     {
       icon: TrendingUp,
-      value: "5,900+",
+      value: "7,500+",
       label: "Trades Executed",
       subtext: "paper & live"
     },
@@ -29,7 +29,41 @@ export default function SocialProof() {
     <section className="py-16 bg-obsidian border-y border-ivory/10">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* ggArena Banner */}
+        {/* $GG Token Banner */}
+        <div className="mb-6">
+          <a
+            href="https://app.virtuals.io/virtuals/21553"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block relative overflow-hidden rounded-sm border-2 border-[#8b5cf6] bg-gradient-to-r from-[#8b5cf6]/10 via-[#8b5cf6]/5 to-[#8b5cf6]/10 p-6 md:p-8 hover:border-[#a78bfa] transition-colors group"
+          >
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 bg-[#8b5cf6]/20 text-[#a78bfa] px-2 py-0.5 rounded-full text-xs font-medium">
+                    <span className="w-1.5 h-1.5 bg-[#8b5cf6] rounded-full animate-pulse"></span>
+                    NOW LIVE
+                  </span>
+                </div>
+                <h3 className="text-2xl md:text-3xl font-bold text-ivory font-display mb-2">
+                  $GG is live on Virtuals
+                </h3>
+                <p className="text-ivory/70">
+                  The token powering ggArena prize pools, strategy staking, and platform rewards
+                </p>
+              </div>
+
+              <div className="flex-shrink-0">
+                <span className="inline-flex items-center gap-2 bg-[#8b5cf6] hover:bg-[#a78bfa] text-white px-6 py-3 rounded-sm font-medium transition-colors">
+                  View on Virtuals
+                  <ExternalLink className="w-4 h-4" />
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+
+        {/* ggArena Season 2 Banner */}
         <div className="mb-12">
           <a
             href="https://app.ggbots.ai/arena"
@@ -44,21 +78,20 @@ export default function SocialProof() {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="inline-flex items-center gap-1.5 bg-brass/20 text-brass px-2 py-0.5 rounded-full text-xs font-medium">
-                    <span className="w-1.5 h-1.5 bg-brass rounded-full animate-pulse"></span>
-                    LIVE NOW
+                    TRAINING GROUNDS
                   </span>
                 </div>
                 <h3 className="text-2xl md:text-3xl font-bold text-ivory font-display mb-2">
-                  ggArena Season 1
+                  ggArena Season 2
                 </h3>
                 <p className="text-ivory/70">
-                  <span className="text-brass font-semibold">$2,500 prize pool</span> • 33 bots competing • Top 3 get funded live trading
+                  Training grounds open now • Registration Apr 1–6 • Competition Apr 7–28 • <span className="text-brass font-semibold">$GG prize pool</span>
                 </p>
               </div>
 
               <div className="flex-shrink-0">
                 <span className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-6 py-3 rounded-sm font-medium transition-colors">
-                  Watch the competition
+                  Prepare your bot
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
@@ -94,7 +127,7 @@ export default function SocialProof() {
 
         {/* Trust line */}
         <p className="text-center text-ivory/50 text-sm mt-8">
-          Join 300+ traders building AI agents that trade while they sleep
+          Join 322+ traders building AI agents that trade while they sleep
         </p>
       </div>
     </section>

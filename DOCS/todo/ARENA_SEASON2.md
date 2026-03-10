@@ -62,28 +62,14 @@ Mar 10                    Apr 1                   Apr 7                    Apr 2
 
 ## Technical Design
 
-### Option A: Separate Registration Table (RECOMMENDED)
+### Single Table: `arena_registrations`
 
-New `arena_seasons` + `arena_registrations` tables. Clean separation from S1, extensible for future seasons.
+One table for registrations. Season metadata (dates, status) lives as Python/TS constants — dates don't change once set, no need for a DB table.
 
 ```sql
-CREATE TABLE arena_seasons (
-    season_id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,              -- "Season 2"
-    training_start TIMESTAMPTZ NOT NULL,
-    registration_start TIMESTAMPTZ NOT NULL,
-    registration_end TIMESTAMPTZ NOT NULL,
-    competition_start TIMESTAMPTZ NOT NULL,
-    competition_end TIMESTAMPTZ NOT NULL,
-    status VARCHAR(20) DEFAULT 'training',  -- training, registration, competition, completed
-    prize_description TEXT,                  -- "Funded by $GG token launch"
-    rules_url TEXT,                          -- link to rules page
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 CREATE TABLE arena_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    season_id INT REFERENCES arena_seasons(season_id),
+    season_id INT NOT NULL,                 -- plain integer tag (2 = Season 2), no FK
     config_id UUID REFERENCES configurations(config_id),
     user_id UUID NOT NULL,
     registered_at TIMESTAMPTZ DEFAULT NOW(),
@@ -97,6 +83,26 @@ CREATE TABLE arena_registrations (
     rank INT,                               -- final leaderboard position
     UNIQUE(season_id, config_id)
 );
+
+CREATE INDEX idx_arena_reg_season ON arena_registrations(season_id);
+CREATE INDEX idx_arena_reg_config ON arena_registrations(config_id);
+CREATE INDEX idx_arena_reg_active ON arena_registrations(season_id, unregistered_at)
+    WHERE unregistered_at IS NULL;
+```
+
+**Season metadata** — Python constant (backend) + TS constant (frontend, already exists as `S2_DATES`):
+```python
+# core/arena/seasons.py
+SEASONS = {
+    2: {
+        'name': 'Season 2',
+        'training_start': '2026-03-10T00:00:00Z',
+        'registration_start': '2026-04-01T00:00:00Z',
+        'registration_end': '2026-04-06T23:59:59Z',
+        'competition_start': '2026-04-07T00:00:00Z',
+        'competition_end': '2026-04-28T23:59:59Z',
+    }
+}
 ```
 
 **Config locking logic**: On every `PUT /config/{config_id}`, check:
@@ -107,27 +113,11 @@ if registration and registration.unregistered_at is None:
     raise HTTPException(400, "Bot is locked for ggArena Season 2. Unregister to edit.")
 ```
 
-**Advantages**:
-- S1 data untouched (`is_public_performance` stays as-is)
-- Clean season-level metadata (dates, status, rules)
-- Per-registration tracking (balance snapshots, eligibility, rank)
-- Easy to query "all S2 bots" without conflating with S1
-- Future seasons trivial to add
-
-**Disadvantages**:
-- 2 new tables
-- Need to seed S1 data if we want it queryable in same format (optional — S1 can stay as legacy)
-
-### Option B: Extend Existing Schema
-
-Add `arena_season INT` + `arena_locked_at TIMESTAMPTZ` columns to `configurations`. Reuse `is_public_performance` for leaderboard visibility.
-
-**Advantages**: No new tables, simpler.
-**Disadvantages**: Mixes season data into configs table, harder to query per-season, no clean place for season metadata, harder to track per-season results.
-
-### Recommendation: Option A
-
-The separate table is cleaner and we're already on Season 2 — this will scale.
+**Why single table**:
+- Season dates don't change once set — no benefit to DB-driven metadata
+- `arena_registrations` is the only table that needs CRUD
+- `season_id` as plain int tag is sufficient for querying per-season
+- If a seasons table is ever needed, add it later and backfill the FK trivially
 
 ---
 
@@ -137,8 +127,7 @@ The separate table is cleaner and we're already on Season 2 — this will scale.
 - `POST /api/v2/arena/season/{season_id}/register` — Register bot for season
 - `POST /api/v2/arena/season/{season_id}/unregister` — Unregister (registration week only)
 - `GET /api/v2/arena/season/{season_id}/leaderboard` — S2 leaderboard
-- `GET /api/v2/arena/season/{season_id}/status` — Season phase, dates, countdown
-- `GET /api/v2/arena/seasons` — List all seasons with status
+- `GET /api/v2/public/arena/season/current` — Season metadata from Python constant + registration count from DB
 
 ### Modified Endpoints
 - `PUT /api/v2/config/{config_id}` — Add arena lock check

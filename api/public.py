@@ -14,6 +14,9 @@ from fastapi import APIRouter, Query
 
 from core.common.db import get_db_connection
 from core.common.logger import logger
+from core.arena.seasons import (
+    SEASONS, CURRENT_SEASON_ID, get_current_season, get_season_phase, get_current_phase
+)
 
 router = APIRouter(prefix="/api/v2/public", tags=["public"])
 
@@ -499,3 +502,230 @@ async def get_arena_metadata(config_id: str) -> Dict[str, Any]:
             "createdAt": created_at.isoformat()
         }
     }
+
+
+# =============================================================================
+# Season 2 Arena Endpoints
+# =============================================================================
+
+@router.get("/arena/season/current")
+async def get_current_season_status() -> Dict[str, Any]:
+    """
+    Get current arena season metadata, computed phase, and registration count.
+    Public endpoint — Redis cached 60s.
+    """
+    cache_key = "arena:season:current"
+
+    # Check cache
+    try:
+        redis_client = _get_redis_client()
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass
+
+    season = get_current_season()
+    phase = get_current_phase()
+
+    # Count active registrations
+    registration_count = 0
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) FROM arena_registrations
+                    WHERE season_id = %s AND unregistered_at IS NULL
+                """, (CURRENT_SEASON_ID,))
+                registration_count = cur.fetchone()[0]
+    except Exception as e:
+        logger.warning(f"Failed to count arena registrations: {e}")
+
+    result = {
+        "success": True,
+        "season_id": season['season_id'],
+        "name": season['name'],
+        "phase": phase,
+        "training_start": season['training_start'].isoformat(),
+        "registration_start": season['registration_start'].isoformat(),
+        "registration_end": season['registration_end'].isoformat(),
+        "competition_start": season['competition_start'].isoformat(),
+        "competition_end": season['competition_end'].isoformat(),
+        "prize_description": season.get('prize_description', ''),
+        "registration_count": registration_count,
+    }
+
+    # Cache 60s
+    try:
+        redis_client = _get_redis_client()
+        redis_client.setex(cache_key, 60, json.dumps(result))
+    except Exception:
+        pass
+
+    return result
+
+
+def _calculate_active_days(config_id: str, start: datetime, end: datetime) -> int:
+    """
+    Count distinct days a bot made at least one decision within a date range.
+    Used for 18/21 day activity requirement.
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(DISTINCT DATE(created_at))
+                FROM decisions
+                WHERE config_id = %s
+                  AND created_at >= %s
+                  AND created_at <= %s
+            """, (config_id, start, end))
+            return cur.fetchone()[0] or 0
+
+
+@router.get("/arena/season/{season_id}/leaderboard")
+async def get_season_leaderboard(season_id: int) -> Dict[str, Any]:
+    """
+    Get leaderboard for a specific arena season.
+    Public endpoint — Redis cached 300s.
+
+    During registration: shows registered bots (no equity data yet).
+    During competition: equity from account_snapshots within competition window.
+    After competition: final snapshotted results from arena_registrations.
+    """
+    season = SEASONS.get(season_id)
+    if not season:
+        return {"success": False, "error": "Season not found"}
+
+    cache_key = f"arena:s{season_id}:leaderboard"
+
+    # Check cache
+    try:
+        redis_client = _get_redis_client()
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass
+
+    phase = get_season_phase(season_id)
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Get all active registrations with bot metadata
+            cur.execute("""
+                SELECT
+                    ar.id,
+                    ar.config_id,
+                    ar.user_id,
+                    ar.registered_at,
+                    ar.starting_balance,
+                    ar.final_balance,
+                    ar.final_pnl_pct,
+                    ar.active_days,
+                    ar.eligible,
+                    ar.rank,
+                    c.config_name,
+                    c.profile_image_url,
+                    c.description,
+                    c.config_data->'decision'->>'analysis_frequency' as frequency,
+                    c.config_data->'llm_config'->>'model' as model,
+                    c.config_data->>'selected_pair' as symbol,
+                    c.config_data->'extraction'->'selected_data_sources' as data_sources,
+                    c.config_data->'trading'->'risk_management'->>'default_stop_loss_percent' as stop_loss,
+                    c.config_data->'trading'->'risk_management'->>'default_take_profit_percent' as take_profit,
+                    c.config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin
+                FROM arena_registrations ar
+                JOIN configurations c ON ar.config_id = c.config_id
+                WHERE ar.season_id = %s AND ar.unregistered_at IS NULL
+                ORDER BY ar.rank ASC NULLS LAST, ar.registered_at ASC
+            """, (season_id,))
+            rows = cur.fetchall()
+
+            bots = []
+            for row in rows:
+                config_id = str(row[1])
+                bot = {
+                    "registration_id": str(row[0]),
+                    "config_id": config_id,
+                    "user_id": str(row[2]),
+                    "registered_at": row[3].isoformat() if row[3] else None,
+                    "starting_balance": float(row[4] or 10000),
+                    "config_name": row[10],
+                    "profile_image_url": row[11],
+                    "description": row[12],
+                    "frequency": row[13],
+                    "model": row[14],
+                    "symbol": row[15],
+                    "data_sources": row[16],
+                    "stop_loss": row[17],
+                    "take_profit": row[18],
+                    "max_margin": row[19],
+                    "current_equity": float(row[4] or 10000),
+                    "current_pnl": 0.0,
+                    "pnl_pct": 0.0,
+                    "total_trades": 0,
+                    "win_rate": 0.0,
+                    "active_days": row[7] or 0,
+                    "is_eligible": row[8] if row[8] is not None else True,
+                    "rank": row[9],
+                }
+
+                # If competition completed, use snapshotted results
+                if phase == 'completed' and row[5] is not None:
+                    bot["current_equity"] = float(row[5])
+                    bot["pnl_pct"] = float(row[6] or 0)
+                    bot["current_pnl"] = float(row[5] or 10000) - float(row[4] or 10000)
+
+                # During competition, get live equity from latest snapshot
+                elif phase == 'competition':
+                    cur.execute("""
+                        SELECT
+                            COALESCE(s.current_balance, 0) + COALESCE(s.unrealized_pnl, 0) as equity,
+                            s.total_trades,
+                            s.win_rate
+                        FROM account_snapshots s
+                        WHERE s.config_id = %s
+                          AND s.timestamp >= %s
+                        ORDER BY s.timestamp DESC
+                        LIMIT 1
+                    """, (config_id, season['competition_start']))
+                    snap = cur.fetchone()
+                    if snap:
+                        equity = float(snap[0])
+                        bot["current_equity"] = equity
+                        bot["current_pnl"] = equity - bot["starting_balance"]
+                        bot["pnl_pct"] = ((equity - bot["starting_balance"]) / bot["starting_balance"]) * 100
+                        bot["total_trades"] = snap[1] or 0
+                        bot["win_rate"] = float(snap[2] or 0)
+
+                    # Calculate live active days
+                    bot["active_days"] = _calculate_active_days(
+                        config_id, season['competition_start'], season['competition_end']
+                    )
+                    bot["is_eligible"] = bot["active_days"] >= 18
+
+                bots.append(bot)
+
+            # Sort by equity during competition, by rank if completed
+            if phase == 'competition':
+                bots.sort(key=lambda b: b["current_equity"], reverse=True)
+            elif phase == 'completed':
+                bots.sort(key=lambda b: (b["rank"] or 999, -(b["pnl_pct"] or 0)))
+
+    result = {
+        "success": True,
+        "season_id": season_id,
+        "phase": phase,
+        "bot_count": len(bots),
+        "bots": bots,
+    }
+
+    # Cache: 300s during competition, 60s during registration, 3600s when completed
+    ttl = 300 if phase == 'competition' else (60 if phase == 'registration' else 3600)
+    try:
+        redis_client = _get_redis_client()
+        redis_client.setex(cache_key, ttl, json.dumps(result))
+    except Exception:
+        pass
+
+    return result

@@ -40,20 +40,27 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 
 ---
 
-## 🏟️ **ggArena Season 2 + $GG Launch** (March 10)
+## 🏟️ **ggArena Season 2 + $GG Launch** (March 10 – April 28)
 
-**Status**: 🟡 PLANNING — needs design before implementation
-**Context**: $GG token launches on Virtuals March 10. Season 2 launches simultaneously.
+**Status**: 🟡 IN PROGRESS — Phase A shipped, Phase B before Apr 1
+**Planning Doc**: [DOCS/todo/ARENA_SEASON2.md](DOCS/todo/ARENA_SEASON2.md)
 
-### **Season 2 Design** (FLUSH OUT)
-- [ ] Define Season 2 format — training grounds period concept, scoring, duration
-- [ ] Determine how training grounds differs from Season 1 (open registration + immediate competition)
-- [ ] Define entry requirements, prize structure, $GG token integration (if any)
-- [ ] Timeline: training grounds duration → competition start → season end
+### ~~Phase A: Arena Page Update~~ ✅ (2026-03-10)
+- [x] S2 hero, timeline visualization, phase-aware progress bar
+- [x] Rules section (10 rules), "How It Works" updated for S2 flow
+- [x] Season toggle (S2 default, S1 results preserved as archive view)
+- [x] Forge banner updated, SEO metadata updated
+- See CHANGELOG for details
 
-### **Arena Page Updates**
-- [ ] Update arena page for Season 2 (new format, rules, registration flow)
-- [ ] Season 1 → Season 2 transition (archive S1 results, reset leaderboard)
+### **Phase B: Database + API** (Before Apr 1)
+- [ ] Create `arena_registrations` table (single table, season metadata as Python/TS constants)
+- [ ] Season status endpoint (`GET /api/v2/public/arena/season/current`)
+- [ ] Register/unregister endpoints with config lock check
+- [ ] S2 leaderboard endpoint
+- [ ] Registration status in config list response
+- [ ] Frontend registration UI + Forge lock UI
+- [ ] Update `arena_reset.py` for S2
+- [ ] Active days calculation (18/21 eligibility)
 
 ---
 

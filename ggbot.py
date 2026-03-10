@@ -482,13 +482,46 @@ async def create_config(
 async def list_configs(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """List all configurations for the current user."""
+    """List all configurations for the current user, with arena registration status."""
     configs = await config_service.list_configs(current_user.user_id)
-    
+    config_dicts = [config.to_dict() for config in configs]
+
+    # Enrich with arena registration data
+    config_ids = [c['config_id'] for c in config_dicts]
+    if config_ids:
+        from core.arena.seasons import SEASONS, get_season_phase
+        arena_map = {}
+        try:
+            from core.common.db import get_db_connection
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT config_id, season_id, registered_at
+                        FROM arena_registrations
+                        WHERE config_id = ANY(%s) AND unregistered_at IS NULL
+                    """, (config_ids,))
+                    for row in cur.fetchall():
+                        cid = str(row[0])
+                        sid = row[1]
+                        phase = get_season_phase(sid)
+                        season = SEASONS.get(sid, {})
+                        arena_map[cid] = {
+                            "season_id": sid,
+                            "season_name": season.get('name', f'Season {sid}'),
+                            "registered_at": row[2].isoformat() if row[2] else None,
+                            "is_locked": phase in ('registration', 'competition'),
+                            "can_unregister": phase == 'registration',
+                        }
+        except Exception:
+            pass  # Non-critical enrichment
+
+        for c in config_dicts:
+            c['arena_registration'] = arena_map.get(c['config_id'])
+
     return {
         "status": "success",
-        "configs": [config.to_dict() for config in configs],
-        "count": len(configs)
+        "configs": config_dicts,
+        "count": len(config_dicts)
     }
 
 
@@ -620,6 +653,32 @@ async def update_config(
     config_type = update_data.pop("config_type", None)
     trading_mode = update_data.pop("trading_mode", None)
     profile_image_url = update_data.pop("profile_image_url", None)
+
+    # Check arena lock — block strategy edits for registered bots
+    strategy_fields_in_update = {k for k in update_data if k in {'selected_pair', 'extraction', 'decision', 'trading', 'llm_config'}}
+    if strategy_fields_in_update:
+        from core.arena.seasons import get_season_phase
+        from core.common.db import get_db_connection as _get_db
+        with _get_db() as _conn:
+            with _conn.cursor() as _cur:
+                _cur.execute("""
+                    SELECT ar.season_id FROM arena_registrations ar
+                    WHERE ar.config_id = %s AND ar.unregistered_at IS NULL
+                    LIMIT 1
+                """, (config_id,))
+                active_reg = _cur.fetchone()
+                if active_reg:
+                    phase = get_season_phase(active_reg[0])
+                    if phase == 'registration':
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Bot is locked for ggArena Season 2. Unregister during registration week to edit your strategy."
+                        )
+                    elif phase == 'competition':
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Bot is locked for ggArena Season 2 competition. Strategy edits are frozen until the season ends."
+                        )
 
     # Validate symbol has real-time price data if changing selected_pair
     selected_pair = update_data.get("selected_pair")
@@ -2956,6 +3015,163 @@ async def unregister_from_arena(
         raise
     except Exception as e:
         logger.error(f"Failed to unregister bot from arena {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Unregistration failed: {str(e)}")
+
+
+# =============================================================================
+# Arena Season 2 Registration
+# =============================================================================
+
+@app.post("/api/v2/arena/season/{season_id}/register")
+async def register_for_arena_s2(
+    season_id: int,
+    request: Request,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Register a bot for ggArena Season 2.
+
+    Requirements:
+    - Season must be in 'registration' phase
+    - User must own the bot
+    - Bot must be active and in paper trading mode
+    - User must have active subscription
+    """
+    from core.arena.seasons import SEASONS, is_registration_open
+
+    season = SEASONS.get(season_id)
+    if not season:
+        raise HTTPException(status_code=404, detail="Season not found")
+
+    if not is_registration_open(season_id):
+        from core.arena.seasons import get_season_phase
+        phase = get_season_phase(season_id)
+        if phase == 'training':
+            raise HTTPException(status_code=400, detail=f"Registration opens {season['registration_start'].strftime('%B %d')}.")
+        elif phase == 'competition':
+            raise HTTPException(status_code=400, detail="Registration is closed. Competition is underway.")
+        else:
+            raise HTTPException(status_code=400, detail="Registration is closed for this season.")
+
+    body = await request.json()
+    config_id = body.get("config_id")
+    if not config_id:
+        raise HTTPException(status_code=400, detail="config_id is required")
+
+    try:
+        # Verify user owns config
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Must be active
+        if config.state != 'active':
+            raise HTTPException(status_code=400, detail="Bot must be active to enter the Arena. Start your bot first.")
+
+        # Must be paper trading
+        if config.trading_mode != 'paper':
+            raise HTTPException(status_code=400, detail="Only paper trading bots can enter the Arena.")
+
+        # Must have subscription
+        profile = await user_service.get_profile(current_user.user_id)
+        if not profile or not profile.can_use_premium_features:
+            raise HTTPException(status_code=403, detail="Arena registration requires an active subscription.")
+
+        # Insert registration
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO arena_registrations (season_id, config_id, user_id)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (season_id, config_id) DO UPDATE
+                    SET unregistered_at = NULL, registered_at = NOW()
+                    RETURNING id
+                """, (season_id, config_id, current_user.user_id))
+                reg_id = cur.fetchone()[0]
+                conn.commit()
+
+        logger.info(f"Bot registered for Arena S{season_id}: config_id={config_id}, user_id={current_user.user_id}")
+
+        return {
+            "status": "success",
+            "registration_id": str(reg_id),
+            "config_id": config_id,
+            "season_id": season_id,
+            "message": f"Your bot is registered for {season['name']}! Strategy is now locked."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to register bot for arena S{season_id}: {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+
+@app.post("/api/v2/arena/season/{season_id}/unregister")
+async def unregister_from_arena_s2(
+    season_id: int,
+    request: Request,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Unregister a bot from ggArena Season 2.
+
+    Only allowed during registration phase (not during competition).
+    Soft-deletes by setting unregistered_at timestamp.
+    """
+    from core.arena.seasons import SEASONS, get_season_phase
+
+    season = SEASONS.get(season_id)
+    if not season:
+        raise HTTPException(status_code=404, detail="Season not found")
+
+    phase = get_season_phase(season_id)
+    if phase == 'competition':
+        raise HTTPException(status_code=400, detail="Cannot unregister during competition. Strategy is frozen.")
+    if phase == 'completed':
+        raise HTTPException(status_code=400, detail="Season is completed. Cannot modify registrations.")
+
+    body = await request.json()
+    config_id = body.get("config_id")
+    if not config_id:
+        raise HTTPException(status_code=400, detail="config_id is required")
+
+    try:
+        # Verify user owns config
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Set unregistered_at
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE arena_registrations
+                    SET unregistered_at = NOW()
+                    WHERE season_id = %s AND config_id = %s AND user_id = %s AND unregistered_at IS NULL
+                    RETURNING id
+                """, (season_id, config_id, current_user.user_id))
+                result = cur.fetchone()
+                conn.commit()
+
+        if not result:
+            raise HTTPException(status_code=404, detail="No active registration found for this bot.")
+
+        logger.info(f"Bot unregistered from Arena S{season_id}: config_id={config_id}, user_id={current_user.user_id}")
+
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "season_id": season_id,
+            "message": f"Your bot has been removed from {season['name']}. Strategy is now unlocked."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to unregister bot from arena S{season_id}: {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Unregistration failed: {str(e)}")
 
 

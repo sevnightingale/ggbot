@@ -17,26 +17,17 @@ export default function Hero() {
         <div className="text-center">
           {/* Main Headline */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-ivory mb-8 font-display leading-tight">
-            AI trading bots that{' '}
-            <span className="inline-flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4">
-              <span className="text-brass relative">
-                think
-                <span className="absolute inset-0 text-brass opacity-30 blur-sm">think</span>
-              </span>
-              <span className="text-brass relative">
-                adapt
-                <span className="absolute inset-0 text-brass opacity-30 blur-sm">adapt</span>
-              </span>
-              <span className="text-brass relative">
-                execute
-                <span className="absolute inset-0 text-brass opacity-30 blur-sm">execute</span>
-              </span>
+            Describe your strategy.{' '}
+            <br className="hidden md:block" />
+            <span className="text-brass relative">
+              AI trades it
+              <span className="absolute inset-0 text-brass opacity-30 blur-sm">AI trades it</span>
             </span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-ivory/70 mb-12 max-w-3xl mx-auto leading-relaxed font-sans">
-            Become a vibetrader. Our AI agents analyze market conditions, reason through decisions, and adapt your trading strategies in real-time — just like you would, but 24/7.
+            Vibecoding let anyone build software. <span className="text-ivory">ggbots does the same for trading.</span> AI agents that reason, adapt, and execute your thesis — no code, no quant degree. 24/7.
           </p>
 
           {/* Primary CTA */}

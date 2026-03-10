@@ -6,6 +6,39 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-10 - ggArena Season 2 — Phase A: Arena Page Update
+
+**Planning Doc**: [DOCS/todo/ARENA_SEASON2.md](DOCS/todo/ARENA_SEASON2.md) (Phase B pending)
+
+Season 2 Training Grounds launched. Arena page now defaults to S2 view with S1 results accessible via toggle.
+
+**S2 Phase System** (`ArenaWithStaking.tsx:17-74`):
+- `S2_DATES` constants (training Mar 10, registration Apr 1-6, competition Apr 7-28)
+- `getS2Phase()` — client-side phase computation from `Date.now()`, 60s polling
+- `getPhaseDayProgress()` — "Day N/22" progress for current phase
+- Phase-dependent hero subtitle, CTA button text, countdown targets
+
+**Timeline Visualization** (`ArenaWithStaking.tsx:460-520`):
+- 4-node horizontal timeline: Training → Registration → Competition → Results
+- Current phase highlighted with accent + pulse animation, past phases checkmarked
+- `CountdownTimer` reused with `getCountdownTarget()` for next phase transition
+
+**Season Toggle** (`ArenaWithStaking.tsx:279`):
+- `seasonView` state: `'s2'` (default) or `'s1'`
+- S1 leaderboard (Top3, Autonomous, Overall) wrapped in `seasonView === 's1'` guards — code untouched
+- S1 hero shows "Back to Season 2" link, S2 hero shows "View Season 1 Results →"
+
+**Rules + How It Works** (`ArenaWithStaking.tsx:948-1055`):
+- 10 numbered rules in brass-accent card (entry, registration lock, 18/21 activity, $GG prizes)
+- "How It Works" unhidden, updated: Build → Register → Compete → Win
+
+**Other Changes**:
+- SEO metadata updated for S2 (`layout.tsx`)
+- Forge banner → "Season 2 — Training Grounds Open", new `arena-s2-banner-dismissed` localStorage key (`forge/page.tsx`)
+- ActivationBar arena button title updated to S2, stays hidden until Phase B (`ActivationBar.tsx`)
+
+---
+
 ## 2026-03-07 - Account Performance as MI Data Source (Statefulness Phase 2a)
 
 Community-requested (Denis @ Buidler Labs). Bots now see their own trading history — win rate, drawdown, recent trades — as market intelligence data. User checks "Trading History" checkbox → adapter queries internal DB → data flows into LLM prompt alongside VIX, funding rates, etc. No new toggles or concepts.

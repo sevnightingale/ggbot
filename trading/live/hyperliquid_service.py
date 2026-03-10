@@ -91,6 +91,10 @@ class HyperliquidLiveTradingService:
         # Use mainnet by default; testnet can be configured per-user in future
         self.base_url = constants.MAINNET_API_URL
         self.settlement_wait = 2  # seconds
+        # Shared Info instance — stateless HTTP client, safe to reuse across users
+        self._info = Info(self.base_url, skip_ws=True)
+        # Cache wallet addresses per user to avoid repeated Vault lookups
+        self._wallet_cache: Dict[str, str] = {}  # user_id -> wallet_address
 
     def _round_price(self, exchange: Exchange, coin: str, px: float) -> float:
         """
@@ -151,12 +155,19 @@ class HyperliquidLiveTradingService:
 
     async def _get_info(self, user_id: str) -> Optional[tuple]:
         """
-        Initialize Hyperliquid Info SDK for querying account state.
+        Get Hyperliquid Info SDK + wallet address for a user.
+
+        Uses cached shared Info instance and per-user wallet address cache
+        to avoid redundant Vault lookups and Info() constructor calls.
 
         Returns:
             Tuple of (Info instance, wallet_address), or None if credentials not found
         """
         try:
+            # Check wallet cache first
+            if user_id in self._wallet_cache:
+                return (self._info, self._wallet_cache[user_id])
+
             from core.auth.vault_utils import VaultManager
             credentials = await VaultManager.get_hyperliquid_credential(user_id)
             if not credentials:
@@ -164,9 +175,9 @@ class HyperliquidLiveTradingService:
                 return None
 
             wallet_address = credentials['wallet_address']
-            info = Info(self.base_url, skip_ws=True)
+            self._wallet_cache[user_id] = wallet_address
 
-            return (info, wallet_address)
+            return (self._info, wallet_address)
 
         except Exception as e:
             self._log.error(f"Failed to initialize Hyperliquid Info for user {user_id}: {e}")

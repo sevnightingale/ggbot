@@ -25,7 +25,7 @@ export default function FAQ() {
     },
     {
       question: "What exchanges and trading pairs are supported?",
-      answer: "Currently we support major cryptocurrency exchanges including BitMEX, with plans to expand to additional exchanges. We focus on the most liquid trading pairs to ensure optimal execution and minimal slippage for your strategies."
+      answer: "We support non-custodial live trading on Hyperliquid — 228 perpetual markets with up to 50x leverage. Paper trading is available for all supported pairs. Your funds stay in your wallet; ggbots never has withdrawal access."
     },
     {
       question: "How does the AI learn and adapt my trading style?",

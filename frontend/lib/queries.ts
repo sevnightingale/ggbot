@@ -87,6 +87,91 @@ export function useArenaQueryClient() {
 }
 
 // ─────────────────────────────────────────────────────────
+// Arena Season 2 Hooks
+// ─────────────────────────────────────────────────────────
+
+export interface CurrentSeasonResponse {
+  success: boolean
+  season_id: number
+  name: string
+  phase: 'training' | 'registration' | 'competition' | 'completed'
+  training_start: string
+  registration_start: string
+  registration_end: string
+  competition_start: string
+  competition_end: string
+  prize_description: string
+  registration_count: number
+}
+
+export interface SeasonLeaderboardBot {
+  registration_id: string
+  config_id: string
+  user_id: string
+  registered_at: string | null
+  starting_balance: number
+  config_name: string
+  profile_image_url: string | null
+  description: string | null
+  frequency: string
+  model: string
+  symbol: string
+  data_sources: Record<string, unknown>
+  stop_loss: string
+  take_profit: string
+  max_margin: string
+  current_equity: number
+  current_pnl: number
+  pnl_pct: number
+  total_trades: number
+  win_rate: number
+  active_days: number
+  is_eligible: boolean
+  rank: number | null
+}
+
+export interface SeasonLeaderboardResponse {
+  success: boolean
+  season_id: number
+  phase: string
+  bot_count: number
+  bots: SeasonLeaderboardBot[]
+}
+
+/**
+ * Fetch current arena season metadata + phase.
+ * Public endpoint, cached 60s server-side.
+ */
+export function useCurrentSeason() {
+  return useQuery<CurrentSeasonResponse>({
+    queryKey: ['arena', 'season', 'current'],
+    queryFn: async () => {
+      const res = await fetch('/api/v2/public/arena/season/current')
+      if (!res.ok) throw new Error(`Failed to fetch season: ${res.status}`)
+      return res.json()
+    },
+    staleTime: 60 * 1000, // 60 seconds — matches server cache
+  })
+}
+
+/**
+ * Fetch leaderboard for a specific arena season.
+ * Public endpoint, cached 300s during competition.
+ */
+export function useSeasonLeaderboard(seasonId: number, enabled: boolean = true) {
+  return useQuery<SeasonLeaderboardResponse>({
+    queryKey: ['arena', 'season', seasonId, 'leaderboard'],
+    queryFn: async () => {
+      const res = await fetch(`/api/v2/public/arena/season/${seasonId}/leaderboard`)
+      if (!res.ok) throw new Error(`Failed to fetch leaderboard: ${res.status}`)
+      return res.json()
+    },
+    staleTime: 60 * 1000,
+    enabled,
+  })
+}
+
+// ─────────────────────────────────────────────────────────
 // Forge Page Hooks
 // ─────────────────────────────────────────────────────────
 
