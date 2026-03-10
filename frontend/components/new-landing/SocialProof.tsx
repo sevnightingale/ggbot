@@ -32,7 +32,7 @@ export default function SocialProof() {
         {/* $GG Token Banner */}
         <div className="mb-6">
           <a
-            href="https://app.virtuals.io/virtuals/21553"
+            href="https://app.virtuals.io/prototypes/0x0497F698CdB42984FFcfb509472a186F984673e2"
             target="_blank"
             rel="noopener noreferrer"
             className="block relative overflow-hidden rounded-sm border-2 border-[#8b5cf6] bg-gradient-to-r from-[#8b5cf6]/10 via-[#8b5cf6]/5 to-[#8b5cf6]/10 p-6 md:p-8 hover:border-[#a78bfa] transition-colors group"
