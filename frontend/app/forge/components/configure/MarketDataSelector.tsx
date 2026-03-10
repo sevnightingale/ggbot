@@ -129,7 +129,7 @@ export function MarketDataSelector({
     }
 
     // Clean up per_indicator_timeframes when removing an indicator
-    let updatedPerIndicator = { ...perIndicatorTimeframes }
+    const updatedPerIndicator = { ...perIndicatorTimeframes }
     if (isSelected && dataPoint.name in updatedPerIndicator) {
       delete updatedPerIndicator[dataPoint.name]
     }
