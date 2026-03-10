@@ -82,7 +82,7 @@ function ForgeApp() {
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
   const [showArenaBanner, setShowArenaBanner] = useState(() => {
     if (typeof window === 'undefined') return false
-    return localStorage.getItem('arena-banner-dismissed') !== 'true'
+    return localStorage.getItem('arena-s2-banner-dismissed') !== 'true'
   })
   const [showOnboardingTour, setShowOnboardingTour] = useState(false)
   const [liveTradingSetupOpen, setLiveTradingSetupOpen] = useState(false)
@@ -1151,19 +1151,19 @@ function ForgeApp() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <Header />
 
-      {/* ggArena Season 1 Announcement Banner */}
+      {/* ggArena Season 2 Announcement Banner */}
       {showArenaBanner && (
         <div className="bg-[var(--accent)]/10 border-b border-[var(--accent)]/20">
           <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
             <p className="text-sm text-[var(--text-primary)]">
-              <span className="font-semibold">ggArena Season 1 Complete</span>
+              <span className="font-semibold">ggArena Season 2 — Training Grounds Open</span>
               <span className="text-[var(--text-secondary)]"> — </span>
               <Link href="/arena" className="text-[var(--accent)] hover:underline">
-                See the results →
+                Prepare your bot for Season 2 →
               </Link>
             </p>
             <button
-              onClick={() => { localStorage.setItem('arena-banner-dismissed', 'true'); setShowArenaBanner(false) }}
+              onClick={() => { localStorage.setItem('arena-s2-banner-dismissed', 'true'); setShowArenaBanner(false) }}
               className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               aria-label="Dismiss banner"
             >

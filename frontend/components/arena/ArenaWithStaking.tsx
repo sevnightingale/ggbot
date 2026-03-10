@@ -11,8 +11,67 @@ import { ThemeProvider } from '@/lib/theme'
 import { useArenaPerformance, ArenaBot } from '@/lib/queries'
 import { Sparkline } from '@/components/arena/Sparkline'
 import { Top3Chart } from '@/components/arena/Top3Chart'
-import { RefreshCw, Bot, TrendingUp, TrendingDown, Zap, ChevronDown, Coins, CheckCircle, Shield } from 'lucide-react'
+import { RefreshCw, Bot, TrendingUp, TrendingDown, Zap, ChevronDown, Coins, CheckCircle, Shield, ArrowLeft, Trophy, Award, Target, Lock } from 'lucide-react'
 import { BetModal } from '@/components/arena/BetModal'
+
+// ── Season 2 Date Constants ──────────────────────────────────────
+const S2_DATES = {
+  trainingStart:    new Date('2026-03-10T00:00:00Z').getTime(),
+  registrationStart: new Date('2026-04-01T00:00:00Z').getTime(),
+  registrationEnd:  new Date('2026-04-06T23:59:59Z').getTime(),
+  competitionStart: new Date('2026-04-07T00:00:00Z').getTime(),
+  competitionEnd:   new Date('2026-04-28T23:59:59Z').getTime(),
+} as const
+
+type S2Phase = 'training' | 'registration' | 'competition' | 'completed'
+
+function getS2Phase(now: number = Date.now()): S2Phase {
+  if (now < S2_DATES.registrationStart) return 'training'
+  if (now <= S2_DATES.registrationEnd) return 'registration'
+  if (now <= S2_DATES.competitionEnd) return 'competition'
+  return 'completed'
+}
+
+function getCountdownTarget(phase: S2Phase): number {
+  switch (phase) {
+    case 'training': return S2_DATES.registrationStart
+    case 'registration': return S2_DATES.competitionStart
+    case 'competition': return S2_DATES.competitionEnd
+    default: return 0
+  }
+}
+
+function getPhaseLabel(phase: S2Phase): string {
+  switch (phase) {
+    case 'training': return 'Training Grounds'
+    case 'registration': return 'Registration'
+    case 'competition': return 'Competition'
+    case 'completed': return 'Completed'
+  }
+}
+
+function getPhaseDayProgress(phase: S2Phase, now: number = Date.now()): { current: number; total: number } {
+  const msPerDay = 86400000
+  switch (phase) {
+    case 'training': {
+      const elapsed = now - S2_DATES.trainingStart
+      const total = S2_DATES.registrationStart - S2_DATES.trainingStart
+      return { current: Math.min(Math.ceil(elapsed / msPerDay), Math.ceil(total / msPerDay)), total: Math.ceil(total / msPerDay) }
+    }
+    case 'registration': {
+      const elapsed = now - S2_DATES.registrationStart
+      const total = S2_DATES.competitionStart - S2_DATES.registrationStart
+      return { current: Math.min(Math.ceil(elapsed / msPerDay), Math.ceil(total / msPerDay)), total: Math.ceil(total / msPerDay) }
+    }
+    case 'competition': {
+      const elapsed = now - S2_DATES.competitionStart
+      const total = S2_DATES.competitionEnd - S2_DATES.competitionStart
+      return { current: Math.min(Math.ceil(elapsed / msPerDay), Math.ceil(total / msPerDay)), total: Math.ceil(total / msPerDay) }
+    }
+    default:
+      return { current: 0, total: 0 }
+  }
+}
 
 // Separate QueryClient for Web3 (wagmi needs its own)
 const web3QueryClient = new QueryClient()
@@ -217,9 +276,17 @@ function ArenaContent() {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const [betModalBot, setBetModalBot] = useState<{ bot: ArenaBot; rank: number } | null>(null)
+  const [seasonView, setSeasonView] = useState<'s2' | 's1'>('s2')
+  const [s2Phase, setS2Phase] = useState<S2Phase>(getS2Phase())
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Update phase every minute
+  useEffect(() => {
+    const interval = setInterval(() => setS2Phase(getS2Phase()), 60000)
+    return () => clearInterval(interval)
   }, [])
 
   const toggleCard = (configId: string) => {
@@ -270,15 +337,29 @@ function ArenaContent() {
           </a>
 
           {mounted && (
-            <div className="hidden sm:flex items-center gap-3 absolute left-1/2 -translate-x-1/2 w-64">
-              <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">Day 21/21</span>
-              <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
-                <div
-                  className="h-full bg-green-500 rounded-full"
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <span className="text-xs font-mono text-green-500 whitespace-nowrap">Complete</span>
+            <div className="hidden sm:flex items-center gap-3 absolute left-1/2 -translate-x-1/2 w-72">
+              {seasonView === 's1' ? (
+                <>
+                  <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">S1</span>
+                  <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
+                    <div className="h-full bg-green-500 rounded-full" style={{ width: '100%' }} />
+                  </div>
+                  <span className="text-xs font-mono text-green-500 whitespace-nowrap">Complete</span>
+                </>
+              ) : (() => {
+                const progress = getPhaseDayProgress(s2Phase)
+                const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
+                return (
+                  <>
+                    <span className="text-xs font-mono text-[var(--accent)] whitespace-nowrap">
+                      {getPhaseLabel(s2Phase)} — Day {progress.current}/{progress.total}
+                    </span>
+                    <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
+                      <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           )}
 
@@ -298,38 +379,148 @@ function ArenaContent() {
       <div className="relative border-b border-[var(--border)] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
 
-        <div className="relative max-w-4xl mx-auto px-4 py-12 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-green-500/15 border border-green-500/50">
-            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
-              Season One
-            </span>
-            <span className="text-green-500">·</span>
-            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-            <span className="text-sm font-bold uppercase tracking-wider text-green-500">Complete</span>
+        {seasonView === 's2' ? (
+          <div className="relative max-w-4xl mx-auto px-4 py-12 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-[var(--accent)]/15 border border-[var(--accent)]/50">
+              <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
+                Season Two
+              </span>
+              <span className="text-[var(--accent)]">·</span>
+              <span className="text-sm font-bold uppercase tracking-wider text-[var(--accent)]">
+                {getPhaseLabel(s2Phase)}
+              </span>
+            </div>
+
+            <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
+              The ggArena
+            </h1>
+
+            <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto mb-3">
+              {s2Phase === 'training' && 'Build. Test. Optimize. Registration opens April 1.'}
+              {s2Phase === 'registration' && 'Registration is open. Lock your strategy and enter.'}
+              {s2Phase === 'competition' && 'Competition is live. 21 days of pure AI trading.'}
+              {s2Phase === 'completed' && 'Season 2 is complete. See the results below.'}
+            </p>
+            <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto mb-8">
+              March 10 — April 28, 2026
+            </p>
+
+            <a
+              href="https://app.ggbots.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-base font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
+            >
+              <Zap className="h-5 w-5" />
+              <span>{s2Phase === 'training' ? 'Build Your Bot' : s2Phase === 'registration' ? 'Register Now' : 'View Leaderboard'}</span>
+            </a>
+
+            <div className="mt-4">
+              <button
+                onClick={() => setSeasonView('s1')}
+                className="text-sm text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+              >
+                View Season 1 Results →
+              </button>
+            </div>
           </div>
+        ) : (
+          <div className="relative max-w-4xl mx-auto px-4 py-12 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-green-500/15 border border-green-500/50">
+              <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
+                Season One
+              </span>
+              <span className="text-green-500">·</span>
+              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+              <span className="text-sm font-bold uppercase tracking-wider text-green-500">Complete</span>
+            </div>
 
-          <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
-            The ggArena
-          </h1>
+            <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
+              The ggArena
+            </h1>
 
-          <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto mb-3">
-            21 days. {rankedBots.length} bots. Here are the results.
-          </p>
-          <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto mb-8">
-            January 21 — February 11, 2026
-          </p>
+            <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto mb-3">
+              21 days. {rankedBots.length} bots. Here are the results.
+            </p>
+            <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto mb-8">
+              January 21 — February 11, 2026
+            </p>
 
-          <a
-            href="https://app.ggbots.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-base font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
-          >
-            <Zap className="h-5 w-5" />
-            <span>Start Building for Season 2</span>
-          </a>
-        </div>
+            <button
+              onClick={() => setSeasonView('s2')}
+              className="inline-flex items-center gap-2 text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Season 2
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* S2 Timeline Visualization — only on S2 view */}
+      {seasonView === 's2' && mounted && (
+        <div className="border-b border-[var(--border)] bg-[var(--bg-secondary)]/30">
+          <div className="max-w-4xl mx-auto px-4 py-10">
+            {/* Timeline nodes */}
+            <div className="flex items-start justify-between relative">
+              {/* Connecting line */}
+              <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-[var(--border)]" />
+
+              {([
+                { phase: 'training' as S2Phase, label: 'Training Grounds', dates: 'Mar 10 – 31', icon: Target },
+                { phase: 'registration' as S2Phase, label: 'Registration', dates: 'Apr 1 – 6', icon: Lock },
+                { phase: 'competition' as S2Phase, label: 'Competition', dates: 'Apr 7 – 28', icon: Trophy },
+                { phase: 'completed' as S2Phase, label: 'Results', dates: 'Apr 28+', icon: Award },
+              ]).map((node) => {
+                const phases: S2Phase[] = ['training', 'registration', 'competition', 'completed']
+                const currentIdx = phases.indexOf(s2Phase)
+                const nodeIdx = phases.indexOf(node.phase)
+                const isPast = nodeIdx < currentIdx
+                const isCurrent = nodeIdx === currentIdx
+                const Icon = node.icon
+
+                return (
+                  <div key={node.phase} className="flex flex-col items-center relative z-10 w-1/4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                      isCurrent
+                        ? 'bg-[var(--accent)]/20 border-[var(--accent)] animate-pulse'
+                        : isPast
+                          ? 'bg-green-500/20 border-green-500'
+                          : 'bg-[var(--bg-tertiary)] border-[var(--border)]'
+                    }`}>
+                      {isPast ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <Icon className={`h-5 w-5 ${isCurrent ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`} />
+                      )}
+                    </div>
+                    <span className={`mt-2 text-xs font-semibold text-center ${
+                      isCurrent ? 'text-[var(--accent)]' : isPast ? 'text-green-500' : 'text-[var(--text-muted)]'
+                    }`}>
+                      {node.label}
+                    </span>
+                    <span className="mt-1 text-[10px] text-[var(--text-muted)] font-mono text-center">
+                      {node.dates}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Countdown to next phase */}
+            {s2Phase !== 'completed' && (
+              <div className="mt-8">
+                <p className="text-center text-xs text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                  {s2Phase === 'training' && 'Registration opens in'}
+                  {s2Phase === 'registration' && 'Competition starts in'}
+                  {s2Phase === 'competition' && 'Competition ends in'}
+                </p>
+                <CountdownTimer targetTime={getCountdownTarget(s2Phase)} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-10">
@@ -339,15 +530,15 @@ function ArenaContent() {
           </div>
         )}
 
-        {loading && !data && (
+        {seasonView === 's1' && loading && !data && (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
             <RefreshCw className="h-8 w-8 animate-spin text-[var(--accent)]" />
             <span className="text-[var(--text-muted)]">Loading arena data...</span>
           </div>
         )}
 
-        {/* Top 3 Podium Chart */}
-        {!loading && data && rankedBots.length >= 3 && (
+        {/* S1 Leaderboard Content — Top 3 Podium Chart */}
+        {seasonView === 's1' && !loading && data && rankedBots.length >= 3 && (
           <>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -369,7 +560,7 @@ function ArenaContent() {
         )}
 
         {/* Autonomous AI Leaderboard */}
-        {!loading && data && autonomousBots.length > 0 && (
+        {seasonView === 's1' && !loading && data && autonomousBots.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -476,7 +667,7 @@ function ArenaContent() {
         )}
 
         {/* Overall Leaderboard — All Participants */}
-        {!loading && data && rankedBots.length > 0 && (
+        {seasonView === 's1' && !loading && data && rankedBots.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -754,8 +945,8 @@ function ArenaContent() {
         )}
       </div>
 
-      {/* How It Works — hidden for Season 1 complete, preserve for Season 2 */}
-      {false && (
+      {/* How It Works — S2 */}
+      {seasonView === 's2' && (
       <div className="border-y border-[var(--border)] bg-[var(--bg-secondary)]/50">
         <div className="max-w-4xl mx-auto px-4 py-10">
           <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-8">
@@ -763,10 +954,10 @@ function ArenaContent() {
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { step: '1', title: 'Build', desc: 'Create your AI trading bot' },
-              { step: '2', title: 'Subscribe', desc: 'Most users spend <$5/mo' },
-              { step: '3', title: 'Enter', desc: 'All accounts reset to $10k' },
-              { step: '4', title: 'Win', desc: 'Highest equity takes all' }
+              { step: '1', title: 'Build', desc: 'Create your AI trading bot in the Forge' },
+              { step: '2', title: 'Register', desc: 'Enter during registration week (Apr 1-6). Strategy locks.' },
+              { step: '3', title: 'Compete', desc: 'All accounts reset to $10k. 21 days of pure AI.' },
+              { step: '4', title: 'Win', desc: 'Highest P&L % wins. Prizes funded by $GG.' }
             ].map(item => (
               <div key={item.step} className="text-center">
                 <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
@@ -781,7 +972,63 @@ function ArenaContent() {
       </div>
       )}
 
-      {/* Partners — hidden until Season 2 sponsors confirmed */}
+      {/* Rules — S2 */}
+      {seasonView === 's2' && (
+      <div className="border-b border-[var(--border)]">
+        <div className="max-w-3xl mx-auto px-4 py-10">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden">
+            <div className="h-1 bg-[var(--accent)]" />
+            <div className="p-6">
+              <h2 className="font-display text-lg text-[var(--text-primary)] mb-6">Season 2 Rules</h2>
+              <ol className="space-y-3 text-sm text-[var(--text-secondary)]">
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">1</span>
+                  <span><strong className="text-[var(--text-primary)]">Entry.</strong> Any active paper trading bot. Must have active subscription (usage-based or credits).</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">2</span>
+                  <span><strong className="text-[var(--text-primary)]">Registration.</strong> April 1-6. Once registered, your bot&apos;s strategy is locked.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">3</span>
+                  <span><strong className="text-[var(--text-primary)]">Unregister.</strong> Allowed during registration week only. Unlocks your bot for editing.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">4</span>
+                  <span><strong className="text-[var(--text-primary)]">Starting Balance.</strong> All bots reset to $10,000 on April 7.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">5</span>
+                  <span><strong className="text-[var(--text-primary)]">Scoring.</strong> Highest P&L % wins. Final balance at April 28 23:59 UTC.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">6</span>
+                  <span><strong className="text-[var(--text-primary)]">Activity Requirement.</strong> Bot must be active for at least 18 of 21 competition days. Below this threshold = ineligible for prizes.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">7</span>
+                  <span><strong className="text-[var(--text-primary)]">No Edits During Competition.</strong> Strategy, indicators, timeframes, and trade settings are frozen.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">8</span>
+                  <span><strong className="text-[var(--text-primary)]">Multiple Bots.</strong> Users may enter multiple bots.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">9</span>
+                  <span><strong className="text-[var(--text-primary)]">Costs.</strong> Users pay for their own bot&apos;s LLM usage (credits or subscription).</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[var(--accent)]/15 flex items-center justify-center text-xs font-bold text-[var(--accent)]">10</span>
+                  <span><strong className="text-[var(--text-primary)]">Prize Pool.</strong> Funded by $GG token launch proceeds. Exact amounts TBD based on token performance.</span>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Partners — unhide when S2 sponsors confirmed. Update: remove Symphony, keep Scroll. */}
       {false && (
       <div className="border-t border-[var(--border)] py-10">
         <div className="text-center space-y-4">
@@ -813,44 +1060,67 @@ function ArenaContent() {
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--accent)]/10 via-[var(--accent)]/5 to-transparent pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
-          <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
-            Season 2 Coming Soon
-          </h2>
+          {seasonView === 's2' ? (
+            <>
+              <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
+                Season 2 — {getPhaseLabel(s2Phase)}
+              </h2>
 
-          <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-            Build your bot now. Test your strategies. Season 2 will reward true autonomous AI performance.
-          </p>
+              <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+                {s2Phase === 'training' && 'Build and test your bot now. Registration opens April 1.'}
+                {s2Phase === 'registration' && 'Registration is open. Lock your strategy and enter the arena.'}
+                {s2Phase === 'competition' && 'Competition is live. May the best AI win.'}
+                {s2Phase === 'completed' && 'Season 2 is complete. Results are in.'}
+              </p>
 
-          {/* Prize breakdown — hidden until Season 2 prizes confirmed */}
-          {false && (
-          <div className="flex justify-center gap-6 mb-10">
-            {[
-              { medal: '🥇', prize: '$1,500' },
-              { medal: '🥈', prize: '$700' },
-              { medal: '🥉', prize: '$300' }
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="text-2xl mb-1">{item.medal}</div>
-                <div className={`text-lg font-mono font-bold ${i === 0 ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>{item.prize}</div>
-                <div className="text-xs text-[var(--text-muted)]">+ funded trading</div>
+              {/* Prize breakdown — hidden until amounts confirmed */}
+              {false && (
+              <div className="flex justify-center gap-6 mb-10">
+                {[
+                  { medal: '🥇', prize: '$1,500' },
+                  { medal: '🥈', prize: '$700' },
+                  { medal: '🥉', prize: '$300' }
+                ].map((item, i) => (
+                  <div key={i} className="text-center">
+                    <div className="text-2xl mb-1">{item.medal}</div>
+                    <div className={`text-lg font-mono font-bold ${i === 0 ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>{item.prize}</div>
+                    <div className="text-xs text-[var(--text-muted)]">+ funded trading</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+              )}
+
+              <p className="text-sm text-[var(--text-muted)] mb-6">
+                Prize pool funded by $GG token launch. Exact amounts TBD.
+              </p>
+
+              <a
+                href="https://app.ggbots.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
+              >
+                <Zap className="h-5 w-5" />
+                <span>Start Building</span>
+              </a>
+            </>
+          ) : (
+            <>
+              <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
+                Season 1 Complete
+              </h2>
+              <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+                {rankedBots.length} bots competed over 21 days. Season 2 is underway.
+              </p>
+              <button
+                onClick={() => setSeasonView('s2')}
+                className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
+              >
+                <Zap className="h-5 w-5" />
+                <span>Go to Season 2</span>
+              </button>
+            </>
           )}
-
-          <a
-            href="https://app.ggbots.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
-          >
-            <Zap className="h-5 w-5" />
-            <span>Start Building</span>
-          </a>
-
-          <p className="mt-6 text-xs text-[var(--text-muted)]">
-            Competition ended February 11th · {rankedBots.length} bots competed
-          </p>
         </div>
       </div>
 

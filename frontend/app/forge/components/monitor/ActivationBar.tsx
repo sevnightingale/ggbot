@@ -272,7 +272,7 @@ export function ActivationBar({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-              {/* Enter Arena Button — Season 1 complete, re-enable for Season 2 */}
+              {/* Enter Arena Button — disabled during training, re-enable when S2 registration API is ready (Phase B) */}
               {false && isPaperTrading && (
                 isRegisteredForArena ? (
                   <div className="inline-flex items-center gap-1.5 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm text-green-500">
@@ -284,7 +284,7 @@ export function ActivationBar({
                     onClick={() => setArenaModalOpen(true)}
                     disabled={!isActive}
                     className="inline-flex items-center gap-2 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={!isActive ? 'Activate your bot first to enter the Arena' : 'Register for ggArena Season 1'}
+                    title={!isActive ? 'Activate your bot first to enter the Arena' : 'Register for ggArena Season 2'}
                   >
                     <Trophy className="h-4 w-4" />
                     <span>Enter Arena</span>
