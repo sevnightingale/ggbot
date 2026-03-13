@@ -1,64 +1,64 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-03-10 08:54:09 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-12 23:25:19 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 336
+- **Total Users**: 346
 - **Prepaid Users**: 21 (21 active subscriptions)
-- **Free Users**: 309
-- **Users with Bots**: 326 (97.0%)
+- **Free Users**: 319
+- **Users with Bots**: 333 (96.2%)
 
 ### Bot Statistics
-- **Total Bots**: 516
-- **Active Bots**: 19 (3.7%)
-  - Paper: 18
+- **Total Bots**: 528
+- **Active Bots**: 22 (4.2%)
+  - Paper: 21
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 1
-- **Inactive Bots**: 497
+- **Inactive Bots**: 506
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,814
-  - Wins: 2,633
-  - Losses: 5,181
-  - Platform Win Rate: 33.70%
-  - Total P&L: $110,779.93
+- **Total Trades (All Time)**: 7,687
+  - Wins: 2,591
+  - Losses: 5,096
+  - Platform Win Rate: 33.71%
+  - Total P&L: $117,779.11
 - **Recent Activity**:
-  - Last 24 hours: 21 trades
-  - Last 7 days: 126 trades
-  - Last 30 days: 1218 trades
+  - Last 24 hours: 10 trades
+  - Last 7 days: 113 trades
+  - Last 30 days: 838 trades
 
 ### Open Positions
-- **Open Positions**: 13
+- **Open Positions**: 10
 - **Unique Symbols**: 3
-- **Total Exposure**: $125,274.77
+- **Total Exposure**: $148,076.90
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,193.16
+- **Average Balance**: $10,202.44
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 11 bots
-- **ETH/USDT**: 7 bots
+- **BTC/USDT**: 12 bots
+- **ETH/USDT**: 9 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 356 decisions (avg confidence: 46.2%)
-- **enter**: 20 decisions (avg confidence: 81.0%)
-- **exit**: 8 decisions (avg confidence: 64.3%)
-- **long**: 2 decisions (avg confidence: 68.5%)
-- **close**: 1 decisions (avg confidence: 70.0%)
+- **wait**: 685 decisions (avg confidence: 42.3%)
+- **enter**: 11 decisions (avg confidence: 67.8%)
+- **exit**: 5 decisions (avg confidence: 53.4%)
+- **close**: 2 decisions (avg confidence: 67.5%)
+- **short**: 1 decisions (avg confidence: 68.0%)
 
 ### System Health
-- **Decisions (last hour)**: 31
+- **Decisions (last hour)**: 28
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -67,24 +67,24 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 5MB | 2d 22h | 4 |
-| ggbot | 🟢 online | 2.6% | 271MB | 2d 20h | 18 |
-| account-monitor | 🟢 online | 0.6% | 26MB | 2d 22h | 8 |
-| sebastian-chrome | 🟢 online | 0.3% | 64MB | 2d 22h | 8 |
-| sebastian-bot | 🟢 online | 0.2% | 34MB | 2d 22h | 5 |
-| market-data-ws | 🟢 online | 1.2% | 13MB | 2d 22h | 4 |
-| sebastian-telegram | 🟢 online | 0% | 14MB | 2d 22h | 4 |
-| ggbot-scheduler | 🟢 online | 0% | 257MB | 2d 21h | 4 |
+| error-alerts | 🟢 online | 0% | 18MB | 5d 13h | 4 |
+| ggbot | 🟢 online | 0.8% | 264MB | 2d 12h | 20 |
+| account-monitor | 🟢 online | 0.8% | 27MB | 2d 12h | 9 |
+| sebastian-chrome | 🟢 online | 1% | 129MB | 5d 13h | 8 |
+| sebastian-bot | 🟢 online | 0.2% | 58MB | 5d 13h | 5 |
+| market-data-ws | 🟢 online | 1.2% | 16MB | 5d 13h | 4 |
+| sebastian-telegram | 🟢 online | 0% | 14MB | 5d 13h | 4 |
+| ggbot-scheduler | 🟢 online | 0% | 243MB | 2d 12h | 5 |
 
 ### VM Resources
 
 - **Disk**: 61G / 78G (78%)
-- **Memory**: 2.5Gi / 3.8Gi
-- **CPU Load**: 0.81 / 0.46 / 0.35 (1m/5m/15m)
+- **Memory**: 1.8Gi / 3.8Gi
+- **CPU Load**: 0.39 / 0.35 / 0.24 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 25.42M)
+- **Redis**: 🟢 connected (Memory: 26.57M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -519,7 +519,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-10 08:54:10 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-12 23:25:20 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -550,6 +550,12 @@ config_id uuid, session_id varchar(255), last_active_at timestamp?, created_at t
 Idx: arena_pledges_tx_hash_key(tx_hash), idx_arena_pledges_config(config_id), idx_arena_pledges_pledged_at(pledged_at), idx_arena_pledges_user(user_id), idx_arena_pledges_wallet(wallet_address)
 id uuid, user_id uuid?, wallet_address text, config_id uuid?, usx_amount numeric, susx_amount numeric?, tx_hash text
 pledged_at timestamptz?, competition_id uuid?, prize_amount numeric?, claimed_at timestamptz?, unstaked_at timestamptz?
+
+### arena_registrations (13 cols) | PK: id | FK: config_id→configurations | UQ: season_id,config_id
+Idx: arena_registrations_season_id_config_id_key(season_id, config_id), idx_arena_reg_active(season_id, unregistered_at), idx_arena_reg_config(config_id), idx_arena_reg_season(season_id)
+id uuid, season_id int, config_id uuid?, user_id uuid, registered_at timestamptz?, unregistered_at timestamptz?
+starting_balance numeric?, final_balance numeric?, final_pnl numeric?, final_pnl_pct numeric?, active_days int?
+eligible bool?=true, rank int?
 
 ### bot_telegram_channels (6 cols) | PK: config_id | FK: config_id→configurations
 Idx: idx_bot_telegram_channels_chat_id(telegram_chat_id), idx_bot_telegram_channels_enabled(enabled)
@@ -708,7 +714,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-03-10 08:54:10 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-12 23:25:20 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

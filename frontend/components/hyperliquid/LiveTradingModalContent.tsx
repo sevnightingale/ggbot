@@ -5,13 +5,14 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, ConnectButton, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
-import { useAccount, useReadContract, useSignTypedData, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useReadContract, useSignTypedData, useSwitchChain, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { Loader2, CheckCircle2, AlertCircle, Wallet, Zap, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 
 import {
   hyperliquidWagmiConfig,
+  ARBITRUM_CHAIN_ID,
   ARBITRUM_USDC_ADDRESS,
   HYPERLIQUID_BRIDGE_ADDRESS,
   ERC20_ABI,
@@ -40,9 +41,11 @@ interface LiveTradingModalContentProps {
 type SetupStep = 'idle' | 'generating' | 'signing' | 'submitting' | 'storing' | 'done'
 
 function ModalContent({ onComplete }: LiveTradingModalContentProps) {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chain } = useAccount()
   const { signTypedDataAsync } = useSignTypedData()
+  const { switchChain } = useSwitchChain()
   const { canAccess } = usePermissions()
+  const isWrongNetwork = isConnected && chain?.id !== ARBITRUM_CHAIN_ID
 
   // Hyperliquid connection state (from backend)
   const [hlStatus, setHlStatus] = useState<{
@@ -140,6 +143,18 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
   const handleAuthorize = async () => {
     if (!address) return
 
+    // Enforce Arbitrum — signing on wrong chain produces invalid signatures
+    if (chain?.id !== ARBITRUM_CHAIN_ID) {
+      try {
+        switchChain({ chainId: ARBITRUM_CHAIN_ID })
+        setSetupError('Switching to Arbitrum... Please try again after switching.')
+        return
+      } catch {
+        setSetupError('Please switch your wallet to Arbitrum network before authorizing.')
+        return
+      }
+    }
+
     try {
       setSetupError(null)
 
@@ -165,7 +180,8 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
 
       const r = signature.slice(0, 66) as `0x${string}`
       const s = `0x${signature.slice(66, 130)}` as `0x${string}`
-      const v = parseInt(signature.slice(130, 132), 16)
+      let v = parseInt(signature.slice(130, 132), 16)
+      if (v < 27) v += 27 // Normalize: some wallets return 0/1 instead of 27/28
 
       setSetupStep('submitting')
       const hlPayload = {
@@ -260,7 +276,8 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
 
       const r = signature.slice(0, 66) as `0x${string}`
       const s = `0x${signature.slice(66, 130)}` as `0x${string}`
-      const v = parseInt(signature.slice(130, 132), 16)
+      let v = parseInt(signature.slice(130, 132), 16)
+      if (v < 27) v += 27 // Normalize: some wallets return 0/1 instead of 27/28
 
       const hlPayload = {
         action: {
@@ -676,9 +693,24 @@ function ModalContent({ onComplete }: LiveTradingModalContentProps) {
           Sign a message in MetaMask. No gas fees. No funds leave your wallet.
         </p>
 
+        {isWrongNetwork && (
+          <div className="mb-3 flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <AlertCircle className="h-3 w-3 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-amber-500">
+              Wrong network — please switch to <strong>Arbitrum</strong> in your wallet.
+              <button
+                onClick={() => switchChain({ chainId: ARBITRUM_CHAIN_ID })}
+                className="ml-1 underline hover:no-underline"
+              >
+                Switch now
+              </button>
+            </div>
+          </div>
+        )}
+
         <button
           onClick={handleAuthorize}
-          disabled={!isConnected || setupStep !== 'idle'}
+          disabled={!isConnected || setupStep !== 'idle' || isWrongNetwork}
           className="flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {setupStep !== 'idle' ? (
