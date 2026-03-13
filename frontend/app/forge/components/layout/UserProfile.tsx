@@ -244,9 +244,9 @@ export function UserProfile({}: UserProfileProps) {
                       )}
                     </>
                   ) : (
-                    // Metered user - show this week's usage
+                    // Metered user - show this month's usage
                     <div className="flex items-center justify-between text-[var(--text-secondary)]">
-                      <span>This week</span>
+                      <span>This month</span>
                       <span>${usageSummary.usage_usd.toFixed(2)}</span>
                     </div>
                   )}
