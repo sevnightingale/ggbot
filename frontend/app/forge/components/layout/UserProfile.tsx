@@ -228,13 +228,17 @@ export function UserProfile({}: UserProfileProps) {
                 <div className="text-[10px] text-[var(--text-muted)] mb-1.5">Powers your bot decisions</div>
                 <div className="space-y-1 text-xs">
                   {usageSummary.credits_usd && usageSummary.credits_usd > 0 ? (
-                    // Prepaid user - show balance
+                    // User with credits - show balance and usage
                     <>
                       <div className="flex items-center justify-between text-[var(--text-primary)] font-medium">
                         <span>Balance</span>
                         <span className={usageSummary.net_balance_usd && usageSummary.net_balance_usd < 5 ? 'text-amber-500' : ''}>
                           ${usageSummary.net_balance_usd?.toFixed(2) ?? '0.00'}
                         </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[var(--text-secondary)]">
+                        <span>Used</span>
+                        <span>${usageSummary.usage_usd.toFixed(2)}</span>
                       </div>
                       {isPrepaid && usageSummary.net_balance_usd !== null && usageSummary.net_balance_usd <= 0 && (
                         <div className="flex items-center gap-1 text-xs text-red-500">
@@ -244,7 +248,7 @@ export function UserProfile({}: UserProfileProps) {
                       )}
                     </>
                   ) : (
-                    // Metered user - show this month's usage
+                    // Metered user without credits - show this month's usage
                     <div className="flex items-center justify-between text-[var(--text-secondary)]">
                       <span>This month</span>
                       <span>${usageSummary.usage_usd.toFixed(2)}</span>
