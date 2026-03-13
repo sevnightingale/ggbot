@@ -424,8 +424,8 @@ export function MarketDataSelector({
                                 disabled={isLastOne}
                                 className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
                                   isActive
-                                    ? 'bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]/30'
-                                    : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                                    ? 'bg-[var(--agent-extraction)]/30 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]'
+                                    : 'bg-transparent border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
                                 } ${isLastOne ? 'opacity-50 cursor-not-allowed' : ''}`}
                               >
                                 {tf}
@@ -496,8 +496,8 @@ export function MarketDataSelector({
                       disabled={isLastOne}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                         isActive
-                          ? 'bg-[var(--agent-extraction)]/20 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]/30'
-                          : 'bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
+                          ? 'bg-[var(--agent-extraction)]/30 text-[var(--agent-extraction)] border border-[var(--agent-extraction)]'
+                          : 'bg-transparent border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--agent-extraction)]'
                       } ${isLastOne ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {tf}
