@@ -82,6 +82,10 @@ function getActivityTypeInfo(activity: Activity): { label: string; icon: string;
       return { label: 'Signal Received', icon: '📡', color: 'var(--signal)' }
     case 'bot_created':
       return { label: 'Bot Created', icon: '🤖', color: 'var(--profit-color)' }
+    case 'deposit':
+      return { label: 'Deposit', icon: '💰', color: 'var(--profit-color)' }
+    case 'withdrawal':
+      return { label: 'Withdrawal', icon: '💸', color: '#f59e0b' }
     default:
       return { label: activity.type, icon: '●', color: 'var(--accent)' }
   }

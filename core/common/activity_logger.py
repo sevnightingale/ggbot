@@ -224,6 +224,10 @@ ACTIVITY_TYPES = {
 
     # Bot Lifecycle
     'bot_created',       # Bot configuration created
+
+    # Account Transfers (Hyperliquid deposits/withdrawals)
+    'deposit',           # USDC deposited to Hyperliquid wallet
+    'withdrawal',        # USDC withdrawn from Hyperliquid wallet
 }
 
 

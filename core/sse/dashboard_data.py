@@ -197,7 +197,11 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                snap.timestamp as updated_at,
                snap.trading_mode as source,
                -- Calculate performance percentage using denormalized initial_equity
+               -- For Hyperliquid bots: use total_pnl / initial_equity (deposit-immune)
+               -- For other bots: use (current_equity - initial_equity) / initial_equity
                CASE
+                   WHEN bc.trading_mode = 'hyperliquid' AND snap.total_pnl IS NOT NULL AND bc.initial_equity > 0
+                   THEN (snap.total_pnl / bc.initial_equity * 100)
                    WHEN bc.initial_equity IS NOT NULL AND bc.initial_equity > 0 AND la.current_equity IS NOT NULL
                    THEN ((la.current_equity - bc.initial_equity) / bc.initial_equity * 100)
                    ELSE 0

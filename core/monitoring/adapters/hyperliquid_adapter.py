@@ -31,6 +31,7 @@ class HyperliquidAccountAdapter(AccountAdapter):
         self._info = Info(constants.MAINNET_API_URL, skip_ws=True)
         self._position_cache: Dict[str, Set[str]] = {}  # config_id -> set of hl_symbols with open positions
         self._logged_closes: Set[str] = set()  # Track already-logged fill hashes
+        self._logged_transfers: Set[str] = set()  # Track already-logged deposit/withdrawal tx hashes
         # Cache wallet address per user_id to avoid repeated Vault lookups
         self._wallet_cache: Dict[str, str] = {}  # user_id -> wallet_address
 
@@ -254,6 +255,9 @@ class HyperliquidAccountAdapter(AccountAdapter):
             # Detect and log position closes
             await self._detect_and_log_closes(config_id, user_id, wallet, bot_hl_symbols)
 
+            # Detect and log deposits/withdrawals
+            await self._detect_and_log_transfers(config_id, user_id, wallet)
+
             return snapshot
 
         except Exception as e:
@@ -455,6 +459,73 @@ class HyperliquidAccountAdapter(AccountAdapter):
 
         except Exception as e:
             self._log.warning(f"Failed to detect Hyperliquid closes for {config_id}: {e}")
+
+    async def _detect_and_log_transfers(
+        self,
+        config_id: str,
+        user_id: str,
+        wallet: str
+    ):
+        """
+        Detect deposits/withdrawals via user_non_funding_ledger_updates.
+
+        Checks ledger updates from last hour for deposit/withdraw events.
+        Deduplicates via self._logged_transfers keyed by tx hash.
+        Logs each new transfer as a deposit or withdrawal activity.
+        """
+        from core.common.activity_logger import log_activity_safe
+
+        try:
+            one_hour_ago_ms = int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp() * 1000)
+            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+            ledger_updates = self._info.user_non_funding_ledger_updates(wallet, one_hour_ago_ms, now_ms)
+
+            for entry in ledger_updates:
+                delta = entry.get("delta", {})
+                ledger_type = delta.get("type", "")
+
+                if ledger_type not in ("deposit", "withdraw"):
+                    continue
+
+                tx_hash = entry.get("hash", "")
+                if not tx_hash or tx_hash in self._logged_transfers:
+                    continue
+
+                amount_str = delta.get("usdc", "0")
+                amount = abs(float(amount_str))
+
+                if amount == 0:
+                    continue
+
+                if ledger_type == "deposit":
+                    activity_type = "deposit"
+                    summary = f"Deposited ${amount:.2f} USDC"
+                else:
+                    activity_type = "withdrawal"
+                    summary = f"Withdrew ${amount:.2f} USDC"
+
+                log_activity_safe(
+                    config_id=config_id,
+                    user_id=user_id,
+                    activity_type=activity_type,
+                    activity_source='hyperliquid',
+                    summary=summary,
+                    details={
+                        'amount_usdc': amount,
+                        'tx_hash': tx_hash,
+                        'ledger_type': ledger_type,
+                    },
+                    importance=8
+                )
+
+                self._logged_transfers.add(tx_hash)
+                self._log.info(
+                    f"Logged {activity_type} for {wallet[:8]}...: ${amount:.2f} USDC"
+                )
+
+        except Exception as e:
+            self._log.warning(f"Failed to detect transfers for {config_id}: {e}")
 
     async def supports_balance(self) -> bool:
         """Hyperliquid provides full account balance data."""

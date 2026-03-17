@@ -39,6 +39,7 @@ interface BalancePoint {
   timestamp: string;
   total_equity?: number;  // New API key
   balance?: number;       // Legacy API key (deprecated)
+  pct_return?: number;    // TWR percentage return (when display=pct)
 }
 
 interface Activity {
@@ -79,6 +80,7 @@ interface TimelineProps {
 
 type ChartMode = 'activity' | 'performance';
 type Timeframe = '5m' | '1h' | '4h' | '1d';
+type DisplayMode = 'dollar' | 'pct';
 
 // Aggregate 5-minute data points into higher timeframes
 function aggregateToTimeframe(dataPoints: BalancePoint[], timeframe: Timeframe): BalancePoint[] {
@@ -159,9 +161,10 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   const [latestActivity, setLatestActivity] = useState<Activity | null>(null);
   const [statusText, setStatusText] = useState<string>('');
 
-  // Chart mode and timeframe state
+  // Chart mode, timeframe, and display mode state
   const [chartMode, setChartMode] = useState<ChartMode>('activity');
   const [timeframe, setTimeframe] = useState<Timeframe>('5m');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('dollar');
 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
@@ -302,8 +305,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       },
       localization: {
         priceFormatter: (price: number) => {
-          if (price == null || isNaN(price)) return '$—';
-          return `$${price.toFixed(2)}`;
+          if (price == null || isNaN(price)) return displayMode === 'pct' ? '—%' : '$—';
+          return displayMode === 'pct' ? `${price.toFixed(2)}%` : `$${price.toFixed(2)}`;
         },
       },
     });
@@ -417,10 +420,11 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
         console.log('Fetching from API...', { mode: chartMode, timeframe });
 
-        // Choose endpoint based on chart mode
+        // Choose endpoint based on chart mode, append display param
+        const displayParam = displayMode !== 'dollar' ? `?display=${displayMode}` : '';
         const seriesEndpoint = chartMode === 'activity'
-          ? `/api/v2/snapshots/${configId}/balance-series`
-          : `/api/v2/snapshots/${configId}/performance-series`;
+          ? `/api/v2/snapshots/${configId}/balance-series${displayParam}`
+          : `/api/v2/snapshots/${configId}/performance-series${displayParam}`;
 
         // Fetch data (activities only needed for activity mode)
         const fetchPromises = [
@@ -461,11 +465,22 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         const metadataData = await metadataRes.json();
         const activitiesData = activitiesRes ? await activitiesRes.json() : null;
 
-        // Get balance points and apply aggregation for performance mode
-        let balancePoints: BalancePoint[] = balanceSeries.equity_series || balanceSeries.balance_series || [];
+        // Handle TWR percentage mode response
+        const isPctMode = balanceSeries.mode === 'pct';
+        let balancePoints: BalancePoint[];
 
-        // Apply timeframe aggregation for performance mode
-        if (chartMode === 'performance' && timeframe !== '5m') {
+        if (isPctMode) {
+          // pct_series: [{timestamp, pct_return}, ...]
+          balancePoints = (balanceSeries.pct_series || []).map((p: { timestamp: string; pct_return: number }) => ({
+            timestamp: p.timestamp,
+            pct_return: p.pct_return,
+          }));
+        } else {
+          balancePoints = balanceSeries.equity_series || balanceSeries.balance_series || [];
+        }
+
+        // Apply timeframe aggregation for performance mode (dollar only)
+        if (!isPctMode && chartMode === 'performance' && timeframe !== '5m') {
           console.log(`Aggregating ${balancePoints.length} points to ${timeframe} timeframe...`);
           balancePoints = aggregateToTimeframe(balancePoints, timeframe);
           console.log(`After aggregation: ${balancePoints.length} points`);
@@ -485,18 +500,18 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           performance: metadataData.metadata?.performance || metadataData.performance || 0,
         });
 
-        // Simplified: Backend already merges snapshots + activities
-        // Just convert timestamps and use equity values directly
+        // Build chart data — use pct_return for pct mode, total_equity for dollar mode
         const chartData: LineData[] = balancePoints
           .filter(point => {
-            const equity = point.total_equity ?? point.balance;  // Use new key with fallback to legacy
+            if (isPctMode) return point.timestamp && point.pct_return != null;
+            const equity = point.total_equity ?? point.balance;
             return point.timestamp && equity != null;
           })
           .map(point => ({
             time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
-            value: point.total_equity ?? point.balance ?? 0  // Use new key with fallback to legacy
+            value: isPctMode ? (point.pct_return ?? 0) : (point.total_equity ?? point.balance ?? 0)
           }))
-          .filter(point => !isNaN(point.time as number) && point.value != null)  // Extra safety check
+          .filter(point => !isNaN(point.time as number) && point.value != null)
           .sort((a, b) => {
             const timeA = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
             const timeB = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
@@ -544,6 +559,18 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           }
 
           lineSeriesRef.current.setData(chartData);
+
+          // Add 0% baseline in pct mode
+          if (isPctMode && lineSeriesRef.current) {
+            lineSeriesRef.current.createPriceLine({
+              price: 0,
+              color: 'rgba(255, 255, 255, 0.3)',
+              lineWidth: 1,
+              lineStyle: LineStyle.Dashed,
+              axisLabelVisible: true,
+              title: '0%',
+            });
+          }
 
           // Build activities lookup map and markers - ONLY for activity mode
           if (chartMode === 'activity') {
@@ -601,6 +628,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             const hasAgentWait = activitiesAtTime.some(a => a.type === 'agent_wait');
             const hasBotCreated = activitiesAtTime.some(a => a.type === 'bot_created');
             const hasStrategyUpdated = activitiesAtTime.some(a => a.type === 'strategy_updated');
+            const depositActivity = activitiesAtTime.find(a => a.type === 'deposit');
+            const withdrawalActivity = activitiesAtTime.find(a => a.type === 'withdrawal');
 
             // TRADE EVENTS (arrows, above/below line)
             if (hasTradeLong) {
@@ -631,6 +660,28 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 shape: 'circle',
                 size: 0.75, // Small circles with text labels
                 text: `${isProfit ? '+' : ''}$${pnl.toFixed(2)}`, // Show P&L amount
+              });
+            }
+            // TRANSFER EVENTS (arrows, deposits/withdrawals)
+            else if (depositActivity) {
+              const depositAmount = Number(depositActivity.data?.details?.amount_usdc || 0);
+              markers.push({
+                time: timestamp as Time,
+                position: 'belowBar',
+                color: '#16a34a', // green
+                shape: 'arrowUp',
+                size: 1.5,
+                text: `+$${depositAmount.toFixed(0)}`,
+              });
+            } else if (withdrawalActivity) {
+              const withdrawAmount = Number(withdrawalActivity.data?.details?.amount_usdc || 0);
+              markers.push({
+                time: timestamp as Time,
+                position: 'aboveBar',
+                color: '#f59e0b', // amber
+                shape: 'arrowDown',
+                size: 1.5,
+                text: `-$${withdrawAmount.toFixed(0)}`,
               });
             }
             // OBSERVATION EVENTS (circles, on the line)
@@ -774,10 +825,10 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       fetchDataRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configId, chartContainer, chartMode, timeframe]); // NOTE: session and theme NOT in dependencies
+  }, [configId, chartContainer, chartMode, timeframe, displayMode]); // NOTE: session and theme NOT in dependencies
   // - session: prevents double render, fetchData reads current value via ref
   // - theme: separate effect handles color updates dynamically
-  // - chartMode and timeframe: trigger data refetch when changed
+  // - chartMode, timeframe, displayMode: trigger data refetch when changed
 
   // Refetch data when session loads (for RLS auth) - without recreating chart
   useEffect(() => {
@@ -1030,6 +1081,34 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 ))}
               </div>
             )}
+
+            {/* $ / % Display Mode Toggle */}
+            <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
+              <button
+                onClick={() => setDisplayMode('dollar')}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                  displayMode === 'dollar' ? 'shadow-sm' : 'hover:bg-opacity-50'
+                }`}
+                style={{
+                  backgroundColor: displayMode === 'dollar' ? VIBE.brass : 'transparent',
+                  color: displayMode === 'dollar' ? VIBE.obsidian : VIBE.ivory
+                }}
+              >
+                $
+              </button>
+              <button
+                onClick={() => setDisplayMode('pct')}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                  displayMode === 'pct' ? 'shadow-sm' : 'hover:bg-opacity-50'
+                }`}
+                style={{
+                  backgroundColor: displayMode === 'pct' ? VIBE.brass : 'transparent',
+                  color: displayMode === 'pct' ? VIBE.obsidian : VIBE.ivory
+                }}
+              >
+                %
+              </button>
+            </div>
           </div>
 
           {/* Chart - takes remaining space */}
@@ -1068,6 +1147,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   {selectedActivity.type === 'strategy_updated' && '⚙️ STRATEGY UPDATE'}
                   {selectedActivity.type === 'signal_received' && '📡 SIGNAL RECEIVED'}
                   {selectedActivity.type === 'bot_created' && '🤖 BOT CREATED'}
+                  {selectedActivity.type === 'deposit' && '💰 DEPOSIT'}
+                  {selectedActivity.type === 'withdrawal' && '💸 WITHDRAWAL'}
                 </div>
                 {selectedActivity.data.summary && (
                   <div className="text-sm mb-1 prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>

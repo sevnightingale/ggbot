@@ -5,16 +5,38 @@ Efficient alternative to activities endpoints that make API calls.
 Uses account_snapshots table for performance.
 """
 
-from fastapi import APIRouter, HTTPException
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Dict, Any
 from core.common.db import get_db_connection
 from core.common.logger import logger
+from core.domain.metrics_calculator import AccountMetricsCalculator
 
 router = APIRouter(prefix="/api/v2/snapshots", tags=["snapshots"])
 
 
+def _get_flows_for_config(config_id: str, cursor) -> List[tuple]:
+    """Query deposit/withdrawal activities for TWR computation."""
+    cursor.execute("""
+        SELECT created_at, activity_type, details->>'amount_usdc'
+        FROM activities
+        WHERE config_id = %s
+          AND activity_type IN ('deposit', 'withdrawal')
+        ORDER BY created_at
+    """, (config_id,))
+    flows = []
+    for row in cursor.fetchall():
+        ts = row[0]
+        amount = float(row[2]) if row[2] else 0.0
+        # Deposits are positive flows, withdrawals are negative
+        if row[1] == 'withdrawal':
+            amount = -amount
+        flows.append((ts, amount))
+    return flows
+
+
 @router.get("/{config_id}/balance-series")
-async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
+async def get_snapshot_balance_series(config_id: str, display: str = Query('dollar')) -> Dict[str, Any]:
     """
     Get AI's consciousness timeline - ACTIVITIES ONLY.
 
@@ -103,7 +125,32 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
         current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
         initial_equity = timeline[0]['total_equity'] if timeline else 10000.0
 
-        # Mode is always "equity" - total account value
+        # TWR percentage mode
+        if display == 'pct' and timeline:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    flows = _get_flows_for_config(config_id, cur)
+
+            equity_points = []
+            for point in timeline:
+                ts = datetime.fromisoformat(point['timestamp'].replace('Z', '+00:00'))
+                equity_points.append((ts, point['total_equity']))
+
+            twr_series = AccountMetricsCalculator.calculate_twr(equity_points, flows)
+            pct_timeline = [
+                {"timestamp": ts.isoformat(), "pct_return": pct}
+                for ts, pct in twr_series
+            ]
+
+            return {
+                "status": "success",
+                "pct_series": pct_timeline,
+                "mode": "pct",
+                "current_equity": current_equity,
+                "initial_equity": initial_equity,
+            }
+
+        # Default: dollar mode
         mode = "equity"
 
         logger.bind(config_id=config_id).debug(
@@ -130,7 +177,7 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
 
 
 @router.get("/{config_id}/performance-series")
-async def get_performance_series(config_id: str) -> Dict[str, Any]:
+async def get_performance_series(config_id: str, display: str = Query('dollar')) -> Dict[str, Any]:
     """
     Get objective performance timeline - ACCOUNT_SNAPSHOTS ONLY.
 
@@ -198,6 +245,31 @@ async def get_performance_series(config_id: str) -> Dict[str, Any]:
         # Calculate current and initial equity
         current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
         initial_equity = timeline[0]['total_equity'] if timeline else 10000.0
+
+        # TWR percentage mode
+        if display == 'pct' and timeline:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    flows = _get_flows_for_config(config_id, cur)
+
+            equity_points = []
+            for point in timeline:
+                ts = datetime.fromisoformat(point['timestamp'].replace('Z', '+00:00'))
+                equity_points.append((ts, point['total_equity']))
+
+            twr_series = AccountMetricsCalculator.calculate_twr(equity_points, flows)
+            pct_timeline = [
+                {"timestamp": ts.isoformat(), "pct_return": pct}
+                for ts, pct in twr_series
+            ]
+
+            return {
+                "status": "success",
+                "pct_series": pct_timeline,
+                "mode": "pct",
+                "current_equity": current_equity,
+                "initial_equity": initial_equity,
+            }
 
         logger.bind(config_id=config_id).debug(
             f"Performance timeline: {len(snapshots)} snapshots (5-min intervals)"

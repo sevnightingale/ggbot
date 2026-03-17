@@ -9,8 +9,9 @@ Eliminates formula duplication and ensures single source of truth for
 metric definitions.
 """
 
+from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List, Tuple
 
 
 class AccountMetricsCalculator:
@@ -216,3 +217,69 @@ class AccountMetricsCalculator:
             Calculated initial equity
         """
         return current_balance - total_pnl
+
+    @staticmethod
+    def calculate_twr(
+        equity_points: List[Tuple[datetime, float]],
+        flows: List[Tuple[datetime, float]]
+    ) -> List[Tuple[datetime, float]]:
+        """
+        Compute time-weighted return series.
+
+        TWR eliminates the impact of deposits/withdrawals by chaining
+        sub-period returns around each cash flow event. A deposit of $500
+        won't inflate the return — only actual trading performance counts.
+
+        Args:
+            equity_points: [(timestamp, equity_value), ...] sorted by time
+            flows: [(timestamp, signed_amount), ...] sorted by time.
+                   Deposits are positive, withdrawals are negative.
+
+        Returns:
+            [(timestamp, pct_return), ...] where pct_return is cumulative
+            TWR percentage (e.g., 5.0 = +5%).
+        """
+        if not equity_points:
+            return []
+
+        if len(equity_points) == 1:
+            return [(equity_points[0][0], 0.0)]
+
+        # Sort flows by time for sequential processing
+        sorted_flows = sorted(flows, key=lambda f: f[0])
+        flow_idx = 0
+
+        cumulative_twr = 1.0
+        period_start_equity = equity_points[0][1]
+        result = [(equity_points[0][0], 0.0)]
+
+        for i in range(1, len(equity_points)):
+            current_time = equity_points[i][0]
+            current_equity = equity_points[i][1]
+            prev_equity = equity_points[i - 1][1]
+
+            # Process any flows that occurred between previous and current snapshot
+            while flow_idx < len(sorted_flows) and sorted_flows[flow_idx][0] <= current_time:
+                flow_time, flow_amount = sorted_flows[flow_idx]
+
+                # Only process flows that are after the previous equity point
+                if flow_time > equity_points[i - 1][0]:
+                    # Close the sub-period at the pre-flow equity
+                    if period_start_equity != 0:
+                        period_return = prev_equity / period_start_equity
+                        cumulative_twr *= period_return
+
+                    # New period starts after the flow
+                    period_start_equity = prev_equity + flow_amount
+
+                flow_idx += 1
+
+            # Current TWR value
+            if period_start_equity != 0:
+                twr_value = (cumulative_twr * (current_equity / period_start_equity)) - 1.0
+            else:
+                twr_value = 0.0
+
+            result.append((current_time, round(twr_value * 100, 4)))
+
+        return result
