@@ -668,7 +668,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               markers.push({
                 time: timestamp as Time,
                 position: 'belowBar',
-                color: '#16a34a', // green
+                color: '#C1A87D', // brass
                 shape: 'arrowUp',
                 size: 1.5,
                 text: `+$${depositAmount.toFixed(0)}`,
@@ -678,7 +678,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               markers.push({
                 time: timestamp as Time,
                 position: 'aboveBar',
-                color: '#f59e0b', // amber
+                color: '#C1A87D', // brass
                 shape: 'arrowDown',
                 size: 1.5,
                 text: `-$${withdrawAmount.toFixed(0)}`,
