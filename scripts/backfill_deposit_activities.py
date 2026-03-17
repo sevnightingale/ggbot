@@ -103,11 +103,26 @@ def backfill():
                         else:
                             created_at = datetime.now(timezone.utc)
 
+                        # Find nearest snapshot for total_equity
+                        total_equity = None
+                        account_pnl = None
+                        cur.execute("""
+                            SELECT current_balance + COALESCE(unrealized_pnl, 0), total_pnl
+                            FROM account_snapshots
+                            WHERE config_id = %s
+                            ORDER BY ABS(EXTRACT(EPOCH FROM (timestamp - %s)))
+                            LIMIT 1
+                        """, (config_id, created_at))
+                        snap = cur.fetchone()
+                        if snap:
+                            total_equity = float(snap[0]) if snap[0] is not None else None
+                            account_pnl = float(snap[1]) if snap[1] is not None else None
+
                         cur.execute("""
                             INSERT INTO activities
                             (config_id, user_id, activity_type, activity_source, summary, details,
-                             importance, created_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                             importance, created_at, total_equity, account_pnl)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             config_id,
                             user_id,
@@ -117,6 +132,8 @@ def backfill():
                             '{"amount_usdc": ' + str(amount) + ', "tx_hash": "' + transfer['tx_hash'] + '", "ledger_type": "' + transfer['type'] + '"}',
                             8,
                             created_at,
+                            total_equity,
+                            account_pnl,
                         ))
                         inserted += 1
 

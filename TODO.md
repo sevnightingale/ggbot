@@ -34,9 +34,17 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 ### ~~Bug: Live Config 404~~ ✅ (2026-03-07)
 - [x] Fixed — `validate()` now skips validation for unconfigured HL bots (`config_service.py:155-159`). See CHANGELOG.
 
+### ~~Deposit/Withdrawal Detection + TWR~~ ✅ (2026-03-17)
+- [x] `_detect_and_log_transfers()` in HL adapter — real-time detection via `user_non_funding_ledger_updates`
+- [x] TWR % chart toggle — deposit-immune performance view
+- [x] Dashboard `performance_pct` uses `total_pnl / initial_equity` for HL bots
+- [x] Backfill script for historical transfers
+- See CHANGELOG for details
+
 ### **Remaining HL Items**
 - [ ] Agent bot support (`trading_mode='hyperliquid'` for agents) — deferred
 - [ ] Strategy Marketplace / copy trading — design tables, trade fan-out, Stripe Connect, legal review
+- [ ] AccountPerformanceAdapter: use `total_pnl`-based metrics for HL bots (equity_change_pct, drawdown)
 
 ---
 

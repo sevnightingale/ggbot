@@ -6,6 +6,59 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-17 - Deposit/Withdrawal Detection + TWR % Chart Toggle
+
+**Deposit/Withdrawal Activity Detection** (`core/monitoring/adapters/hyperliquid_adapter.py`):
+- `_detect_and_log_transfers()` queries `user_non_funding_ledger_updates()` (1hr lookback), filters `deposit`/`withdraw` types
+- Dedup via `_logged_transfers: Set[str]` keyed by tx hash (same pattern as `_logged_closes`)
+- Logs `deposit`/`withdrawal` activity types via `log_activity_safe()`, importance 8
+- Backfill script (`scripts/backfill_deposit_activities.py`) — populated 11 historical transfers across 3 users
+
+**TWR Percentage Chart Mode** (`api/snapshots.py`, `core/domain/metrics_calculator.py`):
+- `?display=pct` query param on both `balance-series` and `performance-series` endpoints
+- `AccountMetricsCalculator.calculate_twr()` — chains sub-period returns around deposit/withdrawal flows, returns cumulative TWR %
+- Deposits/withdrawals don't inflate return — only trading P&L counts
+
+**Frontend $ / % Toggle** (`frontend/components/tv-timeline.tsx`):
+- `DisplayMode` state (`dollar` | `pct`), brass pill toggle next to mode selector
+- Pct mode: Y-axis `X.XX%` format, 0% dashed baseline price line, `pct_series` parsing
+- Deposit/withdrawal markers: brass arrowUp/arrowDown with `+$N`/`-$N` text labels
+- `activity-modal.tsx` — added deposit (💰) and withdrawal (💸) to `getActivityTypeInfo()`
+
+**Dashboard Performance Fix** (`core/sse/dashboard_data.py:199-207`):
+- HL bots: `performance_pct = total_pnl / initial_equity * 100` (deposit-immune)
+- Paper/other bots: unchanged `(current_equity - initial_equity) / initial_equity * 100`
+
+---
+
+## 2026-03-13 - Decision Engine Cache Removal + Light Mode Timeframe Fix
+
+**Decision Engine Stale Config Bug** (`core/orchestrator/orchestrator.py`):
+- `_decision_engines` LRU cache caused 14-hour stale strategy execution — scheduler process cached `DecisionEngineV2` instances, never refreshed `self.config` after DB updates
+- Root cause: two-process architecture (API + scheduler) meant `invalidate_engines()` only cleared API process cache, scheduler never notified
+- Fix: removed `_decision_engines` cache, `MAX_DECISION_ENGINES`, `invalidate_engines()` method entirely. `_get_decision_engine()` now creates fresh engine each cycle (2 DB queries, trivial cost)
+- Removed dead `invalidate_engines()` calls from `ggbot.py:741` and `api/assistant.py:651`
+- Extraction engine cache (`_extraction_engines`) unchanged — stateless, keyed by user_id, no stale-config risk
+
+**Light Mode Timeframe Button Contrast** (`frontend/app/forge/components/configure/MarketDataSelector.tsx`):
+- Per-indicator and global timeframe selector buttons had inverted visual states in light mode
+- Selected: `bg-*/20` + `border-*/30` barely visible on light parchment background
+- Fix: selected → `bg-*/30` + full-opacity border; unselected → `bg-transparent` (no competing fill)
+
+**NOWPayments Webhook Fix** (`.env`):
+- `API_BASE_URL` was `localhost:8000` after env var rename (commit `890a598`), causing IPN callbacks to fail silently
+- Fixed to `https://ggbots-api.nightingale.business`; manually granted $10 credit for one completed payment (Walter)
+
+**Hyperliquid Signing Fixes** (`frontend/components/hyperliquid/LiveTradingModalContent.tsx`):
+- v-value normalization: `if (v < 27) v += 27` — some wallets return 0/1 instead of 27/28
+- Chain validation: added Arbitrum network check + auto-switch before EIP-712 signing (prevents "Unable to recover signer" on wrong chain)
+
+**Credits Display Fixes** (`frontend/app/forge/components/layout/UserProfile.tsx`):
+- "This week" label → "This month" (backend returns monthly data from Redis `usage:user:{id}:YYYY-MM`)
+- Added "Used" line alongside "Balance" for prepaid/usage_based users (was hidden when `credits_usd > 0`)
+
+---
+
 ## 2026-03-10 - ggArena Season 2 — Phase A: Arena Page Update
 
 **Planning Doc**: [DOCS/todo/ARENA_SEASON2.md](DOCS/todo/ARENA_SEASON2.md) (Phase B pending)
