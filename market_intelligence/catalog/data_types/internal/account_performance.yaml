@@ -21,5 +21,5 @@ sources:
 
 cache:
   backend: redis
-  ttl: 300
+  ttl: 0
   key_pattern: "intel:account_perf:{config_id}"

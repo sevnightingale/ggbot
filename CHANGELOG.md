@@ -6,6 +6,29 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-17 - Bot State v1 + OHLCV Cache Fix + HL Position Fix
+
+**OHLCV Stale Cache Bug** (`market_intelligence/cache/manager.py`, `catalog/data_types/market_data/ohlcv.yaml`):
+- MI gateway cached OHLCV data 1 hour (`mi:candles:*` TTL 3600s), masking real-time WebSocket cache (`ws:candles:*`)
+- 30m bots saw identical prices across 2-3 consecutive cycles (Dennis report)
+- Fix: `ttl: 0` in ohlcv.yaml, `cache/manager.py` skips set/get when `ttl <= 0`
+- Existed since Universal Data Layer (Oct 2025, commit `6ddb347`)
+
+**Bot State v1: Account Performance → Monitor + Redis** (`market_intelligence/adapters/internal/account_performance.py`, `core/monitoring/universal_account_monitor.py`):
+- Root cause: `AccountPerformanceAdapter` ran sync DB queries (`psycopg2` pool, maxconn=20) in async bot pipeline → `pool.getconn()` blocked event loop → deadlock when 16+ bots fire at 1h boundary → APScheduler `max_instances=1` prevented recovery → bots permanently stuck
+- Fix: account-monitor (separate PM2 process) pre-computes stats every 5 min → `acct_perf:{config_id}` Redis key (600s TTL). Adapter reads from Redis (sub-ms, no DB)
+- New fields: `consecutive_wins`, `consecutive_losses`, `hours_since_last_trade`, `drawdown_duration_hours`, `largest_win_pct`, `largest_loss_pct`
+- HL deposit-immune metrics: `equity_change_pct` uses `total_pnl / initial_equity * 100`, drawdown from `MAX(total_pnl)` series
+- Catalog TTL → 0 (no gateway double-cache)
+- 9 bots across 4 users were stuck (1h frequency primarily affected)
+
+**HL Cross-Margin liquidationPx Fix** (`trading/live/hyperliquid_service.py:1086`):
+- `pos.get("liquidationPx", 0)` returned `None` (key exists as null for cross-margin) → `float(None)` crash
+- Dashboard SSE fired error every 6 seconds per HL user
+- Fix: `pos.get("liquidationPx") or 0` — `or` coalesces explicit `None` to default
+
+---
+
 ## 2026-03-17 - Deposit/Withdrawal Detection + TWR % Chart Toggle
 
 **Deposit/Withdrawal Activity Detection** (`core/monitoring/adapters/hyperliquid_adapter.py`):

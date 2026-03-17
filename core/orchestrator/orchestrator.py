@@ -81,10 +81,9 @@ class OrchestrationResult(BaseModel):
 class GGBotOrchestrator:
     """Main orchestrator class coordinating all V2 modules with full integration."""
 
-    # Maximum cached engines to prevent memory leaks
+    # Maximum cached extraction engines to prevent memory leaks
     # Engines are evicted LRU-style when limit is exceeded
     MAX_EXTRACTION_ENGINES = 30  # Per user_id
-    MAX_DECISION_ENGINES = 50    # Per config_id
 
     def __init__(self):
         self.config_service = config_service
@@ -96,21 +95,6 @@ class GGBotOrchestrator:
         self._log = logger.bind(component="orchestrator")
 
         self._extraction_engines: OrderedDict = OrderedDict()
-        self._decision_engines: OrderedDict = OrderedDict()
-
-    def invalidate_engines(self, config_id: str) -> None:
-        """Evict cached engines for a config so next run picks up fresh config."""
-        evicted = []
-        if config_id in self._extraction_engines:
-            engine = self._extraction_engines.pop(config_id)
-            if hasattr(engine, 'cleanup'):
-                engine.cleanup()
-            evicted.append("extraction")
-        if config_id in self._decision_engines:
-            self._decision_engines.pop(config_id)
-            evicted.append("decision")
-        if evicted:
-            self._log.info(f"Invalidated {', '.join(evicted)} engine(s) for config {config_id}")
 
     async def run_autonomous_cycle(
         self,
@@ -853,18 +837,9 @@ class GGBotOrchestrator:
             }
 
     async def _get_decision_engine(self, config_id: str, user_id: str) -> DecisionEngineV2:
-        """Get or create V2 decision engine for config with LRU eviction."""
-        if config_id in self._decision_engines:
-            self._decision_engines.move_to_end(config_id)
-            return self._decision_engines[config_id]
-
-        while len(self._decision_engines) >= self.MAX_DECISION_ENGINES:
-            oldest_config_id, oldest_engine = self._decision_engines.popitem(last=False)
-            self._log.info(f"Evicted decision engine for config {oldest_config_id} (LRU)")
-
+        """Create a fresh V2 decision engine (DB is source of truth each cycle)."""
         engine = DecisionEngineV2(config_id, user_id)
         await engine.initialize()
-        self._decision_engines[config_id] = engine
         return engine
 
     async def _run_decision_v2(

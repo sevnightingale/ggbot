@@ -365,19 +365,24 @@ All marked `global: True` in `catalog_mapping.py` — shared cache across all bo
 ---
 
 #### **Type 6: AccountPerformanceAdapter** (`adapters/internal/account_performance.py`)
-**Purpose**: Bot's own trading history and account performance from internal DB
+**Purpose**: Bot's own trading history and account performance metrics
+
+**Architecture**: Pre-computed by `account-monitor` service (separate PM2 process) every 5 minutes. Adapter reads from Redis `acct_perf:{config_id}` — zero DB queries in bot execution pipeline. This prevents event loop deadlocks from sync DB pool contention at concurrent bot boundaries.
 
 **Per-Config Routing**: Uses `{config_id}` template in params (third routing mode, alongside global and symbol-specific). Orchestrator passes `config_id` + `trading_mode` to `_replace_param_templates`.
 
-**Capabilities**:
-- Account equity, drawdown from peak, win rate, avg win/loss %
+**Fields**:
+- Account equity, initial balance, equity change %, peak equity, drawdown from peak %, drawdown duration (hours)
+- Total/win/loss trades, win rate %, avg win/loss %, largest win/loss %
+- Consecutive win/loss streak, hours since last trade
 - Last 10 closed trades with P&L %, side, symbol, close reason, time ago
-- Paper path: queries `paper_accounts` + `paper_trades`
-- Hyperliquid path: queries `live_trades` + `account_snapshots`
+- Human-readable interpretation summary
+- Paper path: `paper_accounts` + `paper_trades` + `account_snapshots`
+- Hyperliquid path: `live_trades` + `account_snapshots` + deposit-immune `total_pnl`-based metrics
 
 **Use Case**: Strategy-aware decisions. User can write "If drawdown >20%, reduce size" or "After 3 consecutive losses, wait one cycle." LLM has facts, user strategy dictates interpretation.
 
-**Cost**: $0 (internal DB queries only). 5-min Redis cache per config.
+**Cost**: $0 (internal DB queries via account-monitor). Redis read per bot cycle.
 
 ---
 

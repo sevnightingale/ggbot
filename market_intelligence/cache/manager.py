@@ -55,6 +55,10 @@ class CacheManager:
         """
         backend = cache_config.backend
 
+        # TTL <= 0 means "no caching" — skip cache entirely
+        if cache_config.ttl <= 0:
+            return None
+
         try:
             if backend == "redis":
                 redis_cache = await self.get_redis()
@@ -100,6 +104,10 @@ class CacheManager:
         """
         backend = cache_config.backend
         ttl = cache_config.ttl
+
+        # TTL <= 0 means "no caching" — skip cache entirely
+        if ttl <= 0:
+            return
 
         try:
             if backend == "redis":

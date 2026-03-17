@@ -138,6 +138,7 @@ export function StrategyAdvisorPanel({
 
   // Check if bot has any closed trades on mount
   useEffect(() => {
+    if (!configId || configId.startsWith('temp-')) return
     const checkClosedTrades = async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'

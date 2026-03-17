@@ -41,7 +41,7 @@ sources:
 
 cache:
   backend: redis
-  ttl: 3600
+  ttl: 0
   key_pattern: "mi:candles:{symbol}:{timeframe}:200"
 
 response_schema:
@@ -74,7 +74,7 @@ agent_format:
 
 data_quality:
   latency_target_ms: 100
-  freshness_target_seconds: 3600
+  freshness_target_seconds: 60
   confidence_scoring: true
 
 examples:

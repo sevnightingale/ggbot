@@ -52,12 +52,14 @@ def _get_connection_pool():
 
     if _connection_pool is None:
         database_url = get_database_url()
-        # Create a connection pool with min 5, max 20 connections
-        # This reduces SSL connection churn dramatically
+        # Connection pool: min 5 idle, max 50 concurrent
+        # maxconn=50 provides headroom for 16+ concurrent bot cycles at hourly boundaries
+        # connect_timeout=5 prevents permanent deadlock if pool exhausted in async context
         _connection_pool = pool.ThreadedConnectionPool(
-            minconn=5,   # Keep 5 connections alive at all times
-            maxconn=20,  # Allow up to 20 concurrent connections
-            dsn=database_url
+            minconn=5,
+            maxconn=50,
+            dsn=database_url,
+            connect_timeout=5
         )
 
     return _connection_pool

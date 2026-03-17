@@ -111,9 +111,11 @@ class UniversalAccountMonitor:
                             f"{elapsed:.1f}s, {len(self.last_snapshots)} cached"
                         )
 
-                # Check for stale agents every 5 minutes (60 cycles at 5s each)
+                # Every 5 minutes (60 cycles at 5s each): stale agents + account performance
                 if self.cycle_count % 60 == 0:
                     await self._check_stale_agents()
+                    if active_configs:
+                        self._cache_all_account_performance(active_configs)
 
                 # Usage monitoring: check credits every 60 seconds (12 cycles)
                 if self.usage_monitor and self.cycle_count % 12 == 0:
@@ -412,6 +414,43 @@ class UniversalAccountMonitor:
 
         except Exception as e:
             logger.error(f"❌ Failed to check stale agents: {e}")
+
+    def _cache_all_account_performance(self, active_configs: List[Dict]):
+        """
+        Pre-compute account performance for all active bots and cache in Redis.
+
+        Called every 5 minutes. The MI adapter reads from these Redis keys
+        instead of querying the DB directly (avoids sync DB in async bot pipeline).
+        """
+        from market_intelligence.adapters.internal.account_performance import AccountPerformanceAdapter
+
+        adapter = AccountPerformanceAdapter()
+        cached = 0
+
+        for config in active_configs:
+            config_id = str(config['config_id'])
+            trading_mode = config.get('trading_mode', 'paper')
+
+            try:
+                if trading_mode == 'hyperliquid':
+                    data = adapter._fetch_live_performance(config_id)
+                else:
+                    data = adapter._fetch_paper_performance(config_id)
+
+                data['fetched_at'] = datetime.now(timezone.utc).isoformat()
+
+                redis_client.setex(
+                    f"{adapter.REDIS_KEY_PREFIX}:{config_id}",
+                    600,  # 10 min TTL (refreshed every 5 min)
+                    json.dumps(data, default=str)
+                )
+                cached += 1
+
+            except Exception as e:
+                logger.debug(f"Failed to cache acct perf for {config_id[:8]}: {e}")
+
+        if cached > 0:
+            logger.info(f"📊 Cached account performance for {cached}/{len(active_configs)} configs")
 
 
 async def main():

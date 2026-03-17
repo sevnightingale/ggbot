@@ -737,9 +737,6 @@ async def update_config(
             importance=5
         )
 
-    # Invalidate cached engines so next run picks up new config
-    orchestrator.invalidate_engines(config_id)
-
     # If bot was active and timeframe changed, include reschedule info in response.
     # The scheduler process detects timeframe changes via reconcile loop.
     reschedule_info = None

@@ -44,7 +44,7 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 ### **Remaining HL Items**
 - [ ] Agent bot support (`trading_mode='hyperliquid'` for agents) — deferred
 - [ ] Strategy Marketplace / copy trading — design tables, trade fan-out, Stripe Connect, legal review
-- [ ] AccountPerformanceAdapter: use `total_pnl`-based metrics for HL bots (equity_change_pct, drawdown)
+- [x] ~~AccountPerformanceAdapter: deposit-immune metrics~~ (done in Bot State v1)
 
 ---
 
@@ -83,6 +83,41 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 - [x] Dashboard CTE: `LATERAL` account_summaries (834ms → 13ms)
 - [x] New indexes: `idx_activities_equity_latest`, `idx_decisions_config_created`
 - [x] Dropped deprecated indexes (127 MB freed)
+
+### ~~Connection Pool Scale-Up~~ ✅ (2026-03-17)
+- [x] `maxconn`: 20 → 50, added `connect_timeout=5` (`core/common/db.py`)
+- Prevents event loop deadlock under pool contention; scales to ~100 active bots
+
+### **Async DB Migration (Before 100+ Active Bots)**
+Sync `get_db_connection()` (psycopg2) blocks asyncio event loop when pool is contended. At 200 bots, even maxconn=50 is insufficient. Wrap hot-path calls in `asyncio.to_thread()` so DB I/O runs in thread pool, event loop never blocks.
+
+**Phase 1 — Bot execution pipeline** (~15 call sites):
+- [ ] `core/orchestrator/orchestrator.py` — 4 calls (ggshot query, market_data cleanup, config loading)
+- [ ] `decision/engine_v2.py` — 6 calls (decision save, position queries, config load)
+- [ ] `core/common/activity_logger.py` — 3 calls (activity logging)
+- [ ] Set `ThreadPoolExecutor(max_workers=32)` as default executor in scheduler entry point
+
+**Phase 2 — Trading pipeline** (fires only on actual trades, lower priority):
+- [ ] `trading/paper/positions.py` — 5 calls (position CRUD)
+- [ ] `trading/paper/supabase_service.py` — 2 calls (account updates)
+- [ ] `trading/live/hyperliquid_service.py` — position/trade DB ops
+
+**Pattern**: Wrap each sync DB block in `await asyncio.to_thread(fn)`:
+```python
+# Before (blocks event loop):
+with get_db_connection() as conn:
+    with conn.cursor() as cur:
+        cur.execute(...)
+
+# After (runs in thread, event loop free):
+def _save_decision(data):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(...)
+await asyncio.to_thread(_save_decision, data)
+```
+
+**Long-term** (500+ bots): migrate to asyncpg (async PostgreSQL driver). Separate project.
 
 ### **Pending: RLS Policy Performance**
 6 tables re-evaluate `auth.uid()` per row — change to `(select auth.uid())`:
@@ -168,11 +203,24 @@ HIP-3 enables equities (NVDA, TSLA), commodities (GOLD, SILVER), indices (US500)
 - [x] DB seed (free tier), frontend auto-populates "Account Performance" category
 - See CHANGELOG for details
 
-### **Community-Requested: Position Statefulness Phase 2b** [COMMUNITY_FIXES_MAR2026.md §4]
-- [ ] `bot_state` JSONB persistence across cycles (PeakEquity, ConsecutiveLosses, CooldownRemaining)
-- [ ] Toggle: `enable_persistent_state: true` in config_data (not default — avoids altering existing bot behavior)
-- [ ] System-computed state (not LLM-written) for deterministic counters
-- Requested by denisigin for deterministic state-machine strategies
+### ~~Bot State v1: System-Computed Performance~~ ✅ (2026-03-17)
+- [x] Account monitor computes perf stats every 5 min → writes `acct_perf:{config_id}` to Redis
+- [x] MI adapter reads from Redis instead of sync DB (fixes deadlock bug)
+- [x] New fields: consecutive win/loss streak, time since last trade, drawdown duration, largest win/loss
+- [x] HL deposit-immune metrics: `equity_change_pct` and `drawdown` use `total_pnl`-based math
+- [x] Catalog TTL → 0, OHLCV cache TTL → 0 (stale price fix)
+- [x] HL `liquidationPx: null` crash fix for cross-margin positions
+- See CHANGELOG for details
+
+### **Bot State v2: LLM-Writable Memory** (PLANNED)
+Bots can write observations that persist across cycles — market context, strategy notes, pattern recognition.
+- [ ] New prompt section: "YOUR PREVIOUS OBSERVATIONS" injected into decision prompt
+- [ ] LLM response includes optional `state_update` field (structured JSON)
+- [ ] Redis persistence: `bot_memory:{config_id}` with size limits (~2KB)
+- [ ] Output instruction updates for all prompt templates (opportunity, position management)
+- [ ] Config toggle: `enable_bot_memory: true` (opt-in, not default)
+- [ ] Guardrails: max field sizes, structured fields, system fields LLM cannot overwrite
+- Separate from v1 — requires prompt engineering discussion
 
 ### **Existing Roadmap Phases**
 - **Phase 2: Premium On-Chain** ($100-500/mo) — Nansen/Arkham whale tracking, Glassnode flows, token unlocks

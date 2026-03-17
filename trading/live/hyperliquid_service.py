@@ -110,6 +110,17 @@ class HyperliquidLiveTradingService:
         max_decimals = (6 if not is_spot else 8) - sz_decimals
         return round(float(f"{px:.5g}"), max_decimals)
 
+    def _round_size(self, exchange: Exchange, coin: str, sz: float) -> float:
+        """
+        Round order size to Hyperliquid-valid precision for a given asset.
+
+        Each asset has its own szDecimals (e.g., BTC=5, ETH=4, AAVE=2, DOGE=0).
+        Sending more decimals than allowed causes 'Order has invalid size.'
+        """
+        asset = exchange.info.coin_to_asset[coin]
+        sz_decimals = exchange.info.asset_to_sz_decimals[asset]
+        return round(sz, sz_decimals)
+
     async def _get_exchange(self, user_id: str) -> Optional[Exchange]:
         """
         Initialize Hyperliquid Exchange SDK with user's API wallet from Vault.
@@ -430,7 +441,6 @@ class HyperliquidLiveTradingService:
                 market_price = await price_service.get_current_price(platform_symbol)
                 asset_price = market_price.mid
                 quantity = float(position_size_usd_override) / asset_price
-                quantity = round(quantity, 4)
                 self._log.info(
                     f"Using USD override: ${position_size_usd_override} = "
                     f"{quantity} at ${asset_price:,.2f}"
@@ -440,8 +450,12 @@ class HyperliquidLiveTradingService:
                     config, confidence, platform_symbol, user_id
                 )
 
-            # Validate minimum quantity
-            min_quantity = 0.001
+            # Round quantity to asset's valid precision (szDecimals varies per asset)
+            quantity = self._round_size(exchange, hl_symbol, quantity)
+            asset_id = exchange.info.coin_to_asset[hl_symbol]
+            sz_decimals = exchange.info.asset_to_sz_decimals[asset_id]
+            min_quantity = 10 ** (-sz_decimals)  # e.g., 0.01 for AAVE (sz=2), 1 for DOGE (sz=0)
+
             if quantity <= 0:
                 return {
                     "status": "failed",
@@ -1069,8 +1083,8 @@ class HyperliquidLiveTradingService:
                     "size": abs(szi),
                     "entry_price": float(pos.get("entryPx", 0)),
                     "unrealized_pnl": float(pos.get("unrealizedPnl", 0)),
-                    "liquidation_price": float(pos.get("liquidationPx", 0)),
-                    "leverage": int(float(pos.get("leverage", {}).get("value", 1))) if isinstance(pos.get("leverage"), dict) else int(float(pos.get("leverage", 1))),
+                    "liquidation_price": float(pos.get("liquidationPx") or 0),
+                    "leverage": int(float(pos.get("leverage", {}).get("value", 1))) if isinstance(pos.get("leverage"), dict) else int(float(pos.get("leverage") or 1)),
                     "margin_type": "cross",
                     "batch_id": batch_id
                 })
