@@ -1049,7 +1049,8 @@ class GGBotOrchestrator:
                     if is_hyperliquid:
                         trade_result = await self.hyperliquid_trading.close_position(
                             position['batch_id'],
-                            user_id
+                            user_id,
+                            close_reason='position_management'
                         )
                     elif is_aster:
                         trade_result = await self.aster_trading.close_position(

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List
 
 from core.common.db import get_db_connection
+from core.common.formatting import format_hours
 from market_intelligence.adapters.base import DataAdapter
 from market_intelligence.types import QueryParams, AdapterResponse, AdapterError
 
@@ -225,8 +226,21 @@ class AccountPerformanceAdapter(DataAdapter):
                 init_row = cur.fetchone()
                 initial_equity = float(init_row[0]) if init_row and init_row[0] else current_equity
 
-                # Peak equity = initial + peak_pnl (deposit-immune)
-                peak_equity = initial_equity + max(peak_pnl, 0)
+                # Cost basis = initial + deposits - withdrawals (true capital invested)
+                cur.execute("""
+                    SELECT
+                        COALESCE(SUM(CASE WHEN activity_type = 'deposit' THEN (details->>'amount_usdc')::numeric ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN activity_type = 'withdrawal' THEN (details->>'amount_usdc')::numeric ELSE 0 END), 0)
+                    FROM activities
+                    WHERE config_id = %s AND activity_type IN ('deposit', 'withdrawal')
+                """, (config_id,))
+                transfer_row = cur.fetchone()
+                total_deposits = float(transfer_row[0]) if transfer_row else 0.0
+                total_withdrawals = float(transfer_row[1]) if transfer_row else 0.0
+                cost_basis = initial_equity + total_deposits - total_withdrawals
+
+                # Peak equity = cost_basis + peak_pnl (deposit-immune)
+                peak_equity = cost_basis + max(peak_pnl, 0)
 
                 # Drawdown duration: time since peak pnl was last reached
                 cur.execute("""
@@ -237,19 +251,26 @@ class AccountPerformanceAdapter(DataAdapter):
                 """, (config_id, peak_pnl))
                 peak_ts_row = cur.fetchone()
 
-                # Recent closed trades
+                # Recent closed trades — join activities for close_reason
                 cur.execute("""
-                    SELECT side, symbol, realized_pnl, size_usd, NULL as close_reason, closed_at
-                    FROM live_trades
-                    WHERE config_id = %s AND closed_at IS NOT NULL
-                    ORDER BY closed_at DESC
+                    SELECT lt.side, lt.symbol, lt.realized_pnl, lt.size_usd,
+                           a.close_reason, lt.closed_at
+                    FROM live_trades lt
+                    LEFT JOIN LATERAL (
+                        SELECT details->>'close_reason' as close_reason
+                        FROM activities
+                        WHERE trade_id = lt.batch_id AND activity_type = 'trade_exit'
+                        ORDER BY created_at DESC LIMIT 1
+                    ) a ON true
+                    WHERE lt.config_id = %s AND lt.closed_at IS NOT NULL
+                    ORDER BY lt.closed_at DESC
                     LIMIT %s
                 """, (config_id, self.RECENT_TRADES_LIMIT))
                 recent_rows = cur.fetchall()
 
         return self._build_response(
             account_equity=current_equity,
-            initial_balance=initial_equity,
+            initial_balance=cost_basis,
             peak_equity=peak_equity,
             total_trades=total_trades,
             win_trades=win_trades,
@@ -308,9 +329,12 @@ class AccountPerformanceAdapter(DataAdapter):
                     closed_at = closed_at.replace(tzinfo=timezone.utc)
                 hours_ago = (now - closed_at).total_seconds() / 3600
 
+            # Normalize symbol: HL platform format (ETH-USDT) -> standard (ETH/USDT)
+            normalized_symbol = symbol.replace('-', '/') if symbol and '-' in symbol else symbol
+
             recent_trades.append({
                 'side': side,
-                'symbol': symbol,
+                'symbol': normalized_symbol,
                 'pnl_pct': round(pnl_pct, 1),
                 'close_reason': close_reason,
                 'closed_ago_hours': round(hours_ago, 1)
@@ -341,7 +365,7 @@ class AccountPerformanceAdapter(DataAdapter):
             if drawdown_pct < -1:
                 parts.append(f"Account down {abs(drawdown_pct):.1f}% from peak.")
                 if drawdown_duration_hours and drawdown_duration_hours > 1:
-                    parts.append(f"In drawdown for {drawdown_duration_hours:.0f}h.")
+                    parts.append(f"In drawdown for {format_hours(drawdown_duration_hours)}.")
             elif equity_change_pct > 1:
                 parts.append(f"Account up {equity_change_pct:.1f}% from start.")
             else:

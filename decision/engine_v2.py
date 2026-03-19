@@ -23,6 +23,7 @@ from core.services.llm_key_service import LLMKeyService
 from core.services.llm_pricing_service import llm_pricing_service
 from core.common.activity_logger import log_llm_activity_safe, log_activity
 from decision.llm_providers import get_llm_provider
+from core.common.formatting import format_hours
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
 from decision.prompts.signal_validation import build_signal_validation_prompt
 from decision.prompts.position_management import build_position_management_prompt
@@ -1572,6 +1573,27 @@ Take Profit: {take_profit_text}
             lines.append(f"**Record**: {total} trades — {wins}W/{losses}L ({win_rate:.1f}% win rate)")
             lines.append(f"**Avg win**: {avg_win:+.1f}% | **Avg loss**: {avg_loss:.1f}%")
 
+            # v1 fields: best/worst, streak, last trade, drawdown duration
+            largest_win = data.get('largest_win_pct', 0)
+            largest_loss = data.get('largest_loss_pct', 0)
+            if largest_win or largest_loss:
+                lines.append(f"**Best/worst**: {largest_win:+.1f}% | {largest_loss:.1f}%")
+
+            consecutive_wins = data.get('consecutive_wins', 0)
+            consecutive_losses = data.get('consecutive_losses', 0)
+            if consecutive_wins >= 2:
+                lines.append(f"**Streak**: {consecutive_wins} consecutive wins")
+            elif consecutive_losses >= 2:
+                lines.append(f"**Streak**: {consecutive_losses} consecutive losses")
+
+            hours_since = data.get('hours_since_last_trade')
+            if hours_since is not None:
+                lines.append(f"**Last trade**: {format_hours(hours_since)} ago")
+
+            dd_hours = data.get('drawdown_duration_hours')
+            if dd_hours is not None and dd_hours > 0:
+                lines.append(f"**In drawdown**: {format_hours(dd_hours)}")
+
             # Recent trades
             recent = data.get('recent_trades', [])
             if recent:
@@ -1579,11 +1601,14 @@ Take Profit: {take_profit_text}
                 lines.append("**Recent trades**:")
                 for trade in recent[:5]:
                     side = trade.get('side', '?').upper()
+                    symbol = trade.get('symbol', '')
                     pnl = trade.get('pnl_pct', 0)
                     reason = trade.get('close_reason', 'unknown')
                     hours = trade.get('closed_ago_hours', 0)
                     result = "WIN" if pnl > 0 else "LOSS" if pnl < 0 else "FLAT"
-                    lines.append(f"  - {side} {pnl:+.1f}% ({result}) — {reason}, {hours:.0f}h ago")
+                    time_str = format_hours(hours) if hours else "just now"
+                    symbol_str = f" {symbol}" if symbol else ""
+                    lines.append(f"  - {side}{symbol_str} {pnl:+.1f}% ({result}) — {reason}, {time_str} ago")
 
             # Interpretation
             interp = data.get('interpretation')

@@ -798,13 +798,14 @@ class HyperliquidLiveTradingService:
                 "batch_id": None
             }
 
-    async def close_position(self, batch_id: str, user_id: str) -> Dict[str, Any]:
+    async def close_position(self, batch_id: str, user_id: str, close_reason: str = 'position_management') -> Dict[str, Any]:
         """
         Close an open position by batch_id.
 
         Args:
             batch_id: Trade batch ID from live_trades
             user_id: User UUID (for loading credentials)
+            close_reason: Why the position was closed (e.g. 'position_management', 'manual')
 
         Returns:
             Close result with status
@@ -973,7 +974,7 @@ class HyperliquidLiveTradingService:
                         'exit_price': exit_price,
                         'pnl': realized_pnl,
                         'pnl_pct': pnl_pct,
-                        'close_reason': 'manual',
+                        'close_reason': close_reason,
                         'size_usd': size_usd,
                         'leverage': position_leverage,
                         'duration_seconds': duration_seconds,
@@ -1011,7 +1012,7 @@ class HyperliquidLiveTradingService:
                         'side': position_side,
                         'pnl': realized_pnl,
                         'pnl_pct': pnl_pct,
-                        'close_reason': 'manual',
+                        'close_reason': close_reason,
                         'duration_seconds': duration_seconds,
                         'live_tag': 'Hyperliquid'
                     }

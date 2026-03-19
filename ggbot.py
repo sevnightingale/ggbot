@@ -2244,8 +2244,9 @@ async def get_bot_account(
             except Exception as e:
                 logger.warning(f"Failed to fetch HL snapshot stats: {e}")
 
-            # Get initial_equity from config for performance calculation
+            # Get initial_equity + cost_basis (initial + deposits - withdrawals)
             initial_equity = None
+            cost_basis = None
             try:
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
@@ -2253,13 +2254,28 @@ async def get_bot_account(
                         row = cur.fetchone()
                         if row and row[0]:
                             initial_equity = float(row[0])
+
+                        # Compute cost_basis from deposits/withdrawals
+                        if initial_equity:
+                            cur.execute("""
+                                SELECT
+                                    COALESCE(SUM(CASE WHEN activity_type = 'deposit' THEN (details->>'amount_usdc')::numeric ELSE 0 END), 0),
+                                    COALESCE(SUM(CASE WHEN activity_type = 'withdrawal' THEN (details->>'amount_usdc')::numeric ELSE 0 END), 0)
+                                FROM activities
+                                WHERE config_id = %s AND activity_type IN ('deposit', 'withdrawal')
+                            """, (config_id,))
+                            transfer_row = cur.fetchone()
+                            total_deposits = float(transfer_row[0]) if transfer_row else 0.0
+                            total_withdrawals = float(transfer_row[1]) if transfer_row else 0.0
+                            cost_basis = initial_equity + total_deposits - total_withdrawals
             except Exception:
                 pass
 
             total_equity = account_value
             performance_pct = 0.0
-            if initial_equity and initial_equity > 0:
-                performance_pct = ((total_equity - initial_equity) / initial_equity) * 100
+            denominator = cost_basis or initial_equity
+            if denominator and denominator > 0:
+                performance_pct = ((total_equity - denominator) / denominator) * 100
 
             realized_pnl_val = snapshot_stats.get('realized_pnl', 0.0)
             total_pnl_val = realized_pnl_val + unrealized_pnl
@@ -2268,7 +2284,7 @@ async def get_bot_account(
                 "status": "success",
                 "config_id": config_id,
                 "account": {
-                    "initial_balance": initial_equity or account_value,
+                    "initial_balance": cost_basis or initial_equity or account_value,
                     "current_balance": account_value,
                     "available_balance": available,
                     "margin_used": margin_used,

@@ -297,7 +297,7 @@ class HyperliquidAccountAdapter(AccountAdapter):
             AggFill = Dict  # type alias for clarity
             aggregated: Dict[tuple, AggFill] = defaultdict(lambda: {
                 'total_pnl': 0.0, 'total_size': 0.0, 'weighted_price': 0.0,
-                'hashes': [], 'side': '', 'coin': ''
+                'hashes': [], 'oids': set(), 'side': '', 'coin': ''
             })
 
             for fill in fills:
@@ -327,6 +327,7 @@ class HyperliquidAccountAdapter(AccountAdapter):
                 agg['total_size'] += fill_size
                 agg['weighted_price'] += fill_price * fill_size
                 agg['hashes'].append(fill_hash)
+                agg['oids'].add(str(fill.get('oid', '')))
                 agg['side'] = side
                 agg['coin'] = coin
 
@@ -340,14 +341,17 @@ class HyperliquidAccountAdapter(AccountAdapter):
 
                 platform_symbol = standardizer.from_hyperliquid(coin) or f"{coin}-USDT"
 
-                # Look up batch_id + entry data from live_trades
+                # Look up batch_id + entry data + SL/TP order IDs from live_trades
                 batch_id = None
                 trade_created_at = None
+                sl_order_id = None
+                tp_order_id = None
                 try:
                     with get_db_connection() as conn:
                         with conn.cursor() as cur:
                             cur.execute("""
-                                SELECT batch_id, created_at FROM live_trades
+                                SELECT batch_id, created_at, stop_loss_order_id, take_profit_order_id
+                                FROM live_trades
                                 WHERE config_id = %s AND provider = 'hyperliquid'
                                   AND symbol = %s
                                 ORDER BY COALESCE(closed_at, created_at) DESC
@@ -357,6 +361,8 @@ class HyperliquidAccountAdapter(AccountAdapter):
                             if result:
                                 batch_id = result[0]
                                 trade_created_at = result[1]
+                                sl_order_id = str(result[2]) if result[2] else None
+                                tp_order_id = str(result[3]) if result[3] else None
                 except Exception:
                     pass
 
@@ -424,6 +430,14 @@ class HyperliquidAccountAdapter(AccountAdapter):
                     except Exception as e:
                         self._log.warning(f"Failed to write P&L to live_trades: {e}")
 
+                # Infer close_reason from SL/TP order IDs vs fill oids
+                inferred_close_reason = 'auto'
+                fill_oids = agg['oids']
+                if sl_order_id and sl_order_id in fill_oids:
+                    inferred_close_reason = 'stop_loss'
+                elif tp_order_id and tp_order_id in fill_oids:
+                    inferred_close_reason = 'take_profit'
+
                 log_activity_safe(
                     config_id=config_id,
                     user_id=user_id,
@@ -438,7 +452,7 @@ class HyperliquidAccountAdapter(AccountAdapter):
                         'pnl': total_pnl,
                         'pnl_pct': pnl_pct,
                         'size_usd': size_usd,
-                        'close_reason': 'auto',
+                        'close_reason': inferred_close_reason,
                         'duration_seconds': duration_seconds,
                         'fill_count': len(agg['hashes']),
                         'fill_time_ms': fill_time,
