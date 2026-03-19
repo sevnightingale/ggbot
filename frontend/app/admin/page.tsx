@@ -409,6 +409,18 @@ export default function AdminDashboard() {
         </Link>
 
         <Link
+          href="/admin/analytics"
+          className="flex items-center justify-between p-4 bg-charcoal-900 rounded-lg border border-charcoal-700 hover:border-charcoal-600 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <DollarSign className="h-5 w-5 text-emerald-400" />
+            <span className="text-white font-medium">Business Analytics</span>
+            <span className="text-gray-500 text-sm">Revenue, funnel, engagement, LTV, cohorts</span>
+          </div>
+          <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-white transition-colors" />
+        </Link>
+
+        <Link
           href="/admin/bots-comparison"
           className="flex items-center justify-between p-4 bg-charcoal-900 rounded-lg border border-charcoal-700 hover:border-charcoal-600 transition-colors group"
         >

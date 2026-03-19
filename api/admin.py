@@ -433,6 +433,262 @@ async def get_billing_overview(
 
 
 # =============================================================================
+# Analytics Endpoint (Business Metrics)
+# =============================================================================
+
+@router.get("/analytics")
+async def get_analytics(
+    admin: AuthenticatedUser = Depends(require_admin)
+) -> Dict[str, Any]:
+    """
+    Business analytics for investor/founder dashboards.
+
+    Returns revenue, conversion funnel, engagement (DAU/WAU/MAU),
+    retention, LTV by tier, cohort conversion, and live trading stats.
+    """
+    analytics = {}
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # ----- REVENUE: monthly breakdown -----
+            cur.execute("""
+                SELECT
+                    TO_CHAR(created_at, 'YYYY-MM') as month,
+                    COUNT(*) as llm_calls,
+                    ROUND(COALESCE(SUM(platform_cost_usd), 0)::numeric, 2) as revenue,
+                    ROUND(COALESCE(SUM(provider_cost_usd), 0)::numeric, 2) as cost,
+                    COUNT(DISTINCT user_id) as paying_users
+                FROM activities
+                WHERE platform_cost_usd IS NOT NULL AND platform_cost_usd > 0
+                GROUP BY month
+                ORDER BY month
+            """)
+            monthly = []
+            total_revenue = 0
+            total_cost = 0
+            for row in cur.fetchall():
+                rev = float(row[2] or 0)
+                cost = float(row[3] or 0)
+                total_revenue += rev
+                total_cost += cost
+                monthly.append({
+                    'month': row[0], 'llm_calls': row[1],
+                    'revenue': rev, 'cost': cost,
+                    'margin': round(rev - cost, 2), 'paying_users': row[4]
+                })
+            analytics['revenue'] = {
+                'monthly': monthly,
+                'total': round(total_revenue, 2),
+                'total_cost': round(total_cost, 2),
+                'total_margin': round(total_revenue - total_cost, 2),
+                'margin_pct': round((total_revenue - total_cost) / total_revenue * 100, 1) if total_revenue > 0 else 0,
+            }
+
+            # Revenue MTD + projected
+            cur.execute("""
+                SELECT
+                    ROUND(COALESCE(SUM(platform_cost_usd), 0)::numeric, 2),
+                    COUNT(DISTINCT user_id),
+                    EXTRACT(day FROM NOW())
+                FROM activities
+                WHERE platform_cost_usd > 0
+                AND created_at >= DATE_TRUNC('month', NOW())
+            """)
+            row = cur.fetchone()
+            mtd_rev = float(row[0] or 0)
+            days = max(float(row[2] or 1), 1)
+            analytics['revenue']['mtd'] = mtd_rev
+            analytics['revenue']['mtd_projected'] = round(mtd_rev / days * 30, 2)
+            analytics['revenue']['mtd_paying_users'] = row[1] or 0
+
+            # Last 30d (MRR proxy)
+            cur.execute("""
+                SELECT
+                    ROUND(COALESCE(SUM(platform_cost_usd), 0)::numeric, 2),
+                    COUNT(DISTINCT user_id)
+                FROM activities
+                WHERE platform_cost_usd > 0
+                AND created_at > NOW() - INTERVAL '30 days'
+            """)
+            row = cur.fetchone()
+            analytics['revenue']['last_30d'] = float(row[0] or 0)
+            analytics['revenue']['last_30d_users'] = row[1] or 0
+
+            # ----- CONVERSION FUNNEL -----
+            cur.execute("""
+                SELECT
+                    COUNT(*) as total_users,
+                    COUNT(CASE WHEN user_id IN (
+                        SELECT DISTINCT user_id FROM configurations
+                    ) THEN 1 END) as created_bot,
+                    COUNT(CASE WHEN user_id IN (
+                        SELECT DISTINCT user_id FROM decisions
+                    ) THEN 1 END) as ran_bot,
+                    COUNT(CASE WHEN user_id IN (
+                        SELECT DISTINCT user_id FROM configurations WHERE state = 'active'
+                    ) THEN 1 END) as active_bot,
+                    COUNT(CASE WHEN subscription_tier IN ('prepaid', 'usage_based', 'pro') THEN 1 END) as paid
+                FROM user_profiles
+            """)
+            row = cur.fetchone()
+            total = max(row[0], 1)
+            analytics['funnel'] = {
+                'total_users': row[0],
+                'created_bot': row[1], 'created_bot_pct': round(row[1] / total * 100, 1),
+                'ran_bot': row[2], 'ran_bot_pct': round(row[2] / total * 100, 1),
+                'active_bot': row[3], 'active_bot_pct': round(row[3] / total * 100, 1),
+                'paid': row[4], 'paid_pct': round(row[4] / total * 100, 1),
+            }
+
+            # ----- COHORT CONVERSION (post-monetization, Jan 2026+) -----
+            cur.execute("""
+                SELECT
+                    TO_CHAR(created_at, 'YYYY-MM') as month,
+                    COUNT(*) as signups,
+                    COUNT(CASE WHEN subscription_tier IN ('prepaid', 'usage_based', 'pro') THEN 1 END) as paid
+                FROM user_profiles
+                WHERE created_at >= '2026-01-01'
+                GROUP BY month
+                ORDER BY month
+            """)
+            cohorts = []
+            total_s, total_p = 0, 0
+            for row in cur.fetchall():
+                s, p = row[1], row[2]
+                total_s += s
+                total_p += p
+                cohorts.append({
+                    'month': row[0], 'signups': s, 'paid': p,
+                    'conversion_pct': round(p / s * 100, 1) if s > 0 else 0
+                })
+            analytics['cohorts'] = {
+                'monthly': cohorts,
+                'total_signups': total_s,
+                'total_paid': total_p,
+                'conversion_pct': round(total_p / total_s * 100, 1) if total_s > 0 else 0
+            }
+
+            # ----- ENGAGEMENT: DAU/WAU/MAU -----
+            cur.execute("""
+                SELECT
+                    COUNT(DISTINCT CASE
+                        WHEN d.created_at > NOW() - INTERVAL '1 day' THEN d.user_id END),
+                    COUNT(DISTINCT CASE
+                        WHEN d.created_at > NOW() - INTERVAL '7 days' THEN d.user_id END),
+                    COUNT(DISTINCT CASE
+                        WHEN d.created_at > NOW() - INTERVAL '30 days' THEN d.user_id END)
+                FROM decisions d
+            """)
+            row = cur.fetchone()
+            dau, wau, mau = row[0], row[1], row[2]
+            analytics['engagement'] = {
+                'dau': dau, 'wau': wau, 'mau': mau,
+                'dau_wau_pct': round(dau / wau * 100, 1) if wau > 0 else 0,
+                'dau_mau_pct': round(dau / mau * 100, 1) if mau > 0 else 0,
+            }
+
+            # ----- RETENTION -----
+            cur.execute("""
+                WITH old_users AS (
+                    SELECT user_id FROM user_profiles
+                    WHERE created_at < NOW() - INTERVAL '30 days'
+                )
+                SELECT
+                    COUNT(*),
+                    COUNT(CASE WHEN ou.user_id IN (
+                        SELECT DISTINCT user_id FROM decisions
+                        WHERE created_at > NOW() - INTERVAL '7 days'
+                    ) THEN 1 END),
+                    COUNT(CASE WHEN ou.user_id IN (
+                        SELECT DISTINCT user_id FROM decisions
+                        WHERE created_at > NOW() - INTERVAL '30 days'
+                    ) THEN 1 END)
+                FROM old_users ou
+            """)
+            row = cur.fetchone()
+            cs = max(row[0], 1)
+            analytics['retention'] = {
+                'cohort_size': row[0],
+                'active_7d': row[1], 'active_7d_pct': round(row[1] / cs * 100, 1),
+                'active_30d': row[2], 'active_30d_pct': round(row[2] / cs * 100, 1),
+            }
+
+            # ----- LTV by tier -----
+            cur.execute("""
+                SELECT
+                    u.subscription_tier,
+                    COUNT(DISTINCT u.user_id) as users,
+                    ROUND(COALESCE(SUM(ut.user_total), 0)::numeric, 2),
+                    ROUND(COALESCE(AVG(ut.user_total), 0)::numeric, 2),
+                    ROUND(COALESCE(MAX(ut.user_total), 0)::numeric, 2)
+                FROM user_profiles u
+                LEFT JOIN LATERAL (
+                    SELECT COALESCE(SUM(platform_cost_usd), 0) as user_total
+                    FROM activities WHERE user_id = u.user_id AND platform_cost_usd > 0
+                ) ut ON TRUE
+                WHERE u.subscription_tier IN ('prepaid', 'usage_based', 'pro')
+                GROUP BY u.subscription_tier
+                ORDER BY 3 DESC
+            """)
+            ltv_list = []
+            total_ltv, total_pu = 0, 0
+            for row in cur.fetchall():
+                ltv_list.append({
+                    'tier': row[0], 'users': row[1],
+                    'total_revenue': float(row[2]), 'avg_ltv': float(row[3]), 'max_ltv': float(row[4])
+                })
+                total_ltv += float(row[2])
+                total_pu += row[1]
+            analytics['ltv'] = {
+                'by_tier': ltv_list,
+                'avg_all': round(total_ltv / total_pu, 2) if total_pu > 0 else 0,
+                'total_paid_users': total_pu,
+            }
+
+            # ----- POWER USERS -----
+            cur.execute("""
+                WITH weekly_activity AS (
+                    SELECT user_id, DATE_TRUNC('week', created_at) as week
+                    FROM decisions
+                    WHERE created_at > NOW() - INTERVAL '8 weeks'
+                    GROUP BY user_id, week
+                )
+                SELECT COUNT(*) FROM (
+                    SELECT user_id FROM weekly_activity
+                    GROUP BY user_id HAVING COUNT(DISTINCT week) >= 4
+                ) power
+            """)
+            analytics['engagement']['power_users'] = cur.fetchone()[0]
+
+            # ----- LIVE TRADING -----
+            cur.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM user_profiles WHERE hyperliquid_wallet_address IS NOT NULL),
+                    (SELECT COUNT(*) FROM configurations WHERE trading_mode = 'hyperliquid' AND state = 'active'),
+                    (SELECT COUNT(*) FROM live_trades),
+                    (SELECT COUNT(*) FROM live_trades WHERE closed_at IS NOT NULL),
+                    (SELECT ROUND(COALESCE(SUM(realized_pnl), 0)::numeric, 2) FROM live_trades),
+                    (SELECT ROUND(COALESCE(SUM(size_usd), 0)::numeric, 2) FROM live_trades)
+            """)
+            row = cur.fetchone()
+            analytics['live_trading'] = {
+                'hl_connected': row[0], 'hl_active_bots': row[1],
+                'total_trades': row[2], 'closed_trades': row[3],
+                'total_pnl': float(row[4] or 0), 'total_volume': float(row[5] or 0)
+            }
+
+            # ----- GROWTH: monthly signups -----
+            cur.execute("""
+                SELECT TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*)
+                FROM user_profiles WHERE created_at IS NOT NULL
+                GROUP BY month ORDER BY month
+            """)
+            analytics['growth'] = [{'month': row[0], 'signups': row[1]} for row in cur.fetchall()]
+
+    return {"success": True, "analytics": analytics}
+
+
+# =============================================================================
 # User Management Endpoints
 # =============================================================================
 

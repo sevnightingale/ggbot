@@ -204,3 +204,4 @@ Deliverable: Trade execution report with P&L, positions, and next action
 - Day 8 of 60-day sprint
 - MC: ~$79K
 - ACP revenue -> buyback-and-burn on $GG -> LP growth -> graduation
+ at some 

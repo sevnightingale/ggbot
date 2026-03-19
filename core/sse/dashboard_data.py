@@ -167,6 +167,17 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         WHERE rn <= 5  -- 5 most recent decisions per bot (no time filter)
     ),
     -- NOTE: first_activities CTE removed - initial_equity now stored on configurations table
+    deposit_flows AS (
+        -- Sum deposits/withdrawals per HL config for cost_basis calculation
+        SELECT a.config_id,
+               COALESCE(SUM(CASE WHEN a.activity_type = 'deposit' THEN (a.details->>'amount_usdc')::numeric ELSE 0 END), 0) as total_deposits,
+               COALESCE(SUM(CASE WHEN a.activity_type = 'withdrawal' THEN (a.details->>'amount_usdc')::numeric ELSE 0 END), 0) as total_withdrawals
+        FROM activities a
+        INNER JOIN bot_configs bc ON a.config_id = bc.config_id
+        WHERE a.activity_type IN ('deposit', 'withdrawal')
+          AND bc.trading_mode = 'hyperliquid'
+        GROUP BY a.config_id
+    ),
     latest_activities AS (
         -- Get latest activity with equity for each of the USER'S bots only
         -- Uses idx_activities_equity_latest partial index (config_id, created_at DESC WHERE total_equity IS NOT NULL)
@@ -196,18 +207,19 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                snap.win_rate,
                snap.timestamp as updated_at,
                snap.trading_mode as source,
-               -- Calculate performance percentage using denormalized initial_equity
-               -- For Hyperliquid bots: use total_pnl / initial_equity (deposit-immune)
+               -- Calculate performance percentage using cost_basis (initial + deposits - withdrawals)
+               -- For Hyperliquid bots: use total_pnl / cost_basis (deposit-immune)
                -- For other bots: use (current_equity - initial_equity) / initial_equity
                CASE
                    WHEN bc.trading_mode = 'hyperliquid' AND snap.total_pnl IS NOT NULL AND bc.initial_equity > 0
-                   THEN (snap.total_pnl / bc.initial_equity * 100)
+                   THEN (snap.total_pnl / (bc.initial_equity + COALESCE(df.total_deposits, 0) - COALESCE(df.total_withdrawals, 0)) * 100)
                    WHEN bc.initial_equity IS NOT NULL AND bc.initial_equity > 0 AND la.current_equity IS NOT NULL
                    THEN ((la.current_equity - bc.initial_equity) / bc.initial_equity * 100)
                    ELSE 0
                END as performance_pct
         FROM bot_configs bc
         LEFT JOIN latest_activities la ON bc.config_id = la.config_id
+        LEFT JOIN deposit_flows df ON bc.config_id = df.config_id
         LEFT JOIN LATERAL (
             SELECT asn.config_id, asn.snapshot_id, asn.current_balance, asn.available_balance,
                    asn.margin_used, asn.total_pnl, asn.unrealized_pnl, asn.total_trades,

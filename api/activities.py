@@ -474,9 +474,30 @@ async def get_timeline_metadata(
         # Same conversion as page.tsx:1241
         win_rate_pct = round(float(win_rate) * 100, 1) if win_rate else 0.0
 
-        # Performance %: same formula as dashboard_data.py:187-188
-        if initial_equity > 0 and not is_legacy_live:
-            performance_pct = ((current_equity - initial_equity) / initial_equity) * 100
+        # Performance %: use cost_basis for HL bots (initial + deposits - withdrawals)
+        cost_basis = initial_equity
+        if trading_mode == 'hyperliquid' and initial_equity > 0:
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT
+                                COALESCE(SUM(CASE WHEN activity_type = 'deposit' THEN (details->>'amount_usdc')::numeric ELSE 0 END), 0),
+                                COALESCE(SUM(CASE WHEN activity_type = 'withdrawal' THEN (details->>'amount_usdc')::numeric ELSE 0 END), 0)
+                            FROM activities
+                            WHERE config_id = %s AND activity_type IN ('deposit', 'withdrawal')
+                        """, (config_id,))
+                        transfer_row = cur.fetchone()
+                        if transfer_row:
+                            cost_basis = initial_equity + float(transfer_row[0]) - float(transfer_row[1])
+            except Exception:
+                pass
+
+        if cost_basis > 0 and not is_legacy_live:
+            if trading_mode == 'hyperliquid':
+                performance_pct = (total_pnl / cost_basis) * 100
+            else:
+                performance_pct = ((current_equity - initial_equity) / initial_equity) * 100
         elif is_legacy_live:
             performance_pct = total_pnl  # Dollar P&L for legacy (no % possible)
         else:
