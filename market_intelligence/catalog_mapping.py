@@ -167,9 +167,9 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     },
 
     # ========================================================================
-    # MARKET CONDITIONS (Internal - Free, Sebastian daily research)
+    # AGENTIC INTELLIGENCE (Virtuals ACP agents - Free)
     # ========================================================================
-    ('market_conditions', 'daily_brief'): {
+    ('agentic_intelligence', 'sebastian'): {
         'data_type': 'market_conditions',
         'params_template': {},
         'cache_ttl': 0,  # Adapter handles own caching (Redis, refreshed on POST)
