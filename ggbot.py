@@ -3456,6 +3456,153 @@ async def get_bot_status(
 
 
 # =============================================================================
+# MARKET CONDITIONS (Sebastian AI Research Agent)
+# =============================================================================
+
+SEBASTIAN_API_KEY = os.getenv('SEBASTIAN_API_KEY')
+
+
+async def verify_sebastian_auth(request: Request):
+    """Authenticate Sebastian's service requests via dedicated API key."""
+    auth_header = request.headers.get('authorization', '')
+    if not auth_header.startswith('Bearer ') or not SEBASTIAN_API_KEY:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    token = auth_header.split(' ', 1)[1]
+    if token != SEBASTIAN_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+@app.get("/api/v2/market-conditions/latest")
+async def get_market_conditions_latest(request: Request):
+    """
+    Get the latest market conditions report.
+
+    Sebastian reads this before producing the next report to maintain
+    temporal context (trends, changes vs previous state).
+    """
+    await verify_sebastian_auth(request)
+
+    try:
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, generated_at, schema_version, regime, domains,
+                           narratives, synthesis, data_quality, raw_tables, created_at
+                    FROM market_conditions
+                    ORDER BY generated_at DESC
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+
+                if not row:
+                    return {"status": "empty", "message": "No market conditions reports yet"}
+
+                return {
+                    "status": "ok",
+                    "report": {
+                        "id": str(row[0]),
+                        "generated_at": row[1].isoformat() if row[1] else None,
+                        "schema_version": row[2],
+                        "regime": row[3],
+                        "domains": row[4],
+                        "narratives": row[5],
+                        "synthesis": row[6],
+                        "data_quality": row[7],
+                        "raw_tables": row[8],
+                        "created_at": row[9].isoformat() if row[9] else None,
+                    }
+                }
+    except Exception as e:
+        logger.error(f"Failed to get market conditions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v2/market-conditions")
+async def post_market_conditions(request: Request):
+    """
+    Create a new market conditions report.
+
+    Sebastian POSTs structured JSON after his daily research pass.
+    The report is stored in Supabase and cached in Redis for
+    fast consumption by the MI pipeline.
+    """
+    await verify_sebastian_auth(request)
+
+    try:
+        body = await request.json()
+
+        # Validate required fields
+        required = ['generated_at', 'regime', 'domains', 'narratives', 'synthesis']
+        missing = [f for f in required if f not in body]
+        if missing:
+            raise HTTPException(status_code=400, detail=f"Missing required fields: {missing}")
+
+        # Validate regime structure
+        regime = body['regime']
+        if not isinstance(regime, dict) or 'overall' not in regime:
+            raise HTTPException(status_code=400, detail="regime must be a dict with 'overall' key")
+
+        # Insert into Supabase
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO market_conditions
+                        (generated_at, schema_version, regime, domains, narratives,
+                         synthesis, data_quality, raw_tables)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, created_at
+                """, (
+                    body['generated_at'],
+                    body.get('schema_version', '0.1'),
+                    json.dumps(body['regime']),
+                    json.dumps(body['domains']),
+                    json.dumps(body['narratives']),
+                    body['synthesis'],
+                    json.dumps(body.get('data_quality')) if body.get('data_quality') else None,
+                    json.dumps(body.get('raw_tables')) if body.get('raw_tables') else None,
+                ))
+                result = cur.fetchone()
+                conn.commit()
+
+        report_id = str(result[0])
+
+        # Cache in Redis for fast MI pipeline access
+        try:
+            import redis as sync_redis
+            r = sync_redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+            cache_data = {
+                'generated_at': body['generated_at'],
+                'schema_version': body.get('schema_version', '0.1'),
+                'regime': body['regime'],
+                'domains': body['domains'],
+                'narratives': body['narratives'],
+                'synthesis': body['synthesis'],
+                'data_quality': body.get('data_quality'),
+                'raw_tables': body.get('raw_tables'),
+            }
+            r.set('market_conditions:latest', json.dumps(cache_data, default=str), ex=86400)  # 24h TTL
+            r.close()
+        except Exception as e:
+            logger.warning(f"Failed to cache market conditions in Redis: {e}")
+
+        logger.info(f"Market conditions report stored: {report_id} (regime: {regime.get('overall', 'unknown')})")
+
+        return {
+            "status": "ok",
+            "id": report_id,
+            "created_at": result[1].isoformat() if result[1] else None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to store market conditions: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # STRIPE INTEGRATION
 # =============================================================================
 

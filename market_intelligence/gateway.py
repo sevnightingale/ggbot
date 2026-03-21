@@ -304,7 +304,7 @@ class MarketIntelligence:
             category = 'signals'
         elif 'funding' in snake_case or 'derivatives' in snake_case:
             category = 'derivatives'
-        elif 'account_performance' in snake_case:
+        elif 'account_performance' in snake_case or 'market_conditions' in snake_case:
             category = 'internal'
         else:
             # Default to market_data

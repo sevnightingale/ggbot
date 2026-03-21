@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-03-19 04:11:04 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-20 01:39:14 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,50 +12,50 @@
 - **Users with Bots**: 338 (96.6%)
 
 ### Bot Statistics
-- **Total Bots**: 531
-- **Active Bots**: 26 (4.9%)
-  - Paper: 23
+- **Total Bots**: 540
+- **Active Bots**: 36 (6.7%)
+  - Paper: 33
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 3
-- **Inactive Bots**: 505
+- **Inactive Bots**: 504
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,549
-  - Wins: 2,529
-  - Losses: 5,020
-  - Platform Win Rate: 33.50%
-  - Total P&L: $130,374.04
+- **Total Trades (All Time)**: 7,563
+  - Wins: 2,539
+  - Losses: 5,024
+  - Platform Win Rate: 33.57%
+  - Total P&L: $131,044.40
 - **Recent Activity**:
-  - Last 24 hours: 25 trades
-  - Last 7 days: 106 trades
-  - Last 30 days: 488 trades
+  - Last 24 hours: 16 trades
+  - Last 7 days: 108 trades
+  - Last 30 days: 485 trades
 
 ### Open Positions
-- **Open Positions**: 6
-- **Unique Symbols**: 3
-- **Total Exposure**: $125,801.24
+- **Open Positions**: 7
+- **Unique Symbols**: 2
+- **Total Exposure**: $143,893.72
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,225.57
+- **Average Balance**: $10,223.04
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
+- **ETH/USDT**: 22 bots
 - **BTC/USDT**: 13 bots
-- **ETH/USDT**: 12 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 731 decisions (avg confidence: 42.7%)
-- **enter**: 34 decisions (avg confidence: 69.2%)
-- **exit**: 13 decisions (avg confidence: 61.7%)
-- **close**: 2 decisions (avg confidence: 63.5%)
-- **short**: 2 decisions (avg confidence: 65.0%)
+- **wait**: 920 decisions (avg confidence: 42.5%)
+- **enter**: 28 decisions (avg confidence: 70.1%)
+- **exit**: 10 decisions (avg confidence: 72.6%)
+- **close**: 1 decisions (avg confidence: 62.0%)
+- **short**: 1 decisions (avg confidence: 65.0%)
 
 ### System Health
 - **Decisions (last hour)**: 27
@@ -64,10 +64,10 @@
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $616.36 (margin: $253.79, 41.2%)
-- **Last 30d Revenue**: $115.82 from 40 users
-- **Month-to-Date**: $59.65 (projected: ~$94.18)
-- **Avg LTV (paid)**: $18.59
+- **All-Time Revenue**: $620.23 (margin: $255.39, 41.2%)
+- **Last 30d Revenue**: $114.74 from 38 users
+- **Month-to-Date**: $63.52 (projected: ~$95.28)
+- **Avg LTV (paid)**: $18.73
 
 ### Conversion Funnel
 - **Signup → Created Bot**: 96.0%
@@ -76,14 +76,14 @@
 - **Post-Monetization (Jan+)**: 22.4% (19/85)
 
 ### Engagement
-- **DAU/WAU/MAU**: 10/15/40
+- **DAU/WAU/MAU**: 10/15/38
 - **DAU/WAU Stickiness**: 66.7%
 - **Power Users (4+/8wk)**: 15
 
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 4
 - **Active Bots**: 3
-- **Total Volume**: $9,360.52
+- **Total Volume**: $13,644.02
 
 ## 🖥️ System Resources
 
@@ -91,24 +91,24 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 20MB | 11h 7m | 8 |
-| ggbot | 🟢 online | 1.2% | 212MB | 11h 7m | 30 |
-| account-monitor | 🟢 online | 0% | 29MB | 11h 7m | 16 |
-| sebastian-chrome | 🟢 online | 0.6% | 78MB | 11h 7m | 12 |
-| sebastian-bot | 🟢 online | 0.6% | 53MB | 11h 7m | 9 |
-| market-data-ws | 🟢 online | 2.3% | 18MB | 11h 7m | 8 |
-| sebastian-telegram | 🟢 online | 0% | 16MB | 11h 7m | 8 |
-| ggbot-scheduler | 🟢 online | 0% | 287MB | 11h 7m | 13 |
+| error-alerts | 🟢 online | 0% | 15MB | 20h 52m | 9 |
+| ggbot | 🟢 online | 0.3% | 224MB | 20h 52m | 31 |
+| account-monitor | 🟢 online | 0% | 27MB | 20h 52m | 17 |
+| sebastian-chrome | 🟢 online | 0.7% | 77MB | 20h 52m | 13 |
+| sebastian-bot | 🟢 online | 0% | 52MB | 20h 52m | 10 |
+| market-data-ws | 🟢 online | 2% | 17MB | 20h 52m | 9 |
+| sebastian-telegram | 🟢 online | 0% | 33MB | 10h 31m | 9 |
+| ggbot-scheduler | 🟢 online | 0% | 287MB | 20h 52m | 14 |
 
 ### VM Resources
 
 - **Disk**: 62G / 78G (80%)
-- **Memory**: 1.9Gi / 3.8Gi
-- **CPU Load**: 0.36 / 0.23 / 0.14 (1m/5m/15m)
+- **Memory**: 1.7Gi / 3.8Gi
+- **CPU Load**: 0.16 / 0.15 / 0.12 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 21.68M)
+- **Redis**: 🟢 connected (Memory: 23.82M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -192,6 +192,12 @@
 - Bot-type aware (agent, scheduled, signal_validation), conversation history, deep merge config updates
 - Inline chat panel in Configure tab (500px fixed height, markdown rendering, auto-save integration)
 
+**Market Conditions** (Sebastian AI Research Agent)
+- `GET /api/v2/market-conditions/latest` - Latest daily market conditions report (service auth)
+- `POST /api/v2/market-conditions` - Submit new report (service auth, `SEBASTIAN_API_KEY`)
+- Daily cross-market regime: equities, bonds, commodities, crypto, geopolitics, monetary policy, narratives
+- Consumed by MI pipeline as `('market_conditions', 'daily_brief')` data point
+
 **User Management**
 - `GET /api/v2/user/profile` - User profile with subscription details
 - `GET /api/v2/me` - Current user profile (includes permissions)
@@ -235,6 +241,7 @@
 - `GET /api/v2/admin/services` - PM2 services, VM resources, Redis status
 - `GET /api/v2/admin/logs/summary` - Log level counts (hours parameter)
 - `GET /api/v2/admin/billing` - 30-day billing overview with token usage
+- `GET /api/v2/admin/analytics` - Business metrics (revenue, funnel, engagement, LTV, cohorts, retention)
 - `GET /api/v2/admin/users` - List users (search by email, pagination)
 - `GET /api/v2/admin/users/{user_id}` - User detail with configs + accounts
 - `PATCH /api/v2/admin/users/{user_id}` - Update subscription tier/status
@@ -244,7 +251,7 @@
 - `POST /api/v2/admin/bots/{config_id}/stop` - Stop bot (admin override)
 - `POST /api/v2/admin/bots/{config_id}/reset-account` - Reset paper account to $10k
 - `GET /api/v2/admin/bots/equity-comparison` - Bot performance comparison (equity curves)
-- Frontend: 4 pages (/admin, /admin/users, /admin/users/[user_id], /admin/bots-comparison)
+- Frontend: 5 pages (/admin, /admin/analytics, /admin/users, /admin/users/[user_id], /admin/bots-comparison)
 
 ---
 
@@ -370,14 +377,15 @@ pm2 logs ggbot --lines 50
 - **Documentation**: Complete guide in DOCS/completed/METERED_BILLING_IMPLEMENTATION.md
 
 ### **Market Intelligence**
-**32 data points across 7 categories (hybrid: 4 Perplexity macro + 4 Grok Twitter/on-chain sources LIVE):**
+**37 data points across 8 categories:**
 - **Technical Analysis** (21 indicators): RSI, MACD, Bollinger Bands, volume, momentum, trend
 - **Trading Signals** (1 source): ggShot AI-filtered signals (1,829+ stored in database, 70 days history, live updates)
 - **On-Chain Analytics** (2 live): BTC TVL, whale activity
 - **Derivatives & Leverage** (2 rates): BTC/ETH funding rates
-- **Sentiment & Social** (1 live): Twitter sentiment analysis
+- **Sentiment & Social** (3 live): Twitter sentiment, lunar phase, mercury status
 - **News & Regulatory** (1 live): Crypto news aggregation
-- **Macro Economics** (4 live): VIX, DXY, CPI, NFP
+- **Macro Economics** (6 live): VIX, DXY, CPI, NFP, USDT Dominance, MOVE Index
+- **Market Conditions** (1 daily): Cross-market regime assessment by Sebastian AI (equities, bonds, commodities, crypto, geopolitics, monetary policy, narratives)
 
 ### **Trading Modes**
 - **Paper Trading**: Virtual $10k accounts, risk-free testing
@@ -543,7 +551,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-19 04:11:05 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-20 01:39:15 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -738,7 +746,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-03-19 04:11:05 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-20 01:39:15 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

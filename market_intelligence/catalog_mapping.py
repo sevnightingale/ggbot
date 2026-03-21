@@ -167,6 +167,16 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     },
 
     # ========================================================================
+    # MARKET CONDITIONS (Internal - Free, Sebastian daily research)
+    # ========================================================================
+    ('market_conditions', 'daily_brief'): {
+        'data_type': 'market_conditions',
+        'params_template': {},
+        'cache_ttl': 0,  # Adapter handles own caching (Redis, refreshed on POST)
+        'global': True,  # Not symbol-specific — shared across all bots
+    },
+
+    # ========================================================================
     # LEGACY CATEGORY ALIASES (for backward compatibility)
     # Maps old category names to correct catalog entries
     # ========================================================================

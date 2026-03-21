@@ -1,10 +1,10 @@
 # Market Data System - Complete Architecture
 
 **Status**: ✅ Production Deployed
-**Version**: Phase 1 Complete (33 data points live, cost-optimized)
-**Last Updated**: 2026-01-13
+**Version**: Phase 1 Complete (37 data points live, cost-optimized)
+**Last Updated**: 2026-03-21
 
-The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **35 data points** across **6 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
+The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **37 data points** across **8 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
 
 ---
 
@@ -44,8 +44,8 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 **Intelligence Orchestrator** → Config-driven routing, parallel execution, permission system, agent support
 
 ### **Current Capabilities**
-- ✅ **36 data points** across 7 categories (all FREE tier)
-- ✅ **6 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB)
+- ✅ **37 data points** across 8 categories (all FREE tier)
+- ✅ **7 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB, Sebastian AI)
 - ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
 - ✅ **Agent dynamic queries** (query without modifying config)
@@ -446,8 +446,10 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | | Crypto News Headlines | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
 | **Account Performance** (1 source) |
 | | Trading History | AccountPerformance (DB) | FREE | 5 min | 🆓 |
+| **Market Conditions** (1 source) |
+| | Daily Market Brief | MarketConditions (DB) | FREE | Daily | 🆓 |
 
-**Total**: 36 data points (all FREE tier)
+**Total**: 37 data points (all FREE tier)
 
 *Note: ggShot (Premium) disabled 2026-01-23 due to stale signals. Astrology data points (lunar_phase, mercury_status) added same date.*
 

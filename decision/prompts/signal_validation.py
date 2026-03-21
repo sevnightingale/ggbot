@@ -46,10 +46,12 @@ Use your trading strategy above to analyze the provided market data and external
 ## OUTPUT FORMAT
 ACTION: [{signal_direction.lower()}]
 CONFIDENCE: [0.000-1.000]
+STOP_LOSS: [price if applicable]
+TAKE_PROFIT: [price if applicable]
 REASONING:
 - KEY_SIGNAL: [Primary indicator or pattern driving this decision]
 - SUPPORTING: [Confirming factors from the data that support your decision]
 - RISK: [Main concern or counter-signal to watch]
 - SUMMARY: [One sentence explaining the decision logic, max 25 words]
 
-Note: Stop loss and take profit levels are managed by your risk management configuration and will be applied automatically based on your settings."""
+STOP_LOSS and TAKE_PROFIT are optional. Default levels are already configured as safety guardrails. Only include them when your analysis or strategy suggests specific price levels that would be more appropriate than the defaults."""

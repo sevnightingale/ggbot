@@ -6,6 +6,67 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-21 - Market Conditions: Sebastian AI Research Agent Integration
+
+New MI data source: daily cross-market intelligence report produced by Sebastian (personal AI research agent). Covers equities, bonds, commodities, crypto, monetary policy, geopolitics, dominant narratives. First report: Iran war / energy crisis macro regime assessment.
+
+**Supabase Table** (`database/migrations/add_market_conditions_table.sql`):
+- `market_conditions` — 10 columns: `regime` (jsonb), `domains` (jsonb), `narratives` (jsonb), `synthesis` (text), `data_quality` (jsonb), `raw_tables` (jsonb). Indexed on `generated_at DESC`
+
+**API Endpoints** (`ggbot.py:3458-3580`):
+- `GET /api/v2/market-conditions/latest` — Sebastian reads previous report for temporal context
+- `POST /api/v2/market-conditions` — Sebastian writes new report after daily research pass
+- Dedicated `SEBASTIAN_API_KEY` auth (independent of Supabase/admin auth)
+
+**MI Adapter** (`market_intelligence/adapters/internal/market_conditions.py`):
+- `MarketConditionsAdapter` — reads Redis cache first, falls back to Supabase query
+- Formats for LLM: domain summaries, narrative bullets, synthesis paragraph
+- Freshness: warns >26h, rejects >48h. Confidence 0.85 base, decays with age
+
+**Pipeline Wiring**:
+- Catalog: `catalog/data_types/internal/market_conditions.yaml`
+- Mapping: `('market_conditions', 'daily_brief')` → `MarketConditionsAdapter`, `global: True`
+- Gateway: `market_conditions` routes to `internal` adapter category (`gateway.py:307`)
+- DB seed: `data_sources` + `data_points` rows (free tier, auto-populates in frontend bot builder)
+
+**Context**: Part of ACP Agent Intelligence initiative ($GG graduation). Sebastian produces daily market conditions → consumed by bots via MI pipeline → later wrapped as ACP provider agent for Virtuals ecosystem.
+
+---
+
+## 2026-03-20 - Business Analytics: Status Check + Admin API + Dashboard
+
+**Status Check Business Metrics** (`scripts/status_check.py`):
+- `get_business_metrics()` — 9 queries: revenue (monthly/MTD/30d), conversion funnel, cohort conversion (Jan+), DAU/WAU/MAU, retention, LTV by tier, power users, live trading, growth
+- `print_business_report()` — formatted console output for business section
+- `update_active_md()` now renders "Business Metrics" section (revenue, funnel, engagement, HL stats)
+- Quiet mode includes `Rev(30d)` + `DAU/WAU/MAU` for monitoring
+
+**Admin Analytics API** (`api/admin.py`):
+- `GET /api/v2/admin/analytics` — returns all business metrics as JSON, same data as status check
+- Revenue: monthly breakdown, MTD, projected, 30d MRR proxy, margin %
+- Funnel: signup → bot creation → ran bot → active → paid (with %)
+- Cohorts: per-month signups vs paid (post-monetization Jan+)
+- Engagement: DAU/WAU/MAU, stickiness ratios, power users (4+/8wk)
+- Retention: 30d+ cohort active in 7d/30d
+- LTV: by tier (users, total rev, avg/max), overall avg
+- Live trading: HL connected, active bots, volume, P&L
+
+**Admin Analytics Dashboard** (`frontend/app/admin/analytics/page.tsx`):
+- KPI cards: all-time revenue, 30d revenue, MTD projected, avg LTV
+- Revenue stacked bar chart (cost + margin by month, Recharts)
+- Conversion funnel visualization (horizontal bars with %)
+- Engagement panel: DAU/WAU/MAU, stickiness, power users, retention
+- Cohort conversion table (monthly signups vs paid, color-coded %)
+- Growth chart: monthly signup bars (pre-monetization gray, post-Jan blue)
+- LTV table by tier, live trading stats grid, revenue detail table
+- Nav link added to main admin page (`frontend/app/admin/page.tsx`)
+
+**Investor Metrics Doc** (`DOCS/business/INVESTOR_METRICS_2026_03_19.md`):
+- One-page briefing: revenue, funnel, engagement, LTV, CAC analysis, growth catalysts
+- Key metric: 22.4% signup-to-paid post-monetization (4-5x B2C SaaS avg)
+
+---
+
 ## 2026-03-17 - Bot State v1 + OHLCV Cache Fix + HL Position Fix
 
 **OHLCV Stale Cache Bug** (`market_intelligence/cache/manager.py`, `catalog/data_types/market_data/ohlcv.yaml`):
