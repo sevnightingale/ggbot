@@ -57,19 +57,14 @@ Sync `get_db_connection()` (psycopg2) blocks asyncio event loop when pool is con
 
 ---
 
-## 🎯 **LLM-Driven SL/TP** (QUICK WIN — Prompt Change)
+## 🎯 **LLM-Driven SL/TP — Phase 2** (Mid-Trade Updates)
 
-**Status**: 🟡 PLANNED — Phase 1 is prompt-only (zero code), Phase 2 needs code
+**Status**: 🔵 PLANNED — Phase 1 complete and verified in production
 **Planning Doc**: [DOCS/todo/LLM_DRIVEN_SL_TP.md](DOCS/todo/LLM_DRIVEN_SL_TP.md)
 **Origin**: Dennis feedback analysis → Sev confirmed SL/TP as the actionable item
 
-Currently all 3 prompt templates tell the LLM NOT to output SL/TP ("managed by your risk management configuration"). Parser + orchestrator + trading services already handle LLM-provided SL/TP prices — only the prompts are missing the ask.
+Phase 1 shipped (prompt-only). LLM now provides SL/TP on entry — verified working on both paper (Rhoda) and live (Hyperliquid) trades. Phase 2 enables mid-trade SL/TP updates.
 
-### **Phase 1: SL/TP on Entry** (~30 min, prompt-only)
-- [ ] `opportunity_analysis.py` — add STOP_LOSS/TAKE_PROFIT to output format, remove "managed automatically" note
-- [ ] `signal_validation.py` — same changes
-
-### **Phase 2: Mid-Trade SL/TP Updates** (~2-4 hours, code)
 - [ ] `position_management.py` — add optional STOP_LOSS/TAKE_PROFIT to wait/hold output
 - [ ] Paper trading: `update_position_stops()` method (UPDATE on paper_trades)
 - [ ] Hyperliquid: `update_trigger_orders()` (cancel existing + place new trigger orders)
@@ -93,23 +88,27 @@ New MI category: "Agent Intelligence" — curated Virtuals ACP agents as data so
 - [x] Sebastian daily research pass producing structured JSON reports
 - See CHANGELOG for details
 
-### **Next: Marketplace Exploration** (Before Code)
-- [ ] Ask Butler about available trading/market analysis ACP agents
-- [ ] Assess marketplace depth — determines if we launch with curated agents or our own only
+### ~~Marketplace Exploration~~ ✅ (2026-03-21)
+- [x] Butler survey: 6 agents identified, 3 strong candidates (Otto AI, Wolfpack, BlackSwan)
+- [x] Marketplace is active — Otto AI has 55K jobs, real ecosystem
 
-### **Workstream 1: ACP Buyer Integration** (~2-3 days, after exploration)
-- [ ] Register buyer agent at app.virtuals.io/acp/join (smart wallet + EOA)
+### ~~Agent Registration~~ ✅ (2026-03-21)
+- [x] "Sebastian by ggbots.ai" registered as Hybrid agent (entity_id: 29537)
+- [x] Smart wallet: `0xDAD56...422612`, EOA whitelisted: `0xFF0ab...19bbD`
+- [x] Job offering: marketBrief ($0.01, 10min SLA)
+- [x] Credentials in `.env` (`ACP_WALLET_ADDRESS`, `ACP_WALLET_PRIVATE_KEY`, `ACP_ENTITY_ID`)
+- [x] `virtuals-acp` SDK installed
+
+### **Workstream 1: ACP Buyer Integration** (~2-3 days)
 - [ ] Fund smart wallet with USDC on Base ($5-10 for testing)
 - [ ] `core/services/acp_client.py` — ACP client wrapper (wallet, job lifecycle, polling mode)
-- [ ] `market_intelligence/adapters/acp/acp_agent_adapter.py` — MI adapter (same pattern as Grok)
-- [ ] Catalog YAML + `catalog_mapping.py` entries for curated agents
-- [ ] DB seed: `data_sources` + `data_points` rows (Agent Intelligence category)
-- [ ] Install `virtuals-acp>=0.3.23`
+- [ ] `market_intelligence/adapters/acp/acp_agent_adapter.py` — MI adapter for ACP agents
+- [ ] Catalog YAML + `catalog_mapping.py` entries for curated agents (Otto, Wolfpack, BlackSwan)
+- [ ] DB seed: additional `data_points` under `agentic_intelligence` for each curated agent
 
-### **Workstream 2: Deploy Market Conditions as ACP Provider**
-- [ ] Register provider agent on Virtuals (separate smart wallet)
-- [ ] Provider service: read latest report from Supabase → deliver on ACP job request
-- [ ] Add our agent to Agent Intelligence category for self-consumption
+### **Workstream 2: ACP Provider Service**
+- [ ] Provider process: listen for ACP jobs → read latest report from Supabase → deliver
+- [ ] Self-consumption: wire our agent into Agentic Intelligence category via ACP
 - [ ] Submit for graduation review (7 working days)
 
 ---

@@ -461,7 +461,7 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         position = position_analysis.get("position", "middle").replace("_", " ")
         position_pct = position_analysis.get("position_pct", 50)
 
-        summary = f"Keltner %pos={position_pct:.0f}% ({position})"
+        summary = f"Keltner %pos={position_pct:.0f}% ({position}), Upper={upper:.4f}, Mid={middle:.4f}, Lower={lower:.4f}"
 
         # Squeeze detection - critical volatility signal
         if squeeze_analysis.get("is_squeeze", False):

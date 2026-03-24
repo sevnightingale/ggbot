@@ -216,8 +216,8 @@ All preprocessors inherit from `BasePreprocessor` providing:
 8. **ADX** (`adx.py`) - Trend strength analysis, directional movement tracking
 9. **Parabolic SAR** (`psar.py`) - Stop-and-reverse signals, trend following, dynamic stops
 10. **Aroon** (`aroon.py`) - Trend identification, oscillator analysis, convergence patterns
-11. **SMA** (`sma.py`) - Trend analysis, support/resistance detection, crossover signals
-12. **EMA** (`ema.py`) - Responsiveness analysis, trend detection, signal quality assessment
+11. **SMA** (`sma.py`) - Multi-period (20/50/200), trend analysis, golden/death cross detection
+12. **EMA** (`ema.py`) - Multi-period (20/50/200), responsiveness analysis, golden/death cross detection
 13. **TRIX** (`trix.py`) - Triple smoothed momentum, turning points, signal line analysis
 
 #### **Volatility Indicators (4 modules)**
@@ -294,9 +294,10 @@ Preprocessor → Full Rich Data → Database Storage → Decision Engine
 - Each preprocessor's `summary` field contains the **most important insights** in human-readable format
 - Designed specifically for LLM interpretation
 - Examples:
-  - `"RSI 73.2 - Overbought, rising strongly"`
-  - `"ADX 24.7 - Developing trend with bearish bias (4.8)"`
-  - `"OBV -8904 - bullish trend (strong, 0.68), accumulation detected"`
+  - `"RSI at 73.2. ⚠️ Overbought (3p streak). Momentum accelerating"`
+  - `"EMA20=2102.57 (falling), EMA50=2107.19 (falling), EMA200=2123.37 (rising). Price below all. Death cross (50<200)"`
+  - `"BB %B=0.19 (near lower), Upper=2110.75, Mid=2102.95, Lower=2095.16. Squeeze (2p)"`
+  - `"Donchian %pos=23%, Upper=2113.43, Mid=2103.49, Lower=2093.54. Consolidation (7p)"`
 
 **Selective Critical Fields:**
 The Decision Engine adds **only significant additional context** when present:

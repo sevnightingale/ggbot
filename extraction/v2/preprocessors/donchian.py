@@ -470,7 +470,7 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         """Generate human-readable Donchian Channels summary with enriched signals."""
         position_pct = ((price - lower) / (upper - lower)) * 100 if upper != lower else 50
 
-        summary = f"Donchian %pos={position_pct:.0f}%"
+        summary = f"Donchian %pos={position_pct:.0f}%, Upper={upper:.4f}, Mid={middle:.4f}, Lower={lower:.4f}"
 
         # Recent breakout - critical signal
         latest_breakout = breakout_analysis.get("latest_breakout")

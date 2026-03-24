@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-03-20 01:39:14 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-21 06:06:40 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,62 +12,61 @@
 - **Users with Bots**: 338 (96.6%)
 
 ### Bot Statistics
-- **Total Bots**: 540
-- **Active Bots**: 36 (6.7%)
-  - Paper: 33
+- **Total Bots**: 541
+- **Active Bots**: 28 (5.2%)
+  - Paper: 25
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 3
-- **Inactive Bots**: 504
+- **Inactive Bots**: 513
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,563
-  - Wins: 2,539
-  - Losses: 5,024
-  - Platform Win Rate: 33.57%
-  - Total P&L: $131,044.40
+- **Total Trades (All Time)**: 7,572
+  - Wins: 2,543
+  - Losses: 5,029
+  - Platform Win Rate: 33.58%
+  - Total P&L: $129,689.97
 - **Recent Activity**:
-  - Last 24 hours: 16 trades
-  - Last 7 days: 108 trades
-  - Last 30 days: 485 trades
+  - Last 24 hours: 6 trades
+  - Last 7 days: 91 trades
+  - Last 30 days: 474 trades
 
 ### Open Positions
-- **Open Positions**: 7
+- **Open Positions**: 4
 - **Unique Symbols**: 2
-- **Total Exposure**: $143,893.72
+- **Total Exposure**: $113,563.59
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,223.04
+- **Average Balance**: $10,220.10
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **ETH/USDT**: 22 bots
+- **ETH/USDT**: 14 bots
 - **BTC/USDT**: 13 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 920 decisions (avg confidence: 42.5%)
-- **enter**: 28 decisions (avg confidence: 70.1%)
-- **exit**: 10 decisions (avg confidence: 72.6%)
-- **close**: 1 decisions (avg confidence: 62.0%)
-- **short**: 1 decisions (avg confidence: 65.0%)
+- **wait**: 789 decisions (avg confidence: 36.6%)
+- **enter**: 13 decisions (avg confidence: 67.1%)
+- **exit**: 7 decisions (avg confidence: 69.3%)
+- **close**: 1 decisions (avg confidence: 65.0%)
 
 ### System Health
-- **Decisions (last hour)**: 27
+- **Decisions (last hour)**: 53
 - **Status**: 🟢 HEALTHY
 
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $620.23 (margin: $255.39, 41.2%)
-- **Last 30d Revenue**: $114.74 from 38 users
-- **Month-to-Date**: $63.52 (projected: ~$95.28)
-- **Avg LTV (paid)**: $18.73
+- **All-Time Revenue**: $624.26 (margin: $257.04, 41.2%)
+- **Last 30d Revenue**: $112.35 from 38 users
+- **Month-to-Date**: $67.55 (projected: ~$96.50)
+- **Avg LTV (paid)**: $18.87
 
 ### Conversion Funnel
 - **Signup → Created Bot**: 96.0%
@@ -76,14 +75,14 @@
 - **Post-Monetization (Jan+)**: 22.4% (19/85)
 
 ### Engagement
-- **DAU/WAU/MAU**: 10/15/38
-- **DAU/WAU Stickiness**: 66.7%
+- **DAU/WAU/MAU**: 10/13/38
+- **DAU/WAU Stickiness**: 76.9%
 - **Power Users (4+/8wk)**: 15
 
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 4
 - **Active Bots**: 3
-- **Total Volume**: $13,644.02
+- **Total Volume**: $15,824.25
 
 ## 🖥️ System Resources
 
@@ -91,24 +90,24 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 15MB | 20h 52m | 9 |
-| ggbot | 🟢 online | 0.3% | 224MB | 20h 52m | 31 |
-| account-monitor | 🟢 online | 0% | 27MB | 20h 52m | 17 |
-| sebastian-chrome | 🟢 online | 0.7% | 77MB | 20h 52m | 13 |
-| sebastian-bot | 🟢 online | 0% | 52MB | 20h 52m | 10 |
-| market-data-ws | 🟢 online | 2% | 17MB | 20h 52m | 9 |
-| sebastian-telegram | 🟢 online | 0% | 33MB | 10h 31m | 9 |
-| ggbot-scheduler | 🟢 online | 0% | 287MB | 20h 52m | 14 |
+| error-alerts | 🟢 online | 0% | 18MB | 7h 24m | 0 |
+| ggbot | 🟢 online | 0.9% | 245MB | 6h 32m | 2 |
+| account-monitor | 🟢 online | 1.3% | 36MB | 7h 24m | 0 |
+| sebastian-chrome | 🟢 online | 0.3% | 70MB | 7h 24m | 0 |
+| sebastian-bot | 🟢 online | 0.2% | 46MB | 7h 24m | 0 |
+| market-data-ws | 🟢 online | 0.7% | 36MB | 7h 24m | 0 |
+| sebastian-telegram | 🟢 online | 0% | 24MB | 7h 24m | 0 |
+| ggbot-scheduler | 🟢 online | 0% | 283MB | 7h 24m | 0 |
 
 ### VM Resources
 
-- **Disk**: 62G / 78G (80%)
-- **Memory**: 1.7Gi / 3.8Gi
-- **CPU Load**: 0.16 / 0.15 / 0.12 (1m/5m/15m)
+- **Disk**: 61G / 78G (78%)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.45 / 0.30 / 0.18 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 23.82M)
+- **Redis**: 🟢 connected (Memory: 21.21M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -551,7 +550,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-20 01:39:15 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-21 06:06:41 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -634,6 +633,11 @@ cost_per_decision_thinking numeric, description text?, sort_order int, created_a
 ### logs (6 cols) | PK: log_id
 Idx: idx_logs_level_timestamp(log_level, timestamp), idx_logs_user_timestamp(user_id, timestamp)
 log_id int, user_id uuid?, module varchar(100)?, log_level varchar(10), message text, timestamp timestamptz
+
+### market_conditions (10 cols) | PK: id
+Idx: idx_market_conditions_generated(generated_at)
+id uuid, generated_at timestamptz, schema_version varchar(10)?, regime jsonb, domains jsonb, narratives jsonb
+synthesis text, data_quality jsonb?, raw_tables jsonb?, created_at timestamptz?
 
 ### market_data (9 cols) | PK: id | FK: config_id→configurations | UQ: user_id,config_id,symbol,timeframe
 Idx: idx_market_data_config_symbol(config_id, symbol), idx_market_data_updated_at(updated_at), idx_market_data_user_symbol_timeframe(user_id, symbol, timeframe, updated_at), market_data_unique_per_...
@@ -746,7 +750,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-03-20 01:39:15 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-21 06:06:41 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

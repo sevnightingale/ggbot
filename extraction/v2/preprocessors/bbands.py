@@ -526,7 +526,7 @@ class BollingerBandsPreprocessor(BasePreprocessor):
         denom = middle if abs(middle) > 1e-12 else 1e-12
         bandwidth = (upper - lower) / denom * 100
 
-        summary = f"BB %B={percent_b:.2f} ({position.replace('_', ' ')})"
+        summary = f"BB %B={percent_b:.2f} ({position.replace('_', ' ')}), Upper={upper:.4f}, Mid={middle:.4f}, Lower={lower:.4f}"
 
         # Squeeze detection - critical volatility signal
         if squeeze_analysis.get("is_squeeze"):

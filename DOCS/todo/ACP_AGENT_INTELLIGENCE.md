@@ -167,40 +167,51 @@ Sebastian AI research agent produces daily cross-market intelligence reports. Th
 
 ---
 
-## Curated Agent Discovery
+## Completed: Marketplace Exploration + Registration (2026-03-21)
 
-Before implementation, explore the ACP marketplace to identify 2-4 useful agents:
+### Agent Registered
+- **Name**: Sebastian by ggbots.ai (Hybrid — buyer + provider)
+- **Entity ID**: 29537
+- **Smart Wallet**: `0xDAD5606b4f049591859DF0f352Cc703881422612`
+- **EOA (whitelisted)**: `0xFF0ab2acF9b81DDd2cf16ad955a8Aaa0A4619bbD`
+- **Offering**: marketBrief ($0.01 USDC, 10min SLA)
+- **SDK**: `virtuals-acp` installed
 
-- [ ] Ask Butler (app.virtuals.io chat) about available trading/market analysis agents
-- [ ] Browse ACP marketplace UI for agent listings
-- [ ] Assess: reliability (successful job count), cost, SLA, deliverable quality
-- [ ] Document curated agents with offering details
+### Curated Third-Party Agents (from Butler survey)
 
-If marketplace is thin (few/no useful agents), launch with our own agent only and add third-party agents as they appear.
+| Agent | Offering | Price | SLA | Jobs | Why |
+|---|---|---|---|---|---|
+| **Otto AI** | Crypto News | $0.01 | 30m | 55,251 (83%) | Replaces/supplements Grok crypto_news |
+| **Wolfpack Intelligence** | Composite Risk Score | $0.05 | 30m | 2,646 (78%) | Risk scoring we don't have |
+| **BlackSwan** | Prediction Market Monitor | $0.01 | 20m | 1,270 (96%) | Anomaly detection, unique |
+
+**Rejected**: Elfa AI ($1.50/query too expensive), Loky ($5/query), Ask Caesar (45min SLA, 68% success rate)
+
+**Daily cost estimate**: 3 agents × ~6 calls/day (4hr cache) × avg $0.02 = ~$0.36/day. Billed to users at 1.7x = ~$0.61/day.
 
 ---
 
 ## Environment Variables
 
 ```bash
-# ACP Buyer (platform wallet on Base)
-ACP_WALLET_ADDRESS=           # Smart wallet address (created at app.virtuals.io/acp/join)
-ACP_WALLET_PRIVATE_KEY=       # EOA private key (no 0x prefix)
-ACP_ENTITY_ID=                # Integer entity ID from registration
+# ACP Agent (Sebastian by ggbots.ai) — all set in .env
+ACP_WALLET_ADDRESS=0xDAD5606b4f049591859DF0f352Cc703881422612
+ACP_WALLET_PRIVATE_KEY=<set>   # EOA private key (no 0x prefix)
+ACP_EOA_ADDRESS=0xFF0ab2acF9b81DDd2cf16ad955a8Aaa0A4619bbD
+ACP_ENTITY_ID=29537
 ```
 
-No user-facing wallet setup. Platform manages a single buyer wallet.
+No user-facing wallet setup. Platform manages a single buyer/provider wallet.
 
 ---
 
-## Prerequisites
+## Remaining Prerequisites
 
-- [ ] Register buyer agent at app.virtuals.io/acp/join
-- [ ] Create smart wallet + whitelist EOA
-- [ ] Fund smart wallet with USDC on Base (test: $5, production: $50-100)
-- [ ] Install `virtuals-acp` SDK (`pip install virtuals-acp`)
-- [ ] Explore marketplace for curated agents
-- [ ] Decide on Workstream 2 scope (our own provider agent)
+- [x] ~~Register agent at app.virtuals.io/acp/join~~
+- [x] ~~Create smart wallet + whitelist EOA~~
+- [x] ~~Install `virtuals-acp` SDK~~
+- [x] ~~Explore marketplace for curated agents~~
+- [ ] Fund smart wallet with USDC on Base (test: $5-10)
 
 ---
 

@@ -6,6 +6,35 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-21 - Extraction Enrichment: Multi-Period MAs + Channel Price Levels + BB Fix
+
+**Preprocessor Summary Gaps** (Dennis report: SZN2 bots hitting PARSE_FAIL):
+- Channel indicators (Donchian, BB, Keltner) only showed `%pos`/`%B` — missing actual price levels
+- EMA only computed period-20 — no EMA50/EMA200 available to strategies
+- BB preprocessor never wired up — `calculate_bollinger_bands()` bypassed advanced preprocessor entirely
+
+**Multi-Period EMA/SMA** (`extraction/v2/indicators.py`):
+- `calculate_ema()` / `calculate_sma()` now compute 20/50/200 in single pass
+- Summary: `EMA20=2102.57 (falling), EMA50=2107.19 (falling), EMA200=2123.37 (rising). Price below all. Death cross (50<200)`
+- Golden/death cross detection (50 vs 200) included automatically
+- Graceful degradation: 100 candles → EMA20+50 only, 250+ → all three
+- Values stored in `result['current']['ema20']`, `ema50`, `ema200`
+- Smart limits (`smart_limits.py`) bumped from 100→250 candles for EMA/SMA
+
+**Channel Summary Enrichment** (`extraction/v2/preprocessors/`):
+- `donchian.py`: `Donchian %pos=23%, Upper=2113.43, Mid=2103.49, Lower=2093.54`
+- `bbands.py`: `BB %B=0.19 (near lower), Upper=2110.75, Mid=2102.95, Lower=2095.16`
+- `keltner.py`: `Keltner %pos=29% (lower channel), Upper=2113.20, Mid=2102.57, Lower=2091.94`
+
+**BB Preprocessor Wire-Up** (`extraction/v2/indicators.py`):
+- `calculate_bollinger_bands()` now routes through advanced preprocessor (was legacy fallback, no `summary`)
+- Cleaned up 3 duplicate BB dispatch branches → 1 canonical `"bbands"` case
+- All bots using `"BB"` now get enriched summary with squeeze detection, walking bands, patterns
+
+**Stripe Fix**: Usage-based price ID inactive since ~Jan 22 (`price_1SSz0E...` → `price_1SsU8V...`). New pay-as-you-go checkouts broken ~2 months. Existing subscribers unaffected. `.env` updated.
+
+---
+
 ## 2026-03-21 - Market Conditions: Sebastian AI Research Agent Integration
 
 New MI data source: daily cross-market intelligence report produced by Sebastian (personal AI research agent). Covers equities, bonds, commodities, crypto, monetary policy, geopolitics, dominant narratives. First report: Iran war / energy crisis macro regime assessment.

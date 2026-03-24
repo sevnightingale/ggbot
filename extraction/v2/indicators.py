@@ -185,7 +185,7 @@ class TechnicalIndicators:
             }
     
     def calculate_sma(self, df: pd.DataFrame, length: int = 20) -> Dict[str, Any]:
-        """Calculate Simple Moving Average."""
+        """Calculate Simple Moving Average with standard multi-period output (20/50/200)."""
         if len(df) < length:
             raise ValueError(f"Need at least {length} periods for SMA calculation, got {len(df)}")
 
@@ -195,15 +195,28 @@ class TechnicalIndicators:
             raise ValueError("SMA calculation failed")
 
         if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
-            # Use sophisticated preprocessing
             prices = df['close'] if 'close' in df.columns else None
-            return self.preprocessor.preprocess_sma(sma_series, prices, length=length)
+            result = self.preprocessor.preprocess_sma(sma_series, prices, length=length)
+
+            # Compute all standard periods and build enriched summary
+            current_price = float(df['close'].iloc[-1])
+            sma_values = {}
+            for period in self.MA_STANDARD_PERIODS:
+                if len(df) >= period:
+                    series = ta.sma(df['close'], length=period)
+                    if series is not None and not series.dropna().empty:
+                        val = float(series.dropna().iloc[-1])
+                        trend = "rising" if len(series.dropna()) >= 2 and series.dropna().iloc[-1] > series.dropna().iloc[-2] else "falling"
+                        sma_values[period] = (round(val, 4), trend)
+
+            result['summary'] = self._build_multi_ma_summary("SMA", current_price, sma_values, result)
+            for period, (val, _) in sma_values.items():
+                result['current'][f'sma{period}'] = val
+
+            return result
         else:
-            # Simple analytical context (fallback)
             current = float(sma_series.iloc[-1])
             current_price = float(df['close'].iloc[-1])
-
-            # Simple analysis
             price_vs_sma = (current_price - current) / current * 100
 
             return {
@@ -219,8 +232,11 @@ class TechnicalIndicators:
                 "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
             }
     
+    # Standard MA periods computed for every EMA/SMA indicator
+    MA_STANDARD_PERIODS = [20, 50, 200]
+
     def calculate_ema(self, df: pd.DataFrame, length: int = 20) -> Dict[str, Any]:
-        """Calculate Exponential Moving Average."""
+        """Calculate Exponential Moving Average with standard multi-period output (20/50/200)."""
         if len(df) < length:
             raise ValueError(f"Need at least {length} periods for EMA calculation, got {len(df)}")
 
@@ -230,15 +246,28 @@ class TechnicalIndicators:
             raise ValueError("EMA calculation failed")
 
         if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
-            # Use sophisticated preprocessing
             prices = df['close'] if 'close' in df.columns else None
-            return self.preprocessor.preprocess_ema(ema_series, prices, length=length)
+            result = self.preprocessor.preprocess_ema(ema_series, prices, length=length)
+
+            # Compute all standard periods and build enriched summary
+            current_price = float(df['close'].iloc[-1])
+            ema_values = {}
+            for period in self.MA_STANDARD_PERIODS:
+                if len(df) >= period:
+                    series = ta.ema(df['close'], length=period)
+                    if series is not None and not series.dropna().empty:
+                        val = float(series.dropna().iloc[-1])
+                        trend = "rising" if len(series.dropna()) >= 2 and series.dropna().iloc[-1] > series.dropna().iloc[-2] else "falling"
+                        ema_values[period] = (round(val, 4), trend)
+
+            result['summary'] = self._build_multi_ma_summary("EMA", current_price, ema_values, result)
+            for period, (val, _) in ema_values.items():
+                result['current'][f'ema{period}'] = val
+
+            return result
         else:
-            # Simple analytical context (fallback)
             current = float(ema_series.iloc[-1])
             current_price = float(df['close'].iloc[-1])
-
-            # Simple analysis
             price_vs_ema = (current_price - current) / current * 100
 
             return {
@@ -258,25 +287,30 @@ class TechnicalIndicators:
         """Calculate Bollinger Bands."""
         if len(df) < length:
             raise ValueError(f"Need at least {length} periods for Bollinger Bands calculation, got {len(df)}")
-        
+
         bb_result = ta.bbands(df['close'], length=length, std=std)
-        
+
         if bb_result is None or bb_result.empty:
             raise ValueError("Bollinger Bands calculation failed")
-        
+
         lower = bb_result[f'BBL_{length}_{std}']
         middle = bb_result[f'BBM_{length}_{std}']
         upper = bb_result[f'BBU_{length}_{std}']
         bandwidth = bb_result[f'BBB_{length}_{std}']
         percent_b = bb_result[f'BBP_{length}_{std}']
-        
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_bollinger_bands(
+                upper, middle, lower, df['close'], length=length, std=std
+            )
+
         current_price = float(df['close'].iloc[-1])
         current_lower = float(lower.iloc[-1])
         current_middle = float(middle.iloc[-1])
         current_upper = float(upper.iloc[-1])
         current_bandwidth = float(bandwidth.iloc[-1])
         current_percent_b = float(percent_b.iloc[-1])
-        
+
         # Simple BB analysis
         position = "middle"
         if current_price > current_upper:
@@ -287,9 +321,9 @@ class TechnicalIndicators:
             position = "upper_half"
         else:
             position = "lower_half"
-        
+
         squeeze = current_bandwidth < np.percentile(bandwidth.dropna(), 20)
-        
+
         return {
             "indicator": "Bollinger_Bands",
             "parameters": {"length": length, "std": std},
@@ -660,25 +694,20 @@ class TechnicalIndicators:
                 elif normalized == "ema":
                     length = params.get("ema_length", 20)
                     results["ema"] = self.calculate_ema(df, length)
-                
-                elif normalized == "bollinger_bands":
+
+                elif normalized == "bbands":
                     length = params.get("bb_length", 20)
                     std = params.get("bb_std", 2.0)
-                    results["bollinger_bands"] = self.calculate_bollinger_bands(df, length, std)
-                
+                    results["bbands"] = self.calculate_bollinger_bands(df, length, std)
+
                 elif normalized == "stochastic":
                     k = params.get("stoch_k", 14)
                     d = params.get("stoch_d", 3)
                     results["stochastic"] = self.calculate_stochastic(df, k, d)
-                
+
                 elif normalized == "williams_r":
                     length = params.get("williams_r_length", 14)
                     results["williams_r"] = self.calculate_williams_r(df, length)
-                
-                elif normalized in ["bb", "bbands", "bollinger_bands"]:
-                    length = params.get("bb_length", 20)
-                    std = params.get("bb_std", 2.0)
-                    results["bollinger_bands"] = self.calculate_bollinger_bands(df, length, std)
                 
                 elif normalized == "atr":
                     length = params.get("atr_length", 14)
@@ -691,11 +720,6 @@ class TechnicalIndicators:
                 elif normalized == "aroon":
                     length = params.get("aroon_length", 14)
                     results["aroon"] = self.calculate_aroon(df, length)
-
-                elif normalized == "bbands":
-                    length = params.get("bbands_length", 20)
-                    std = params.get("bbands_std", 2.0)
-                    results["bbands"] = self.calculate_bollinger_bands(df, length, std)
 
                 elif normalized == "bbwidth":
                     length = params.get("bbwidth_length", 20)
@@ -999,6 +1023,53 @@ class TechnicalIndicators:
             "oversold_threshold": oversold
         }
     
+    def _build_multi_ma_summary(self, ma_type: str, current_price: float,
+                                ma_values: Dict[int, tuple], preprocessor_result: Dict) -> str:
+        """Build enriched MA summary with all standard periods (20/50/200).
+
+        Args:
+            ma_type: "EMA" or "SMA"
+            current_price: Current close price
+            ma_values: {period: (value, trend_direction)} for each computed period
+            preprocessor_result: Full preprocessor output (for extracting enriched signals)
+        """
+        # Build value parts: EMA20=2102.57 (falling), EMA50=2107.19 (falling), ...
+        parts = []
+        for period in sorted(ma_values.keys()):
+            val, trend = ma_values[period]
+            parts.append(f"{ma_type}{period}={val:.4f} ({trend})")
+
+        summary = ", ".join(parts)
+
+        # Price position relative to all MAs
+        above = [p for p, (v, _) in sorted(ma_values.items()) if current_price > v]
+        below = [p for p, (v, _) in sorted(ma_values.items()) if current_price <= v]
+        if not below:
+            summary += f". Price above all"
+        elif not above:
+            summary += f". Price below all"
+        else:
+            above_names = "/".join(str(p) for p in above)
+            summary += f". Price above {ma_type}{above_names}"
+
+        # Golden/death cross detection (50 vs 200)
+        if 50 in ma_values and 200 in ma_values:
+            ma50_val = ma_values[50][0]
+            ma200_val = ma_values[200][0]
+            if ma50_val > ma200_val:
+                summary += ". Golden cross (50>200)"
+            else:
+                summary += ". Death cross (50<200)"
+
+        # Append enriched signals from preprocessor (crossovers, S/R, acceleration)
+        original_summary = preprocessor_result.get('summary', '')
+        for signal in original_summary.split('. ')[1:]:
+            signal = signal.strip().rstrip('.')
+            if signal and any(marker in signal for marker in ['✓', '⚠️', 'Strong', 'Trend', 'crossover']):
+                summary += f". {signal}"
+
+        return summary
+
     def _determine_ma_trend(self, series: pd.Series, periods: int = 5) -> str:
         """Determine moving average trend direction."""
         if len(series) < periods:
