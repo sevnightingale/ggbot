@@ -19,15 +19,15 @@ Or for research first:
 
 | Model | Economy | Standard | Premium |
 |-------|---------|----------|---------|
-| **Grok** | `x-ai/grok-3-mini` | `x-ai/grok-4-fast` | `x-ai/grok-4` |
+| **Grok** | `x-ai/grok-3-mini` | `x-ai/grok-4-fast` | `x-ai/grok-4.20-beta` |
 | **DeepSeek** | `deepseek/deepseek-chat` | `deepseek/deepseek-v3.2` | `deepseek/deepseek-r1` |
 | **Gemini** | `google/gemini-2.0-flash-001` | `google/gemini-2.5-pro` | `google/gemini-3-pro-preview` |
-| **Claude** | `anthropic/claude-haiku-4.5` | `anthropic/claude-sonnet-4.5` | `anthropic/claude-opus-4.5` |
+| **Claude** | `anthropic/claude-haiku-4.5` | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.6` |
 | **GPT** | `openai/gpt-4.1-mini` | `openai/gpt-5` | `openai/gpt-5-pro` |
 | **Kimi** | `moonshotai/kimi-k2` | `moonshotai/kimi-k2.5` | `moonshotai/kimi-k2.5` |
 | **Qwen** | `qwen/qwen-turbo` | `qwen/qwen-plus` | `qwen/qwen3-max` |
 
-**Last updated**: 2026-01-27 (Kimi standard/premium → K2.5)
+**Last updated**: 2026-03-26 (Claude → 4.6, Grok premium → 4.20 beta)
 
 ---
 
@@ -154,4 +154,6 @@ If adding a new provider (e.g., "mistral") rather than updating existing tiers:
 
 | Date | Model | Tiers Changed | Old → New | Reason |
 |------|-------|---------------|-----------|--------|
+| 2026-03-26 | Claude | Standard, Premium | `claude-sonnet-4.5`, `claude-opus-4.5` → `claude-sonnet-4.6`, `claude-opus-4.6` | Gen upgrade. Opus 4.6 gets 1M context (was 200K). Same pricing. |
+| 2026-03-26 | Grok | Premium | `grok-4` → `grok-4.20-beta` | New flagship. $2/$6 (was $3/$15). 2M context (was 256K). |
 | 2026-01-27 | Kimi | Standard, Premium | `kimi-k2-0905`, `kimi-k2-thinking` → `kimi-k2.5` | K2.5 launch: multimodal SOTA, reasoning support, gen upgrade |

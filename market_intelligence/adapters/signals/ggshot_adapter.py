@@ -11,7 +11,8 @@ from typing import Dict, Any
 
 from market_intelligence.adapters.base import DataAdapter
 from market_intelligence.types import QueryParams, AdapterResponse, AdapterError
-from core.common.db import get_db_connection
+import asyncio
+from core.common.db import get_db_connection, db_fetch_all
 
 
 class GGShotAdapter(DataAdapter):
@@ -65,26 +66,21 @@ class GGShotAdapter(DataAdapter):
         include_raw = params.get('include_raw', False)
 
         try:
-            # Get data source ID
-            signals_source_id = self._get_signals_source_id()
+            # Get data source ID (sync function with cache — run in thread on first call)
+            signals_source_id = await asyncio.to_thread(self._get_signals_source_id)
 
             # Query for latest signal per timeframe
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # Use DISTINCT ON to get latest signal per timeframe
-                    cur.execute("""
-                        SELECT DISTINCT ON (timeframe)
-                            timeframe,
-                            data_points,
-                            raw_data,
-                            updated_at
-                        FROM market_data
-                        WHERE symbol = %s
-                          AND data_source = %s
-                        ORDER BY timeframe, updated_at DESC
-                    """, (symbol, signals_source_id))
-
-                    rows = cur.fetchall()
+            rows = await db_fetch_all("""
+                SELECT DISTINCT ON (timeframe)
+                    timeframe,
+                    data_points,
+                    raw_data,
+                    updated_at
+                FROM market_data
+                WHERE symbol = %s
+                  AND data_source = %s
+                ORDER BY timeframe, updated_at DESC
+            """, (symbol, signals_source_id))
 
             if not rows:
                 self._log.info(f"No ggShot signals found for {symbol}")

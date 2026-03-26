@@ -12,7 +12,7 @@ updating catalog_mapping.py, not modifying ggbot.py or this orchestrator.
 import asyncio
 from typing import Dict, Any, Optional, List
 from core.common.logger import logger
-from core.common.db import get_db_connection
+from core.common.db import get_db_connection, db_fetch_one
 from core.services.user_service import UserService
 from core.symbols.standardizer import UniversalSymbolStandardizer
 from market_intelligence.gateway import MarketIntelligence
@@ -299,35 +299,32 @@ async def _check_permission(
     """
     # Query database for data point's requires_premium AND enabled flags
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT dp.requires_premium, dp.enabled, ds.enabled as source_enabled
-                    FROM data_points dp
-                    JOIN data_sources ds ON dp.source_id = ds.source_id
-                    WHERE ds.name = %s AND dp.name = %s
-                """, (source_name, point_name))
+        result = await db_fetch_one("""
+            SELECT dp.requires_premium, dp.enabled, ds.enabled as source_enabled
+            FROM data_points dp
+            JOIN data_sources ds ON dp.source_id = ds.source_id
+            WHERE ds.name = %s AND dp.name = %s
+        """, (source_name, point_name))
 
-                result = cur.fetchone()
-                if not result:
-                    logger.warning(f"Data point not found: {source_name}.{point_name}")
-                    return False
+        if not result:
+            logger.warning(f"Data point not found: {source_name}.{point_name}")
+            return False
 
-                requires_premium, point_enabled, source_enabled = result
+        requires_premium, point_enabled, source_enabled = result
 
-                # Check if data point or source is disabled
-                if not point_enabled or not source_enabled:
-                    logger.debug(f"Data point disabled: {source_name}.{point_name} (point_enabled={point_enabled}, source_enabled={source_enabled})")
-                    return False
+        # Check if data point or source is disabled
+        if not point_enabled or not source_enabled:
+            logger.debug(f"Data point disabled: {source_name}.{point_name} (point_enabled={point_enabled}, source_enabled={source_enabled})")
+            return False
 
-                # If free, allow access
-                if not requires_premium:
-                    return True
+        # If free, allow access
+        if not requires_premium:
+            return True
 
-                # If premium, check user permissions
-                # For now, point_name must be in paid_data_points array
-                # Example: 'ggshot' in user.paid_data_points grants access to ggshot signals
-                return point_name in user_permissions
+        # If premium, check user permissions
+        # For now, point_name must be in paid_data_points array
+        # Example: 'ggshot' in user.paid_data_points grants access to ggshot signals
+        return point_name in user_permissions
 
     except Exception as e:
         logger.error(f"Permission check failed for {source_name}.{point_name}: {e}")

@@ -39,6 +39,7 @@ class BotConfigV2:
         first_run_used: bool = False,
         free_runs_remaining: int = 3,
         rei_enabled: bool = False,
+        arena_enabled: bool = False,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -62,6 +63,7 @@ class BotConfigV2:
         self.first_run_used = first_run_used
         self.free_runs_remaining = free_runs_remaining
         self.rei_enabled = rei_enabled
+        self.arena_enabled = arena_enabled
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -136,6 +138,7 @@ class BotConfigV2:
             first_run_used=data.get("first_run_used", False),
             free_runs_remaining=data.get("free_runs_remaining", 3),
             rei_enabled=data.get("rei_enabled", False),
+            arena_enabled=data.get("arena_enabled", False),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -298,7 +301,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used, free_runs_remaining
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used, free_runs_remaining, arena_enabled
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -316,6 +319,7 @@ class ConfigService:
                     state = result[8] or "inactive"
                     first_run_used = result[9] if result[9] is not None else False
                     free_runs_remaining = result[10] if result[10] is not None else 3
+                    arena_enabled = result[11] if result[11] is not None else False
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -341,6 +345,7 @@ class ConfigService:
                             "state": state,
                             "first_run_used": first_run_used,
                             "free_runs_remaining": free_runs_remaining,
+                            "arena_enabled": arena_enabled,
                             "created_at": result[2].isoformat() if result[2] else None,
                             "updated_at": result[3].isoformat() if result[3] else None
                         }
@@ -360,6 +365,7 @@ class ConfigService:
                         flattened_config["state"] = state
                         flattened_config["first_run_used"] = first_run_used
                         flattened_config["free_runs_remaining"] = free_runs_remaining
+                        flattened_config["arena_enabled"] = arena_enabled
                         if "created_at" not in flattened_config and result[2]:
                             flattened_config["created_at"] = result[2].isoformat()
                         if "updated_at" not in flattened_config and result[3]:
@@ -388,14 +394,14 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
-                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining
+                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
 
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled = row
 
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -424,6 +430,7 @@ class ConfigService:
                                 "is_public_performance": is_public_performance or False,
                                 "first_run_used": first_run_used if first_run_used is not None else False,
                                 "free_runs_remaining": free_runs_remaining if free_runs_remaining is not None else 3,
+                                "arena_enabled": arena_enabled if arena_enabled is not None else False,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -443,6 +450,7 @@ class ConfigService:
                             flattened_config["is_public_performance"] = is_public_performance or False
                             flattened_config["first_run_used"] = first_run_used if first_run_used is not None else False
                             flattened_config["free_runs_remaining"] = free_runs_remaining if free_runs_remaining is not None else 3
+                            flattened_config["arena_enabled"] = arena_enabled if arena_enabled is not None else False
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:

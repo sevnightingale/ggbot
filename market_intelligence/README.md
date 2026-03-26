@@ -1,8 +1,8 @@
 # Market Data System - Complete Architecture
 
 **Status**: ✅ Production Deployed
-**Version**: Phase 1 Complete (37 data points live, cost-optimized)
-**Last Updated**: 2026-03-21
+**Version**: Phase 1 Complete (38 data points live, cost-optimized + ACP agents)
+**Last Updated**: 2026-03-24
 
 The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **37 data points** across **8 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
 
@@ -44,8 +44,8 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 **Intelligence Orchestrator** → Config-driven routing, parallel execution, permission system, agent support
 
 ### **Current Capabilities**
-- ✅ **37 data points** across 8 categories (all FREE tier)
-- ✅ **7 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB, Sebastian AI)
+- ✅ **38 data points** across 8 categories (all FREE tier)
+- ✅ **8 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB, Sebastian AI, ACP agents)
 - ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
 - ✅ **Agent dynamic queries** (query without modifying config)

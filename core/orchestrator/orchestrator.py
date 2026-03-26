@@ -6,6 +6,8 @@ to share the same orchestration logic without importing FastAPI app creation.
 """
 
 import asyncio
+import json
+import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
@@ -250,7 +252,17 @@ class GGBotOrchestrator:
                 config, user_id, decision_result, run_id=run_id
             )
 
-            if self._should_publish_signal(config, decision_result):
+            # Arena mirror: route trade to DGClaw
+            # Phase 2 (user agents via claw API) checked first, Phase 1 (admin via ACP SDK) as fallback
+            arena_agent = await self._get_user_arena_agent(config)
+            if arena_agent:
+                asyncio.create_task(
+                    self._execute_claw_arena_trade(arena_agent, config, decision_result, run_id)
+                )
+            elif self._is_arena_enabled(config):
+                await self._enqueue_arena_trade(config, decision_result, run_id)
+
+            if await self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
                     config, {}, decision_result
                 )
@@ -343,7 +355,16 @@ class GGBotOrchestrator:
                 config, user_id, decision_result, run_id=run_id
             )
 
-            if self._should_publish_signal(config, decision_result):
+            # Arena mirror: route trade to DGClaw
+            arena_agent = await self._get_user_arena_agent(config)
+            if arena_agent:
+                asyncio.create_task(
+                    self._execute_claw_arena_trade(arena_agent, config, decision_result, run_id)
+                )
+            elif self._is_arena_enabled(config):
+                await self._enqueue_arena_trade(config, decision_result, run_id)
+
+            if await self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
                     config, signal_data, decision_result
                 )
@@ -533,7 +554,7 @@ class GGBotOrchestrator:
             self._log.error(f"Failed to fetch latest ggShot signal: {e}")
             raise
 
-    def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
+    async def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
         """Check if signal should be published to telegram."""
         telegram_config = config.telegram_integration or {}
         publisher_config = telegram_config.get('publisher', {})
@@ -546,26 +567,23 @@ class GGBotOrchestrator:
             return False
 
         try:
-            from core.common.db import get_db_connection
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT subscription_tier, subscription_status
-                        FROM user_profiles
-                        WHERE user_id = %s
-                    """, (config.user_id,))
+            from core.common.db import db_fetch_one
+            result = await db_fetch_one("""
+                SELECT subscription_tier, subscription_status
+                FROM user_profiles
+                WHERE user_id = %s
+            """, (config.user_id,))
 
-                    result = cur.fetchone()
-                    if not result:
-                        self._log.warning(f"No user profile found for {config.user_id}")
-                        return False
+            if not result:
+                self._log.warning(f"No user profile found for {config.user_id}")
+                return False
 
-                    tier, status = result
+            tier, status = result
 
-                    paid_tiers = ('usage_based', 'prepaid', 'pro')
-                    if tier not in paid_tiers or status != 'active':
-                        self._log.info(f"User {config.user_id} requires paid subscription for signal publishing")
-                        return False
+            paid_tiers = ('usage_based', 'prepaid', 'pro')
+            if tier not in paid_tiers or status != 'active':
+                self._log.info(f"User {config.user_id} requires paid subscription for signal publishing")
+                return False
 
         except Exception as e:
             self._log.error(f"Failed to check subscription for signal publishing: {e}")
@@ -808,18 +826,14 @@ class GGBotOrchestrator:
             # Old rows linger after config changes and pollute LLM prompts.
             # Use effective_timeframes (which accounts for per-indicator TF overrides).
             try:
-                from core.common.db import get_db_connection
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("""
-                            DELETE FROM market_data
-                            WHERE config_id = %s AND symbol = %s
-                              AND timeframe != ALL(%s)
-                        """, (config.config_id, symbol, effective_timeframes))
-                        deleted = cur.rowcount
-                        if deleted > 0:
-                            conn.commit()
-                            self._log.info(f"Cleaned up {deleted} stale market_data rows for removed timeframes")
+                from core.common.db import db_execute
+                deleted = await db_execute("""
+                    DELETE FROM market_data
+                    WHERE config_id = %s AND symbol = %s
+                      AND timeframe != ALL(%s)
+                """, (config.config_id, symbol, effective_timeframes))
+                if deleted > 0:
+                    self._log.info(f"Cleaned up {deleted} stale market_data rows for removed timeframes")
             except Exception as e:
                 self._log.warning(f"Failed to clean stale market_data (non-critical): {e}")
 
@@ -920,6 +934,235 @@ class GGBotOrchestrator:
                 "confidence": 0.0
             }
 
+    # =========================================================================
+    # Arena Mirror — DGClaw parallel execution layer
+    # =========================================================================
+
+    def _is_arena_enabled(self, config: BotConfigV2) -> bool:
+        """Check if this config should mirror trades to DGClaw arena."""
+        arena_configs = os.environ.get('ARENA_ENABLED_CONFIGS', '')
+        if not arena_configs:
+            return False
+        return config.config_id in [c.strip() for c in arena_configs.split(',') if c.strip()]
+
+    async def _enqueue_arena_trade(
+        self, config: BotConfigV2, decision_result: Dict[str, Any], run_id: Optional[str] = None
+    ):
+        """
+        Enqueue a trade intent to the arena Redis queue for sebastian_virtuals to process.
+        Fire-and-forget — does not block the bot cycle.
+        """
+        try:
+            action = decision_result.get('action', 'wait')
+            if action in ['wait', 'no_action', 'hold']:
+                return  # Nothing to mirror
+
+            import redis as sync_redis
+            r = sync_redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+            trading_config = config.trading or {}
+            arena_intent = {
+                'config_id': config.config_id,
+                'config_name': config.config_name,
+                'symbol': decision_result.get('symbol') or config.selected_pair,
+                'action': action,
+                'confidence': decision_result.get('confidence', 0),
+                'stop_loss_price': decision_result.get('stop_loss_price'),
+                'take_profit_price': decision_result.get('take_profit_price'),
+                'leverage': trading_config.get('leverage', 3),
+                'max_margin_percent': trading_config.get('position_sizing', {}).get('max_margin_percent', 20),
+                'run_id': run_id,
+                'enqueued_at': datetime.now(timezone.utc).isoformat(),
+            }
+
+            r.lpush('arena:trade_queue', json.dumps(arena_intent))
+            r.close()
+            self._log.info(f"Arena trade enqueued: {action} {arena_intent['symbol']}")
+
+        except Exception as e:
+            # Non-fatal — arena mirror failing should never affect the primary trade
+            self._log.error(f"Failed to enqueue arena trade: {e}")
+
+    # =========================================================================
+    # Arena Phase 2 — Claw API direct routing (user agents)
+    # =========================================================================
+
+    async def _get_user_arena_agent(self, config: BotConfigV2) -> Optional[Dict[str, Any]]:
+        """
+        Check if this config's user has an arena agent AND this config is arena_enabled.
+
+        Returns dict with claw_api_key and wallet_address, or None.
+        """
+        if not getattr(config, 'arena_enabled', False):
+            return None
+
+        from core.common.db import db_fetch_one
+
+        result = await db_fetch_one("""
+            SELECT aa.wallet_address, aa.claw_api_key_vault_id, aa.agent_name
+            FROM arena_agents aa
+            WHERE aa.assigned_user_id = %s AND aa.status = 'assigned'
+        """, (config.user_id,))
+
+        if not result or not result[1]:
+            return None
+
+        wallet_address, claw_vault_id, agent_name = result
+
+        # Decrypt claw API key from vault
+        claw_key_row = await db_fetch_one("""
+            SELECT decrypted_secret
+            FROM vault.decrypted_secrets
+            WHERE id = %s
+        """, (claw_vault_id,))
+
+        if not claw_key_row:
+            self._log.error(f"Vault secret missing for arena agent {agent_name}")
+            return None
+
+        return {
+            'wallet_address': wallet_address,
+            'claw_api_key': claw_key_row[0],
+            'agent_name': agent_name,
+        }
+
+    async def _execute_claw_arena_trade(
+        self,
+        arena_agent: Dict[str, Any],
+        config: BotConfigV2,
+        decision_result: Dict[str, Any],
+        run_id: Optional[str] = None,
+    ):
+        """
+        Execute arena trade via claw REST API. Fire-and-forget.
+
+        Same position sizing logic as Phase 1 dgclaw_service but async.
+        """
+        try:
+            action = decision_result.get('action', 'wait')
+            if action in ['wait', 'no_action', 'hold']:
+                return
+
+            from trading.virtuals.claw_api import ClawAPIClient
+
+            client = ClawAPIClient(arena_agent['claw_api_key'])
+            wallet = arena_agent['wallet_address']
+
+            # Determine side
+            if action in ('long', 'enter_long', 'enter'):
+                side = 'long'
+            elif action in ('short', 'enter_short'):
+                side = 'short'
+            elif action in ('exit', 'close'):
+                # Close position — need to determine pair
+                symbol = decision_result.get('symbol') or config.selected_pair
+                pair = self._arena_to_pair(symbol)
+                if pair:
+                    result = await client.close_trade(pair)
+                    self._log.info(f"Arena close {pair}: {result.get('status')}")
+                return
+            else:
+                return
+
+            # Get DGClaw balance for position sizing
+            account = await client.get_dgclaw_account(wallet)
+            if not account:
+                self._log.warning("Arena: DGClaw account query failed, skipping")
+                return
+
+            balance = account.get('balance', 0)
+            if balance <= 0:
+                self._log.warning("Arena: DGClaw balance is $0, skipping")
+                return
+
+            # Position sizing: confidence x max_margin% x balance x leverage
+            trading_config = config.trading or {}
+            confidence = decision_result.get('confidence', 0.5)
+            leverage = trading_config.get('leverage', 3)
+            max_margin_pct = trading_config.get('position_sizing', {}).get('max_margin_percent', 20)
+
+            margin = confidence * (max_margin_pct / 100.0) * balance
+            size_usd = margin * leverage
+
+            # Safety cap: 90% of balance as margin
+            max_margin = balance * 0.90
+            if margin > max_margin:
+                margin = max_margin
+                size_usd = margin * leverage
+
+            if size_usd < 10:
+                self._log.debug(f"Arena size ${size_usd:.2f} below $10 minimum, skipping")
+                return
+
+            # Convert symbol to HL pair name
+            symbol = decision_result.get('symbol') or config.selected_pair
+            pair = self._arena_to_pair(symbol)
+            if not pair:
+                self._log.warning(f"Arena: cannot convert symbol {symbol}")
+                return
+
+            self._log.info(
+                f"Arena trade: {side.upper()} {pair} ${size_usd:.0f} @ {leverage}x "
+                f"(agent={arena_agent['agent_name']})"
+            )
+
+            # SL/TP
+            sl = decision_result.get('stop_loss_price')
+            tp = decision_result.get('take_profit_price')
+
+            result = await client.create_trade(
+                pair=pair,
+                side=side,
+                size=size_usd,
+                leverage=leverage,
+                stop_loss=sl,
+                take_profit=tp,
+            )
+
+            status = result.get('status', 'unknown')
+            self._log.info(f"Arena trade result: {status} (job={result.get('job_id', 'N/A')})")
+
+            # Log activity
+            try:
+                from core.common.activity_logger import log_activity_safe
+                log_activity_safe(
+                    config_id=config.config_id,
+                    user_id=config.user_id,
+                    activity_type=f"arena_{side}",
+                    activity_source="claw_arena",
+                    summary=f"Arena: {side.upper()} {pair} ${size_usd:.0f} @ {leverage}x",
+                    details={
+                        "pair": pair,
+                        "side": side,
+                        "size_usd": round(size_usd, 2),
+                        "leverage": leverage,
+                        "agent": arena_agent['agent_name'],
+                        "job_id": result.get('job_id'),
+                        "status": status,
+                    },
+                    importance=5,
+                )
+            except Exception:
+                pass
+
+        except Exception as e:
+            self._log.error(f"Claw arena trade failed: {e}")
+
+    @staticmethod
+    def _arena_to_pair(symbol: str) -> Optional[str]:
+        """Convert any symbol format to HL bare name (e.g., 'ETH')."""
+        if not symbol:
+            return None
+        # Strip common suffixes: BTC/USDT -> BTC, BTC-USDT -> BTC, BTCUSDT -> BTC
+        for sep in ['/', '-']:
+            if sep in symbol:
+                symbol = symbol.split(sep)[0]
+        # Handle BTCUSDT-style (no separator)
+        for suffix in ['USDT', 'USD', 'USDC', 'PERP']:
+            if symbol.upper().endswith(suffix) and len(symbol) > len(suffix):
+                symbol = symbol[:-len(suffix)]
+        return symbol.upper() if symbol.isalpha() and len(symbol) <= 10 else None
+
     async def _run_trading_v2(
         self,
         config: BotConfigV2,
@@ -1006,36 +1249,30 @@ class GGBotOrchestrator:
 
             if trading_action == "close":
                 try:
-                    from core.common.db import get_db_connection
+                    from core.common.db import db_fetch_one
                     open_positions = []
 
                     if is_live or is_aster or is_hyperliquid:
                         provider = 'hyperliquid' if is_hyperliquid else ('aster' if is_aster else 'symphony')
-                        with get_db_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute("""
-                                    SELECT batch_id FROM live_trades
-                                    WHERE config_id = %s AND provider = %s AND closed_at IS NULL
-                                    ORDER BY created_at DESC LIMIT 1
-                                """, (config.config_id, provider))
-                                result = cur.fetchone()
-                                if result:
-                                    open_positions.append({'batch_id': result[0]})
+                        result = await db_fetch_one("""
+                            SELECT batch_id FROM live_trades
+                            WHERE config_id = %s AND provider = %s AND closed_at IS NULL
+                            ORDER BY created_at DESC LIMIT 1
+                        """, (config.config_id, provider))
+                        if result:
+                            open_positions.append({'batch_id': result[0]})
                     else:
-                        with get_db_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute("""
-                                    SELECT trade_id, symbol, side FROM paper_trades
-                                    WHERE config_id = %s AND symbol = %s AND status = 'open'
-                                    ORDER BY opened_at DESC LIMIT 1
-                                """, (config.config_id, symbol))
-                                result = cur.fetchone()
-                                if result:
-                                    open_positions.append({
-                                        'trade_id': result[0],
-                                        'symbol': result[1],
-                                        'side': result[2]
-                                    })
+                        result = await db_fetch_one("""
+                            SELECT trade_id, symbol, side FROM paper_trades
+                            WHERE config_id = %s AND symbol = %s AND status = 'open'
+                            ORDER BY opened_at DESC LIMIT 1
+                        """, (config.config_id, symbol))
+                        if result:
+                            open_positions.append({
+                                'trade_id': result[0],
+                                'symbol': result[1],
+                                'side': result[2]
+                            })
 
                     if not open_positions:
                         return {

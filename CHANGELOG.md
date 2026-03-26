@@ -6,6 +6,114 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-26 - DGClaw Arena Phase 1 + Phase 2 Validation
+
+**Architecture Doc**: [trading/virtuals/README.md](trading/virtuals/README.md)
+
+Arena is parallel execution layer — bot trades normally (paper/live), same decision also mirrors to DGClaw via ACP. Every arena trade = on-chain ACP transaction = $GG volume.
+
+**Phase 2 Validation — Lite Agent Pool Model**:
+- Discovered lite agents use **claw REST API** (`x-api-key` header) instead of EOA/SDK signing
+- Privy-managed signer handles on-chain transactions automatically via `https://claw-api.virtuals.io`
+- Full programmatic flow proven: create agent → tokenize → fund → register DGClaw → deposit → trade
+- Test agent `ggbots-arena-test-001` (GGBOT001): created, funded $6, registered, deposited $4.99 to HL, opened ETH long $12 @ 3x
+- Key endpoints: `POST /acp/jobs` (create), `GET /acp/jobs/{id}` (poll), `GET /acp/wallet-balances`
+- Agent pool model viable: batch-create ~50 lite agents per auth session (30min JWT), tokenize on dashboard, assign to users on demand
+- No user-side Virtuals interaction needed — user just sends USDC to assigned agent wallet
+
+**DGClaw Arena Service** (`trading/virtuals/dgclaw_service.py`, new):
+- `execute_arena_trade()` — full ACP job lifecycle (initiate → pay → poll → receipt, ~20-50s)
+- `close_arena_position()` — close via ACP `perp_trade` action=close
+- `get_arena_account()` — queries DGClaw Railway backend (`dgclaw-app-production.up.railway.app`)
+- Position sizing: `confidence × max_margin% × balance × leverage`, 90% safety cap, $10 min
+- Payment retry on "No negotiation memo" (timing issue — memo not ready on first poll)
+
+**Orchestrator Arena Hook** (`core/orchestrator/orchestrator.py`):
+- `_is_arena_enabled()` — checks `ARENA_ENABLED_CONFIGS` env var (comma-separated config IDs)
+- `_enqueue_arena_trade()` — LPUSH to `arena:trade_queue` (fire-and-forget, never blocks bot cycle)
+- Hooks in both `_run_autonomous_trading_cycle()` and `_run_signal_validation_cycle()`
+
+**Sebastian-Virtuals Section D** (`sebastian_virtuals.py`):
+- `process_arena_trades()` — RPOP from `arena:trade_queue`, dispatches to dgclaw_service
+- `DGClawArenaService` initialized on startup alongside ACP client
+- Max 3 trades per 30s poll cycle
+
+**Key Discovery — DGClaw Fund Management**:
+- DGClaw pools funds centrally, NOT per-HL-subaccount. Subaccount only holds active margin.
+- HL Info API shows $0 between trades (misleading). Railway backend has real balance.
+- API: `/users/{wallet}/account`, `/users/{wallet}/positions`, `/users/{wallet}/trades`
+- Reference: https://github.com/Virtual-Protocol/dgclaw-skill.git
+
+**Config**: Sev's live HL bot (`b9d9bf00...`) as admin arena bot. $35.79 DGClaw balance. PM2: removed `sebastian-chrome` (245MB), started `sebastian-virtuals` with DGClaw env vars.
+
+---
+
+## 2026-03-26 - Async DB Migration: Eliminate Bot Execution Deadlocks
+
+**Root cause**: 2026-03-24 19:00 UTC, 20/37 bots permanently hung. Sync psycopg2 `get_db_connection()` blocked asyncio event loop when 29+ bots fired at candle boundary. APScheduler `max_instances=1` prevented recovery → bots stuck until manual restart.
+
+**Async DB helpers** (`core/common/db.py`):
+- Added `db_fetch_one`, `db_fetch_all`, `db_execute`, `db_execute_returning` — wrap sync queries in `asyncio.to_thread()`
+- `get_db_connection()` unchanged for sync callers (API, monitors)
+
+**20 call sites migrated across 6 hot-path files**:
+- `core/orchestrator/orchestrator.py` — 4 sites (subscription check, stale cleanup, position lookups)
+- `decision/engine_v2.py` — 10 sites (6 DB calls + 4 activity logger wraps via `asyncio.to_thread(lambda: ...)`)
+- `market_intelligence/orchestrator.py` — 1 site (`_check_permission`, called 4-12x per cycle)
+- `market_intelligence/adapters/signals/ggshot_adapter.py` — 2 sites
+- `market_intelligence/adapters/internal/market_conditions.py` — 1 site
+- `core/scheduler/bot_runner.py` — reconcile loop DB query wrapped
+
+**Scheduler hardening** (`core/scheduler/bot_runner.py`, `ggbot_scheduler.py`):
+- `asyncio.wait_for(cycle, timeout=180)` — kills hung cycles, frees APScheduler slot, deletes Redis idempotency key for retry
+- `ThreadPoolExecutor(max_workers=32)` as default executor
+- `Semaphore(30)` — concurrency cap with headroom for connection pool (maxconn=50)
+- TCP keepalive on connection pool (`keepalives_idle=30`) — prevents Supabase PgBouncer from closing idle connections
+
+**Result**: 36 bots at boundary complete in 25-36s. Zero hangs. Timeout mechanism works (1 slow bot correctly killed and retried).
+
+**Capacity**: ~100 bots with zero changes. Tuning knobs: semaphore (30→50), ThreadPool (32→48), pool maxconn (50→80). Asyncpg migration at 300+ bots.
+
+---
+
+## 2026-03-24 - ACP Agent Intelligence: Buyer + Provider Infrastructure
+
+**Planning Doc**: [DOCS/todo/ACP_AGENT_INTELLIGENCE.md](DOCS/todo/ACP_AGENT_INTELLIGENCE.md)
+
+**Agent Registration** (revised from Sebastian → $GG token agent):
+- ggbots.ai registered as Hybrid agent linked to $GG token (`isVirtualAgent: true`)
+- Smart wallet `0x2E48f...`, Sebastian wallet `0xDAD56...` as separate provider
+- On-chain entity_id is **2** (not API ID 40623) — SDK validates signer via `signers(entity_id, wallet)` on `SingleSignerValidationModule`
+- First live ACP transactions: Otto AI crypto_news ($0.01) + self-consumption ggbots→Sebastian ($0.07)
+
+**ACP Client** (`core/services/acp_client.py`):
+- Singleton wrapper, dual-client: buyer (ggbots.ai wallet) + provider (Sebastian wallet)
+- Lazy init from env vars, polling mode (`skip_socket_connection=True`)
+- Buyer: `buy_from_offering()`, `pay_job()`, `get_deliverable()` — full job lifecycle
+- Provider: `get_pending_provider_jobs()`, `accept_job()`, `deliver_job()`
+- Agent discovery cache in Redis (`acp:agent:{address}`, 1hr TTL)
+
+**MI Adapter** (`market_intelligence/adapters/acp/acp_agent_adapter.py`):
+- Cache-first: reads Redis, never blocks bot cycle on ACP
+- Cache miss → enqueues job to `acp:job_queue` (Redis list), skips gracefully
+- Dedup via `acp:pending:{agent}:{hash}` markers (SET NX, 600s TTL)
+- Catalog YAML at `market_intelligence/catalog/data_types/acp/acp_agent.yaml`
+
+**Background Service** (`sebastian_virtuals.py`):
+- PM2 service `sebastian-virtuals` with 30s poll loop
+- Provider: polls pending jobs → reads market_conditions from DB → delivers
+- Buyer queue: pops from `acp:job_queue` → initiates ACP jobs on-chain
+- Buyer monitor: polls active jobs → pay/collect/cache deliverables in Redis
+
+**Catalog + Routing**:
+- `gateway.py`: added `'acp'` category routing
+- `catalog_mapping.py`: `ggbots_acp` entry active, Otto/Wolfpack/BlackSwan commented (pending address discovery)
+- DB seed: `ggbots_acp` data point under `agentic_intelligence` source
+
+**Known Issue**: Self-consumption evaluate reverts with `OnlyCounterParty()` because both wallets share same EOA/entity_id. Fix: create separate EOA for Sebastian.
+
+---
+
 ## 2026-03-21 - Extraction Enrichment: Multi-Period MAs + Channel Price Levels + BB Fix
 
 **Preprocessor Summary Gaps** (Dennis report: SZN2 bots hitting PARSE_FAIL):

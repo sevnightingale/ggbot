@@ -743,6 +743,180 @@ class VaultManager:
             logger.bind(user_id=user_id).error(f"Failed to delete Hyperliquid credential: {e}")
             return False
 
+    # =========================================================================
+    # Arena Agent Credentials (Supabase Vault → arena_agents table)
+    # =========================================================================
+
+    @staticmethod
+    async def store_arena_credential(
+        agent_id: int,
+        claw_api_key: str,
+        dgclaw_api_key: Optional[str] = None,
+    ) -> bool:
+        """
+        Store arena agent API keys in Vault and update arena_agents vault_id columns.
+
+        Args:
+            agent_id: arena_agents.id (serial PK)
+            claw_api_key: Claw REST API key (x-api-key header)
+            dgclaw_api_key: Optional DGClaw API key
+
+        Returns:
+            True if stored successfully
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Store claw API key in vault
+                    vault_name_claw = f"arena_claw_{agent_id}"
+                    cur.execute(
+                        "SELECT vault.create_secret(%s, %s) as secret_id;",
+                        (claw_api_key, vault_name_claw)
+                    )
+                    claw_vault_id = cur.fetchone()[0]
+
+                    # Store DGClaw API key if provided
+                    dgclaw_vault_id = None
+                    if dgclaw_api_key:
+                        vault_name_dgclaw = f"arena_dgclaw_{agent_id}"
+                        cur.execute(
+                            "SELECT vault.create_secret(%s, %s) as secret_id;",
+                            (dgclaw_api_key, vault_name_dgclaw)
+                        )
+                        dgclaw_vault_id = cur.fetchone()[0]
+
+                    # Update arena_agents with vault references
+                    cur.execute("""
+                        UPDATE arena_agents
+                        SET claw_api_key_vault_id = %s,
+                            dgclaw_api_key_vault_id = %s
+                        WHERE id = %s
+                    """, (claw_vault_id, dgclaw_vault_id, agent_id))
+
+                    conn.commit()
+                    logger.info(f"Stored arena credentials for agent {agent_id}")
+                    return True
+
+        except Exception as e:
+            logger.error(f"Failed to store arena credential for agent {agent_id}: {e}")
+            return False
+
+    @staticmethod
+    async def get_arena_credential(agent_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve arena agent API keys from Vault.
+
+        Args:
+            agent_id: arena_agents.id
+
+        Returns:
+            Dict with 'claw_api_key', 'wallet_address', 'agent_name', etc. or None
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT claw_api_key_vault_id, dgclaw_api_key_vault_id,
+                               wallet_address, agent_name, token_symbol
+                        FROM arena_agents
+                        WHERE id = %s
+                    """, (agent_id,))
+
+                    result = cur.fetchone()
+                    if not result or not result[0]:
+                        return None
+
+                    claw_vault_id, dgclaw_vault_id, wallet_address, agent_name, token_symbol = result
+
+                    # Decrypt claw API key
+                    cur.execute("""
+                        SELECT decrypted_secret
+                        FROM vault.decrypted_secrets
+                        WHERE id = %s
+                    """, (claw_vault_id,))
+                    vault_result = cur.fetchone()
+                    if not vault_result:
+                        logger.error(f"Vault secret not found for arena agent {agent_id}")
+                        return None
+
+                    claw_api_key = vault_result[0]
+
+                    # Decrypt DGClaw API key if present
+                    dgclaw_api_key = None
+                    if dgclaw_vault_id:
+                        cur.execute("""
+                            SELECT decrypted_secret
+                            FROM vault.decrypted_secrets
+                            WHERE id = %s
+                        """, (dgclaw_vault_id,))
+                        dgclaw_result = cur.fetchone()
+                        if dgclaw_result:
+                            dgclaw_api_key = dgclaw_result[0]
+
+                    return {
+                        'claw_api_key': claw_api_key,
+                        'dgclaw_api_key': dgclaw_api_key,
+                        'wallet_address': wallet_address,
+                        'agent_name': agent_name,
+                        'token_symbol': token_symbol,
+                    }
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve arena credential for agent {agent_id}: {e}")
+            return None
+
+    @staticmethod
+    async def get_arena_credential_by_user(user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve the arena agent assigned to a user, with decrypted claw API key.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            Dict with 'claw_api_key', 'wallet_address', 'agent_id', etc. or None
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT aa.id, aa.claw_api_key_vault_id, aa.wallet_address,
+                               aa.agent_name, aa.token_symbol, aa.user_wallet_address
+                        FROM arena_agents aa
+                        WHERE aa.assigned_user_id = %s AND aa.status = 'assigned'
+                    """, (user_id,))
+
+                    result = cur.fetchone()
+                    if not result or not result[1]:
+                        return None
+
+                    agent_id, claw_vault_id, wallet_address, agent_name, token_symbol, user_wallet = result
+
+                    cur.execute("""
+                        SELECT decrypted_secret
+                        FROM vault.decrypted_secrets
+                        WHERE id = %s
+                    """, (claw_vault_id,))
+                    vault_result = cur.fetchone()
+                    if not vault_result:
+                        logger.bind(user_id=user_id).error(
+                            f"Vault secret not found for arena agent {agent_id}"
+                        )
+                        return None
+
+                    return {
+                        'agent_id': agent_id,
+                        'claw_api_key': vault_result[0],
+                        'wallet_address': wallet_address,
+                        'agent_name': agent_name,
+                        'token_symbol': token_symbol,
+                        'user_wallet_address': user_wallet,
+                    }
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to retrieve arena credential: {e}")
+            return None
+
 
 # Convenience functions for common operations
 async def store_credential(user_id: str, name: str, provider: str, api_key: str) -> Optional[str]:
@@ -796,3 +970,15 @@ async def get_hyperliquid_credential(user_id: str) -> Optional[Dict[str, Any]]:
 async def delete_hyperliquid_credential(user_id: str) -> bool:
     """Delete Hyperliquid credential. Convenience wrapper."""
     return await VaultManager.delete_hyperliquid_credential(user_id)
+
+async def store_arena_credential(agent_id: int, claw_api_key: str, dgclaw_api_key: Optional[str] = None) -> bool:
+    """Store arena agent credentials. Convenience wrapper."""
+    return await VaultManager.store_arena_credential(agent_id, claw_api_key, dgclaw_api_key)
+
+async def get_arena_credential(agent_id: int) -> Optional[Dict[str, Any]]:
+    """Get arena agent credentials. Convenience wrapper."""
+    return await VaultManager.get_arena_credential(agent_id)
+
+async def get_arena_credential_by_user(user_id: str) -> Optional[Dict[str, Any]]:
+    """Get arena agent for a user. Convenience wrapper."""
+    return await VaultManager.get_arena_credential_by_user(user_id)

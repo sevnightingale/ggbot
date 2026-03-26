@@ -194,14 +194,16 @@ Sebastian AI research agent produces daily cross-market intelligence reports. Th
 ## Environment Variables
 
 ```bash
-# ACP Agent (Sebastian by ggbots.ai) — all set in .env
-ACP_WALLET_ADDRESS=0xDAD5606b4f049591859DF0f352Cc703881422612
+# ACP Buyer Agent (ggbots.ai — $GG token agent)
+ACP_WALLET_ADDRESS=0xREDACTED_AGENT_WALLET
 ACP_WALLET_PRIVATE_KEY=<set>   # EOA private key (no 0x prefix)
 ACP_EOA_ADDRESS=0xFF0ab2acF9b81DDd2cf16ad955a8Aaa0A4619bbD
-ACP_ENTITY_ID=29537
+ACP_ENTITY_ID=2   # ON-CHAIN entity_id (NOT API ID 40623!)
 ```
 
-No user-facing wallet setup. Platform manages a single buyer/provider wallet.
+**CRITICAL**: The `ACP_ENTITY_ID` is the **on-chain** entity_id, not the Virtuals marketplace API ID. The SDK validates signers via `signers(entity_id, wallet)` on the `SingleSignerValidationModule` contract. To find an agent's on-chain entity_id, scan `signers(0..N, wallet)` until a non-zero signer is found.
+
+**Dual-wallet architecture**: ggbots.ai = buyer, Sebastian = provider (separate wallet `0xDAD56...`). SDK blocks self-buy (same wallet), so two wallets are needed for self-consumption. Both currently share the same EOA — needs separate EOA for Sebastian to fix `OnlyCounterParty` evaluate revert.
 
 ---
 

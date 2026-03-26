@@ -1,4 +1,5 @@
 # common/db.py
+import asyncio
 import json
 import psycopg2
 from psycopg2 import pool
@@ -59,7 +60,14 @@ def _get_connection_pool():
             minconn=5,
             maxconn=50,
             dsn=database_url,
-            connect_timeout=5
+            connect_timeout=5,
+            # TCP keepalive prevents Supabase PgBouncer from closing idle connections.
+            # Without this, threads grabbing stale pooled connections get
+            # "SSL connection has been closed unexpectedly" errors.
+            keepalives=1,
+            keepalives_idle=30,     # seconds before first probe
+            keepalives_interval=10, # seconds between probes
+            keepalives_count=3      # failed probes before closing
         )
 
     return _connection_pool
@@ -84,6 +92,55 @@ def get_db_connection():
         yield conn
     finally:
         pool.putconn(conn)  # Return connection to pool (keeps SSL connection alive)
+
+# ---------------------------------------------------------------------------
+# Async-safe DB helpers — run sync psycopg2 queries in a thread pool so they
+# never block the asyncio event loop.  Used by the scheduler process where
+# 30+ bot coroutines share a single event loop thread.
+# ---------------------------------------------------------------------------
+
+async def db_fetch_one(sql, params=None):
+    """Execute SELECT returning one row, in a thread pool."""
+    def _run():
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.fetchone()
+    return await asyncio.to_thread(_run)
+
+
+async def db_fetch_all(sql, params=None):
+    """Execute SELECT returning all rows, in a thread pool."""
+    def _run():
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.fetchall()
+    return await asyncio.to_thread(_run)
+
+
+async def db_execute(sql, params=None):
+    """Execute INSERT/UPDATE/DELETE with commit, in a thread pool."""
+    def _run():
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                conn.commit()
+                return cur.rowcount
+    return await asyncio.to_thread(_run)
+
+
+async def db_execute_returning(sql, params=None):
+    """Execute INSERT ... RETURNING with commit, in a thread pool."""
+    def _run():
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                result = cur.fetchone()
+                conn.commit()
+                return result
+    return await asyncio.to_thread(_run)
+
 
 def upsert_market_data(user_id, symbol, config_id, data_dict, data_type=None, source=None, timeframe='mixed'):
     """

@@ -18,7 +18,7 @@ from decimal import Decimal
 from core.common.logger import logger
 from core.services.user_service import user_service
 from core.services.config_service import config_service
-from core.common.db import get_db_connection, DecimalEncoder
+from core.common.db import get_db_connection, DecimalEncoder, db_fetch_one, db_fetch_all, db_execute
 from core.services.llm_key_service import LLMKeyService
 from core.services.llm_pricing_service import llm_pricing_service
 from core.common.activity_logger import log_llm_activity_safe, log_activity
@@ -340,19 +340,21 @@ class DecisionEngineV2:
             symbol, signal_data, market_data, current_price, volume_analysis
         )
 
-        # Log market_query activity with formatted data
-        self._log_market_query_activity(
-            symbol=symbol,
-            query_mode="signal_validation",
-            current_price=current_price,
-            data_age_seconds=market_data.get('data_age_seconds', 0),
-            formatted_sections=formatted_sections,
-            metadata={
-                "timeframes_analyzed": market_data.get('timeframes_available', []),
-                "indicators_count": 21,  # All preprocessors
-                "signal_direction": signal_data.get('direction', 'UNKNOWN'),
-                "signal_source": signal_data.get('source', 'unknown')
-            }
+        # Log market_query activity with formatted data (run in thread — contains sync DB)
+        await asyncio.to_thread(
+            lambda: self._log_market_query_activity(
+                symbol=symbol,
+                query_mode="signal_validation",
+                current_price=current_price,
+                data_age_seconds=market_data.get('data_age_seconds', 0),
+                formatted_sections=formatted_sections,
+                metadata={
+                    "timeframes_analyzed": market_data.get('timeframes_available', []),
+                    "indicators_count": 21,  # All preprocessors
+                    "signal_direction": signal_data.get('direction', 'UNKNOWN'),
+                    "signal_source": signal_data.get('source', 'unknown')
+                }
+            )
         )
 
         # Call LLM for validation
@@ -434,19 +436,21 @@ class DecisionEngineV2:
         # Step 3: Build prompt from template
         prompt, formatted_sections = await self._build_opportunity_analysis_prompt(symbol, market_data, current_price, volume_analysis)
 
-        # Step 3.5: Log market_query activity with formatted data
-        self._log_market_query_activity(
-            symbol=symbol,
-            query_mode="opportunity_analysis",
-            current_price=current_price,
-            data_age_seconds=market_data.get('data_age_seconds', 0),
-            formatted_sections=formatted_sections,
-            metadata={
-                "timeframes_analyzed": market_data.get('timeframes_available', []),
-                "indicators_count": 21,  # All preprocessors
-                "ggshot_available": bool(formatted_sections.get('ggshot_signals')),
-                "market_intelligence_categories": list(self.market_intelligence.keys()) if self.market_intelligence else []
-            }
+        # Step 3.5: Log market_query activity with formatted data (run in thread — contains sync DB)
+        await asyncio.to_thread(
+            lambda: self._log_market_query_activity(
+                symbol=symbol,
+                query_mode="opportunity_analysis",
+                current_price=current_price,
+                data_age_seconds=market_data.get('data_age_seconds', 0),
+                formatted_sections=formatted_sections,
+                metadata={
+                    "timeframes_analyzed": market_data.get('timeframes_available', []),
+                    "indicators_count": 21,  # All preprocessors
+                    "ggshot_available": bool(formatted_sections.get('ggshot_signals')),
+                    "market_intelligence_categories": list(self.market_intelligence.keys()) if self.market_intelligence else []
+                }
+            )
         )
 
         # Step 4: Call LLM
@@ -489,78 +493,75 @@ class DecisionEngineV2:
                 if isinstance(ta_config, dict) and ta_config.get('timeframes'):
                     configured_timeframes = ta_config['timeframes']
 
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    if configured_timeframes:
-                        # Filter to only configured timeframes
-                        cur.execute("""
-                            SELECT timeframe, data_points, raw_data, updated_at
-                            FROM market_data
-                            WHERE config_id = %s AND symbol = %s AND timeframe = ANY(%s)
-                            ORDER BY timeframe ASC, updated_at DESC
-                        """, (self.config_id, symbol, configured_timeframes))
-                    else:
-                        # Fallback: no timeframe config available, fetch all
-                        cur.execute("""
-                            SELECT timeframe, data_points, raw_data, updated_at
-                            FROM market_data
-                            WHERE config_id = %s AND symbol = %s
-                            ORDER BY timeframe ASC, updated_at DESC
-                        """, (self.config_id, symbol))
-                    
-                    rows = cur.fetchall()
-                    if not rows:
-                        logger.bind(config_id=self.config_id, symbol=symbol).error(
-                            "No market data available - orchestrator should have ensured fresh data"
-                        )
-                        raise MarketDataError(
-                            f"No market data available for {symbol}. "
-                            f"Orchestrator should have triggered extraction and waited for completion."
-                        )
-                    
-                    # Group data by timeframe (taking most recent for each timeframe)
-                    timeframe_data = {}
-                    latest_price = None
-                    oldest_update = None
-                    
-                    for timeframe, data_points, raw_data, updated_at in rows:
-                        # Only take the first (most recent) entry for each timeframe
-                        if timeframe not in timeframe_data:
-                            timeframe_data[timeframe] = {
-                                "indicators": data_points.get("indicators", {}) if data_points else {},
-                                "raw_summary": raw_data.get("metadata", {}) if raw_data else {},
-                                "updated_at": updated_at
-                            }
-                            
-                            # Extract latest price from first timeframe processed
-                            if latest_price is None and raw_data and raw_data.get("metadata"):
-                                latest_price = raw_data["metadata"].get("latest_price")
-                            
-                            # Track age
-                            if oldest_update is None or updated_at < oldest_update:
-                                oldest_update = updated_at
-                    
-                    # Calculate data age
-                    age_seconds = (datetime.now(timezone.utc) - oldest_update).total_seconds() if oldest_update else 0
-                    
-                    # Prepare consolidated multi-timeframe structure
-                    consolidated_data = {
-                        "symbol": symbol,
-                        "timeframes": timeframe_data,
-                        "latest_price": latest_price or 0.0,
-                        "data_age_seconds": age_seconds,
-                        "timeframes_available": list(timeframe_data.keys())
+            if configured_timeframes:
+                # Filter to only configured timeframes
+                rows = await db_fetch_all("""
+                    SELECT timeframe, data_points, raw_data, updated_at
+                    FROM market_data
+                    WHERE config_id = %s AND symbol = %s AND timeframe = ANY(%s)
+                    ORDER BY timeframe ASC, updated_at DESC
+                """, (self.config_id, symbol, configured_timeframes))
+            else:
+                # Fallback: no timeframe config available, fetch all
+                rows = await db_fetch_all("""
+                    SELECT timeframe, data_points, raw_data, updated_at
+                    FROM market_data
+                    WHERE config_id = %s AND symbol = %s
+                    ORDER BY timeframe ASC, updated_at DESC
+                """, (self.config_id, symbol))
+
+            if not rows:
+                logger.bind(config_id=self.config_id, symbol=symbol).error(
+                    "No market data available - orchestrator should have ensured fresh data"
+                )
+                raise MarketDataError(
+                    f"No market data available for {symbol}. "
+                    f"Orchestrator should have triggered extraction and waited for completion."
+                )
+
+            # Group data by timeframe (taking most recent for each timeframe)
+            timeframe_data = {}
+            latest_price = None
+            oldest_update = None
+
+            for timeframe, data_points, raw_data, updated_at in rows:
+                # Only take the first (most recent) entry for each timeframe
+                if timeframe not in timeframe_data:
+                    timeframe_data[timeframe] = {
+                        "indicators": data_points.get("indicators", {}) if data_points else {},
+                        "raw_summary": raw_data.get("metadata", {}) if raw_data else {},
+                        "updated_at": updated_at
                     }
-                    
-                    logger.bind(
-                        config_id=self.config_id, 
-                        symbol=symbol,
-                        timeframes_count=len(timeframe_data),
-                        age_seconds=age_seconds
-                    ).info("Retrieved multi-timeframe market data for decision")
-                    
-                    return consolidated_data
-                    
+
+                    # Extract latest price from first timeframe processed
+                    if latest_price is None and raw_data and raw_data.get("metadata"):
+                        latest_price = raw_data["metadata"].get("latest_price")
+
+                    # Track age
+                    if oldest_update is None or updated_at < oldest_update:
+                        oldest_update = updated_at
+
+            # Calculate data age
+            age_seconds = (datetime.now(timezone.utc) - oldest_update).total_seconds() if oldest_update else 0
+
+            # Prepare consolidated multi-timeframe structure
+            consolidated_data = {
+                "symbol": symbol,
+                "timeframes": timeframe_data,
+                "latest_price": latest_price or 0.0,
+                "data_age_seconds": age_seconds,
+                "timeframes_available": list(timeframe_data.keys())
+            }
+
+            logger.bind(
+                config_id=self.config_id,
+                symbol=symbol,
+                timeframes_count=len(timeframe_data),
+                age_seconds=age_seconds
+            ).info("Retrieved multi-timeframe market data for decision")
+
+            return consolidated_data
+
         except MarketDataError:
             raise  # Re-raise domain errors
         except Exception as e:
@@ -717,20 +718,22 @@ class DecisionEngineV2:
             symbol, position_data, market_data, current_price, volume_analysis
         )
 
-        # Step 3.5: Log market_query activity with formatted data
-        self._log_market_query_activity(
-            symbol=symbol,
-            query_mode="position_management",
-            current_price=current_price,
-            data_age_seconds=market_data.get('data_age_seconds', 0),
-            formatted_sections=formatted_sections,
-            metadata={
-                "timeframes_analyzed": market_data.get('timeframes_available', []),
-                "indicators_count": 21,  # All preprocessors
-                "position_side": position_data.get('side', 'unknown'),
-                "position_pnl": float(position_data.get('unrealized_pnl', 0)),
-                "position_duration_hours": position_data.get('duration_hours', 0)
-            }
+        # Step 3.5: Log market_query activity with formatted data (run in thread — contains sync DB)
+        await asyncio.to_thread(
+            lambda: self._log_market_query_activity(
+                symbol=symbol,
+                query_mode="position_management",
+                current_price=current_price,
+                data_age_seconds=market_data.get('data_age_seconds', 0),
+                formatted_sections=formatted_sections,
+                metadata={
+                    "timeframes_analyzed": market_data.get('timeframes_available', []),
+                    "indicators_count": 21,  # All preprocessors
+                    "position_side": position_data.get('side', 'unknown'),
+                    "position_pnl": float(position_data.get('unrealized_pnl', 0)),
+                    "position_duration_hours": position_data.get('duration_hours', 0)
+                }
+            )
         )
 
         # Step 4: Call LLM
@@ -928,29 +931,26 @@ Take Profit: {take_profit_text}
 
         try:
             # Save to decisions table (deprecated but kept for compatibility)
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    decision_data_json = {**decision_data, 'raw_action': raw_action}  # Preserve original action
+            decision_data_json = {**decision_data, 'raw_action': raw_action}  # Preserve original action
 
-                    cur.execute("""
-                        INSERT INTO decisions (
-                            decision_id, user_id, config_id, symbol, action, status,
-                            confidence, reasoning, prompt, decision_data, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        decision_id,
-                        self.user_id,
-                        self.config_id,
-                        symbol,
-                        schema_action,  # Use schema-compliant action
-                        'completed',
-                        decision_data.get('confidence', 0.5),
-                        decision_data.get('reasoning', llm_response),
-                        None,  # prompt no longer stored (redundant with activities.market_query)
-                        json.dumps(decision_data_json, cls=DecisionJSONEncoder),
-                        datetime.now(timezone.utc).isoformat()
-                    ))
-                    conn.commit()
+            await db_execute("""
+                INSERT INTO decisions (
+                    decision_id, user_id, config_id, symbol, action, status,
+                    confidence, reasoning, prompt, decision_data, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                decision_id,
+                self.user_id,
+                self.config_id,
+                symbol,
+                schema_action,  # Use schema-compliant action
+                'completed',
+                decision_data.get('confidence', 0.5),
+                decision_data.get('reasoning', llm_response),
+                None,  # prompt no longer stored (redundant with activities.market_query)
+                json.dumps(decision_data_json, cls=DecisionJSONEncoder),
+                datetime.now(timezone.utc).isoformat()
+            ))
 
             logger.bind(
                 config_id=self.config_id,
@@ -1038,34 +1038,36 @@ Take Profit: {take_profit_text}
             except Exception:
                 pass  # Default to non-prepaid if check fails
 
-            # Log activity with token tracking (standalone - no decision_id)
-            activity_id = log_llm_activity_safe(
-                config_id=self.config_id,
-                user_id=self.user_id,
-                activity_source='scheduled_bot',
-                summary=summary,
-                details={
-                    'thought': decision_data.get('reasoning', ''),  # Changed from 'reasoning' to 'thought' for frontend compatibility
-                    'confidence': confidence,
-                    'action': action,
-                    'symbol': symbol,
-                    'stop_loss_price': decision_data.get('stop_loss_price'),
-                    'take_profit_price': decision_data.get('take_profit_price'),
-                    # Audit fields for billing verification
-                    'openrouter_model': openrouter_model,  # Actual model used (e.g., anthropic/claude-opus-4.5)
-                    'reasoning_tier': reasoning_tier,  # economy/standard/premium
-                },
-                provider=provider,
-                model=model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                provider_cost_usd=provider_cost,
-                platform_cost_usd=platform_cost,
-                thinking_mode=thinking_mode,
-                reasoning_tokens=reasoning_tokens,
-                related_symbol=symbol,
-                importance=7,  # Decision activities are important
-                stripe_reported=is_prepaid  # Prepaid users: already "reported" (no Stripe reporting)
+            # Log activity with token tracking (run in thread — contains sync DB)
+            activity_id = await asyncio.to_thread(
+                lambda: log_llm_activity_safe(
+                    config_id=self.config_id,
+                    user_id=self.user_id,
+                    activity_source='scheduled_bot',
+                    summary=summary,
+                    details={
+                        'thought': decision_data.get('reasoning', ''),  # Changed from 'reasoning' to 'thought' for frontend compatibility
+                        'confidence': confidence,
+                        'action': action,
+                        'symbol': symbol,
+                        'stop_loss_price': decision_data.get('stop_loss_price'),
+                        'take_profit_price': decision_data.get('take_profit_price'),
+                        # Audit fields for billing verification
+                        'openrouter_model': openrouter_model,  # Actual model used (e.g., anthropic/claude-opus-4.5)
+                        'reasoning_tier': reasoning_tier,  # economy/standard/premium
+                    },
+                    provider=provider,
+                    model=model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    provider_cost_usd=provider_cost,
+                    platform_cost_usd=platform_cost,
+                    thinking_mode=thinking_mode,
+                    reasoning_tokens=reasoning_tokens,
+                    related_symbol=symbol,
+                    importance=7,  # Decision activities are important
+                    stripe_reported=is_prepaid  # Prepaid users: already "reported" (no Stripe reporting)
+                )
             )
 
             logger.bind(
@@ -1832,35 +1834,32 @@ Take Profit: {take_profit_text}
             schema_action = 'wait'
         
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    decision_data_json = {
-                        'signal_source': signal_data.get('source'),
-                        'signal_data': signal_data,
-                        'validation_framework': '4-pillar',
-                        'current_price': float(current_price),
-                        'raw_action': raw_action  # Preserve original action
-                    }
+            decision_data_json = {
+                'signal_source': signal_data.get('source'),
+                'signal_data': signal_data,
+                'validation_framework': '4-pillar',
+                'current_price': float(current_price),
+                'raw_action': raw_action  # Preserve original action
+            }
 
-                    cur.execute("""
-                        INSERT INTO decisions (
-                            decision_id, user_id, config_id, symbol, action, status,
-                            confidence, reasoning, prompt, decision_data, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        decision_id,
-                        self.user_id,
-                        self.config_id,
-                        symbol,
-                        schema_action,  # Use schema-compliant action
-                        'completed',
-                        decision_data.get('confidence', 0.5),
-                        decision_data.get('reasoning', llm_response),
-                        None,  # prompt no longer stored (redundant with activities.market_query)
-                        json.dumps(decision_data_json, cls=DecisionJSONEncoder),
-                        datetime.now(timezone.utc).isoformat()
-                    ))
-                    conn.commit()
+            await db_execute("""
+                INSERT INTO decisions (
+                    decision_id, user_id, config_id, symbol, action, status,
+                    confidence, reasoning, prompt, decision_data, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                decision_id,
+                self.user_id,
+                self.config_id,
+                symbol,
+                schema_action,  # Use schema-compliant action
+                'completed',
+                decision_data.get('confidence', 0.5),
+                decision_data.get('reasoning', llm_response),
+                None,  # prompt no longer stored (redundant with activities.market_query)
+                json.dumps(decision_data_json, cls=DecisionJSONEncoder),
+                datetime.now(timezone.utc).isoformat()
+            ))
 
             logger.bind(
                 config_id=self.config_id,
@@ -1953,247 +1952,243 @@ Take Profit: {take_profit_text}
             # Determine trading mode from config
             trading_mode = getattr(self.config, 'trading_mode', 'paper')
 
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    if trading_mode in ('symphony', 'hyperliquid'):
-                        # Check live_trades table for open positions
-                        cur.execute("""
-                            SELECT
-                                lt.batch_id,
-                                lt.config_id,
-                                lt.decision_id,
-                                lt.created_at,
-                                lt.symbol,
-                                lt.stop_loss_order_id,
-                                lt.take_profit_order_id,
-                                d.reasoning as entry_reasoning,
-                                d.confidence as entry_confidence,
-                                d.decision_data as entry_decision_data
-                            FROM live_trades lt
-                            LEFT JOIN decisions d ON lt.decision_id = d.decision_id
-                            WHERE lt.config_id = %s
-                              AND lt.closed_at IS NULL
-                            ORDER BY lt.created_at DESC
-                            LIMIT 1
-                        """, (config_id,))
+            if trading_mode in ('symphony', 'hyperliquid'):
+                # DB query in thread pool — async API calls follow below
+                row = await db_fetch_one("""
+                    SELECT
+                        lt.batch_id,
+                        lt.config_id,
+                        lt.decision_id,
+                        lt.created_at,
+                        lt.symbol,
+                        lt.stop_loss_order_id,
+                        lt.take_profit_order_id,
+                        d.reasoning as entry_reasoning,
+                        d.confidence as entry_confidence,
+                        d.decision_data as entry_decision_data
+                    FROM live_trades lt
+                    LEFT JOIN decisions d ON lt.decision_id = d.decision_id
+                    WHERE lt.config_id = %s
+                      AND lt.closed_at IS NULL
+                    ORDER BY lt.created_at DESC
+                    LIMIT 1
+                """, (config_id,))
 
-                        row = cur.fetchone()
-                        if not row:
-                            return None
+                if not row:
+                    return None
 
-                        batch_id = row[0]
-                        trade_symbol = row[4]
-                        entry_reasoning = row[7] if row[7] else 'No reasoning available'
-                        entry_confidence = float(row[8]) if row[8] else 0.0
-                        entry_decision_data = row[9] if row[9] else {}
+                batch_id = row[0]
+                trade_symbol = row[4]
+                entry_reasoning = row[7] if row[7] else 'No reasoning available'
+                entry_confidence = float(row[8]) if row[8] else 0.0
+                entry_decision_data = row[9] if row[9] else {}
 
-                        if trading_mode == 'symphony':
-                            # Fetch REAL position data from Symphony API
-                            try:
-                                from trading.live.symphony_service import SymphonyLiveTradingService
-                                symphony_service = SymphonyLiveTradingService()
-
-                                live_positions = await symphony_service.get_open_positions(config_id)
-
-                                matching_position = None
-                                for pos in live_positions:
-                                    if pos.get('batch_id') == batch_id:
-                                        matching_position = pos
-                                        break
-
-                                if matching_position:
-                                    matching_position['entry_reasoning'] = entry_reasoning
-                                    matching_position['entry_confidence'] = entry_confidence
-                                    matching_position['entry_decision_data'] = entry_decision_data
-                                    matching_position['is_live'] = True
-
-                                    logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                                        f"Found active LIVE position from Symphony: batch_id={batch_id}, "
-                                        f"entry_price=${matching_position.get('entry_price', 0):.2f}"
-                                    )
-                                    return matching_position
-                                else:
-                                    logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
-                                        f"Live position batch_id={batch_id} found in database but not in Symphony API. "
-                                        f"Position may have been closed externally."
-                                    )
-                                    return None
-
-                            except Exception as e:
-                                logger.bind(config_id=self.config_id, user_id=self.user_id).error(
-                                    f"Failed to fetch live position from Symphony: {e}"
-                                )
-                                return None
-
-                        else:
-                            # Hyperliquid: fetch position data from Hyperliquid Info API
-                            try:
-                                from hyperliquid.info import Info
-                                from hyperliquid.utils import constants
-                                from core.auth.vault_utils import VaultManager
-
-                                credentials = await VaultManager.get_hyperliquid_credential(self.user_id)
-                                if not credentials:
-                                    logger.bind(config_id=self.config_id).warning(
-                                        "No Hyperliquid credentials — cannot check position"
-                                    )
-                                    return None
-
-                                wallet_address = credentials['wallet_address']
-                                info = Info(constants.MAINNET_API_URL, skip_ws=True)
-                                user_state = info.user_state(wallet_address)
-
-                                # Find the matching position by coin
-                                # trade_symbol is platform format e.g. "BTC-USDT", coin is "BTC"
-                                coin = trade_symbol.split('-')[0] if trade_symbol else symbol.split('/')[0]
-
-                                matching_pos = None
-                                for ap in user_state.get("assetPositions", []):
-                                    pos = ap.get("position", {})
-                                    if pos.get("coin") == coin and float(pos.get("szi", 0)) != 0:
-                                        matching_pos = pos
-                                        break
-
-                                if not matching_pos:
-                                    # Position in our DB but not on Hyperliquid — closed externally
-                                    logger.bind(config_id=self.config_id).warning(
-                                        f"Live trade batch_id={batch_id} in DB but no {coin} position on Hyperliquid. "
-                                        f"May have been closed externally or liquidated."
-                                    )
-                                    return None
-
-                                # Build position_data dict matching the format position management expects
-                                szi = float(matching_pos.get("szi", 0))
-                                entry_px = float(matching_pos.get("entryPx", 0))
-                                unrealized_pnl = float(matching_pos.get("unrealizedPnl", 0))
-                                margin_used = float(matching_pos.get("marginUsed", 0))
-                                leverage_info = matching_pos.get("leverage", {})
-                                leverage_val = int(leverage_info.get("value", 1)) if isinstance(leverage_info, dict) else 1
-
-                                # Get current mid price for this coin
-                                all_mids = info.all_mids()
-                                current_mid = float(all_mids.get(coin, entry_px))
-                                notional = abs(szi) * current_mid
-
-                                side = "long" if szi > 0 else "short"
-
-                                # Ensure opened_at is timezone-aware (live_trades.created_at is timestamp without time zone)
-                                opened_at_raw = row[3]
-                                if opened_at_raw and opened_at_raw.tzinfo is None:
-                                    from datetime import timezone as tz
-                                    opened_at_raw = opened_at_raw.replace(tzinfo=tz.utc)
-
-                                # Compute SL/TP prices from config risk_management
-                                trading_config = self.config.trading if hasattr(self.config, 'trading') else {}
-                                risk_config = trading_config.get('risk_management', {}) if isinstance(trading_config, dict) else {}
-                                sl_pct = risk_config.get('default_stop_loss_percent', 2.0) / 100.0
-                                tp_pct = risk_config.get('default_take_profit_percent', 3.0) / 100.0
-                                if side == 'long':
-                                    sl_price = entry_px * (1 - sl_pct)
-                                    tp_price = entry_px * (1 + tp_pct)
-                                else:
-                                    sl_price = entry_px * (1 + sl_pct)
-                                    tp_price = entry_px * (1 - tp_pct)
-
-                                position_data = {
-                                    'trade_id': batch_id,
-                                    'batch_id': batch_id,
-                                    'symbol': trade_symbol,
-                                    'side': side,
-                                    'entry_price': entry_px,
-                                    'current_price': current_mid,
-                                    'size_usd': notional,
-                                    'unrealized_pnl': unrealized_pnl,
-                                    'opened_at': opened_at_raw,
-                                    'stop_loss': sl_price,
-                                    'take_profit': tp_price,
-                                    'confidence_score': entry_confidence,
-                                    'entry_reasoning': entry_reasoning,
-                                    'entry_confidence': entry_confidence,
-                                    'entry_decision_data': entry_decision_data,
-                                    'is_live': True,
-                                    'leverage': leverage_val,
-                                    'margin_used': margin_used,
-                                    'quantity': abs(szi),
-                                }
-
-                                logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                                    f"Found active Hyperliquid position: {side} {coin}, "
-                                    f"entry=${entry_px:,.2f}, size=${notional:,.2f}, "
-                                    f"P&L=${unrealized_pnl:+.2f}, leverage={leverage_val}x"
-                                )
-
-                                return position_data
-
-                            except Exception as e:
-                                logger.bind(config_id=self.config_id, user_id=self.user_id).error(
-                                    f"Failed to fetch Hyperliquid position: {e}"
-                                )
-                                return None
-
-                    else:
-                        # Paper trading: Query paper_trades for open position with entry decision context
-                        cur.execute("""
-                            SELECT
-                                pt.trade_id,
-                                pt.symbol,
-                                pt.side,
-                                pt.entry_price,
-                                pt.current_price,
-                                pt.size_usd,
-                                pt.unrealized_pnl,
-                                pt.opened_at,
-                                pt.stop_loss,
-                                pt.take_profit,
-                                pt.confidence_score,
-                                d.reasoning as entry_reasoning,
-                                d.confidence as entry_confidence,
-                                d.decision_data as entry_decision_data,
-                                pt.leverage
-                            FROM paper_trades pt
-                            LEFT JOIN decisions d ON pt.decision_id = d.decision_id
-                            WHERE pt.config_id = %s
-                              AND pt.symbol = %s
-                              AND pt.status = 'open'
-                            ORDER BY pt.opened_at DESC
-                            LIMIT 1
-                        """, (config_id, symbol))
-
-                        row = cur.fetchone()
-                        if not row:
-                            return None
-                    
-                    # Convert to dict with position details
-                    position_data = {
-                        'trade_id': row[0],
-                        'symbol': row[1],
-                        'side': row[2],  # 'buy' or 'sell'
-                        'entry_price': float(row[3]),
-                        'current_price': float(row[4]) if row[4] else float(row[3]),
-                        'size_usd': float(row[5]),
-                        'unrealized_pnl': float(row[6]) if row[6] else 0.0,
-                        'opened_at': row[7],
-                        'stop_loss': float(row[8]) if row[8] else None,
-                        'take_profit': float(row[9]) if row[9] else None,
-                        'confidence_score': float(row[10]) if row[10] else 0.0,
-                        'entry_reasoning': row[11] if row[11] else 'No reasoning available',
-                        'entry_confidence': float(row[12]) if row[12] else 0.0,
-                        'entry_decision_data': row[13] if row[13] else {},
-                        'leverage': int(row[14]) if row[14] else 1
-                    }
-
-                    # Enrich with live price from Redis (position monitor writes there)
+                if trading_mode == 'symphony':
+                    # Fetch REAL position data from Symphony API
                     try:
-                        from trading.paper.supabase_service import enrich_positions_from_redis
-                        enrich_positions_from_redis([position_data])
-                    except Exception:
-                        pass  # Use DB values as fallback
-                    
-                    logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                        f"Found active position for {symbol}: {position_data['side']} ${position_data['size_usd']:.2f}, P&L: ${position_data['unrealized_pnl']:.2f}"
-                    )
-                    
-                    return position_data
+                        from trading.live.symphony_service import SymphonyLiveTradingService
+                        symphony_service = SymphonyLiveTradingService()
+
+                        live_positions = await symphony_service.get_open_positions(config_id)
+
+                        matching_position = None
+                        for pos in live_positions:
+                            if pos.get('batch_id') == batch_id:
+                                matching_position = pos
+                                break
+
+                        if matching_position:
+                            matching_position['entry_reasoning'] = entry_reasoning
+                            matching_position['entry_confidence'] = entry_confidence
+                            matching_position['entry_decision_data'] = entry_decision_data
+                            matching_position['is_live'] = True
+
+                            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                                f"Found active LIVE position from Symphony: batch_id={batch_id}, "
+                                f"entry_price=${matching_position.get('entry_price', 0):.2f}"
+                            )
+                            return matching_position
+                        else:
+                            logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
+                                f"Live position batch_id={batch_id} found in database but not in Symphony API. "
+                                f"Position may have been closed externally."
+                            )
+                            return None
+
+                    except Exception as e:
+                        logger.bind(config_id=self.config_id, user_id=self.user_id).error(
+                            f"Failed to fetch live position from Symphony: {e}"
+                        )
+                        return None
+
+                else:
+                    # Hyperliquid: fetch position data from Hyperliquid Info API
+                    try:
+                        from hyperliquid.info import Info
+                        from hyperliquid.utils import constants
+                        from core.auth.vault_utils import VaultManager
+
+                        credentials = await VaultManager.get_hyperliquid_credential(self.user_id)
+                        if not credentials:
+                            logger.bind(config_id=self.config_id).warning(
+                                "No Hyperliquid credentials — cannot check position"
+                            )
+                            return None
+
+                        wallet_address = credentials['wallet_address']
+                        info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                        user_state = info.user_state(wallet_address)
+
+                        # Find the matching position by coin
+                        # trade_symbol is platform format e.g. "BTC-USDT", coin is "BTC"
+                        coin = trade_symbol.split('-')[0] if trade_symbol else symbol.split('/')[0]
+
+                        matching_pos = None
+                        for ap in user_state.get("assetPositions", []):
+                            pos = ap.get("position", {})
+                            if pos.get("coin") == coin and float(pos.get("szi", 0)) != 0:
+                                matching_pos = pos
+                                break
+
+                        if not matching_pos:
+                            # Position in our DB but not on Hyperliquid — closed externally
+                            logger.bind(config_id=self.config_id).warning(
+                                f"Live trade batch_id={batch_id} in DB but no {coin} position on Hyperliquid. "
+                                f"May have been closed externally or liquidated."
+                            )
+                            return None
+
+                        # Build position_data dict matching the format position management expects
+                        szi = float(matching_pos.get("szi", 0))
+                        entry_px = float(matching_pos.get("entryPx", 0))
+                        unrealized_pnl = float(matching_pos.get("unrealizedPnl", 0))
+                        margin_used = float(matching_pos.get("marginUsed", 0))
+                        leverage_info = matching_pos.get("leverage", {})
+                        leverage_val = int(leverage_info.get("value", 1)) if isinstance(leverage_info, dict) else 1
+
+                        # Get current mid price for this coin
+                        all_mids = info.all_mids()
+                        current_mid = float(all_mids.get(coin, entry_px))
+                        notional = abs(szi) * current_mid
+
+                        side = "long" if szi > 0 else "short"
+
+                        # Ensure opened_at is timezone-aware (live_trades.created_at is timestamp without time zone)
+                        opened_at_raw = row[3]
+                        if opened_at_raw and opened_at_raw.tzinfo is None:
+                            from datetime import timezone as tz
+                            opened_at_raw = opened_at_raw.replace(tzinfo=tz.utc)
+
+                        # Compute SL/TP prices from config risk_management
+                        trading_config = self.config.trading if hasattr(self.config, 'trading') else {}
+                        risk_config = trading_config.get('risk_management', {}) if isinstance(trading_config, dict) else {}
+                        sl_pct = risk_config.get('default_stop_loss_percent', 2.0) / 100.0
+                        tp_pct = risk_config.get('default_take_profit_percent', 3.0) / 100.0
+                        if side == 'long':
+                            sl_price = entry_px * (1 - sl_pct)
+                            tp_price = entry_px * (1 + tp_pct)
+                        else:
+                            sl_price = entry_px * (1 + sl_pct)
+                            tp_price = entry_px * (1 - tp_pct)
+
+                        position_data = {
+                            'trade_id': batch_id,
+                            'batch_id': batch_id,
+                            'symbol': trade_symbol,
+                            'side': side,
+                            'entry_price': entry_px,
+                            'current_price': current_mid,
+                            'size_usd': notional,
+                            'unrealized_pnl': unrealized_pnl,
+                            'opened_at': opened_at_raw,
+                            'stop_loss': sl_price,
+                            'take_profit': tp_price,
+                            'confidence_score': entry_confidence,
+                            'entry_reasoning': entry_reasoning,
+                            'entry_confidence': entry_confidence,
+                            'entry_decision_data': entry_decision_data,
+                            'is_live': True,
+                            'leverage': leverage_val,
+                            'margin_used': margin_used,
+                            'quantity': abs(szi),
+                        }
+
+                        logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                            f"Found active Hyperliquid position: {side} {coin}, "
+                            f"entry=${entry_px:,.2f}, size=${notional:,.2f}, "
+                            f"P&L=${unrealized_pnl:+.2f}, leverage={leverage_val}x"
+                        )
+
+                        return position_data
+
+                    except Exception as e:
+                        logger.bind(config_id=self.config_id, user_id=self.user_id).error(
+                            f"Failed to fetch Hyperliquid position: {e}"
+                        )
+                        return None
+
+            else:
+                # Paper trading: DB query in thread pool
+                row = await db_fetch_one("""
+                    SELECT
+                        pt.trade_id,
+                        pt.symbol,
+                        pt.side,
+                        pt.entry_price,
+                        pt.current_price,
+                        pt.size_usd,
+                        pt.unrealized_pnl,
+                        pt.opened_at,
+                        pt.stop_loss,
+                        pt.take_profit,
+                        pt.confidence_score,
+                        d.reasoning as entry_reasoning,
+                        d.confidence as entry_confidence,
+                        d.decision_data as entry_decision_data,
+                        pt.leverage
+                    FROM paper_trades pt
+                    LEFT JOIN decisions d ON pt.decision_id = d.decision_id
+                    WHERE pt.config_id = %s
+                      AND pt.symbol = %s
+                      AND pt.status = 'open'
+                    ORDER BY pt.opened_at DESC
+                    LIMIT 1
+                """, (config_id, symbol))
+
+                if not row:
+                    return None
+
+                # Convert to dict with position details
+                position_data = {
+                    'trade_id': row[0],
+                    'symbol': row[1],
+                    'side': row[2],  # 'buy' or 'sell'
+                    'entry_price': float(row[3]),
+                    'current_price': float(row[4]) if row[4] else float(row[3]),
+                    'size_usd': float(row[5]),
+                    'unrealized_pnl': float(row[6]) if row[6] else 0.0,
+                    'opened_at': row[7],
+                    'stop_loss': float(row[8]) if row[8] else None,
+                    'take_profit': float(row[9]) if row[9] else None,
+                    'confidence_score': float(row[10]) if row[10] else 0.0,
+                    'entry_reasoning': row[11] if row[11] else 'No reasoning available',
+                    'entry_confidence': float(row[12]) if row[12] else 0.0,
+                    'entry_decision_data': row[13] if row[13] else {},
+                    'leverage': int(row[14]) if row[14] else 1
+                }
+
+                # Enrich with live price from Redis (position monitor writes there)
+                try:
+                    from trading.paper.supabase_service import enrich_positions_from_redis
+                    enrich_positions_from_redis([position_data])
+                except Exception:
+                    pass  # Use DB values as fallback
+
+                logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                    f"Found active position for {symbol}: {position_data['side']} ${position_data['size_usd']:.2f}, P&L: ${position_data['unrealized_pnl']:.2f}"
+                )
+
+                return position_data
                     
         except Exception as e:
             logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
@@ -2278,51 +2273,46 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             Dictionary with volume analysis data or None if unavailable
         """
         try:
-            from core.common.db import get_db_connection
-            
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # Get recent market data for this symbol and timeframe
-                    cur.execute("""
-                        SELECT raw_data FROM market_data 
-                        WHERE user_id = %s AND symbol = %s AND timeframe = %s
-                        ORDER BY updated_at DESC LIMIT 1
-                    """, (self.user_id, symbol, timeframe))
-                    
-                    result = cur.fetchone()
-                    if not result:
-                        return None
-                    
-                    raw_data = result[0] if isinstance(result, tuple) else result['raw_data']
-                    if not raw_data or not isinstance(raw_data, dict):
-                        return None
+            # Get recent market data for this symbol and timeframe
+            result = await db_fetch_one("""
+                SELECT raw_data FROM market_data
+                WHERE user_id = %s AND symbol = %s AND timeframe = %s
+                ORDER BY updated_at DESC LIMIT 1
+            """, (self.user_id, symbol, timeframe))
 
-                    # Extract volume data from OHLCV candles (V2 structure)
-                    candles = raw_data.get('candles', [])
-                    if not candles or not isinstance(candles, list):
-                        return None
+            if not result:
+                return None
 
-                    volumes = [candle.get('volume', 0) for candle in candles if isinstance(candle, dict) and 'volume' in candle]
-                    if not volumes or len(volumes) < 2:
-                        return None
-                    
-                    # Get dynamic period for averaging
-                    period = min(self._get_dynamic_volume_period(timeframe), len(volumes) - 1)
-                    
-                    # Calculate volume metrics
-                    current_volume = volumes[-1]  # Latest candle volume
-                    recent_volumes = volumes[-period-1:-1]  # Previous N periods
-                    average_volume = sum(recent_volumes) / len(recent_volumes) if recent_volumes else current_volume
-                    
-                    volume_ratio = current_volume / average_volume if average_volume > 0 else 1.0
-                    
-                    return {
-                        'current_volume': current_volume,
-                        'average_volume': average_volume,
-                        'volume_ratio': volume_ratio,
-                        'period_used': period
-                    }
-                    
+            raw_data = result[0] if isinstance(result, tuple) else result['raw_data']
+            if not raw_data or not isinstance(raw_data, dict):
+                return None
+
+            # Extract volume data from OHLCV candles (V2 structure)
+            candles = raw_data.get('candles', [])
+            if not candles or not isinstance(candles, list):
+                return None
+
+            volumes = [candle.get('volume', 0) for candle in candles if isinstance(candle, dict) and 'volume' in candle]
+            if not volumes or len(volumes) < 2:
+                return None
+
+            # Get dynamic period for averaging
+            period = min(self._get_dynamic_volume_period(timeframe), len(volumes) - 1)
+
+            # Calculate volume metrics
+            current_volume = volumes[-1]  # Latest candle volume
+            recent_volumes = volumes[-period-1:-1]  # Previous N periods
+            average_volume = sum(recent_volumes) / len(recent_volumes) if recent_volumes else current_volume
+
+            volume_ratio = current_volume / average_volume if average_volume > 0 else 1.0
+
+            return {
+                'current_volume': current_volume,
+                'average_volume': average_volume,
+                'volume_ratio': volume_ratio,
+                'period_used': period
+            }
+
         except Exception as e:
             logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
                 f"Failed to get volume data from extraction for {symbol}: {e}"
@@ -2354,37 +2344,34 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             schema_action = 'wait'
         
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    decision_data_json = {
-                        'decision_type': 'position_management',
-                        'position_data': position_data,
-                        'current_price': float(current_price),
-                        'raw_action': raw_action,  # Preserve original action
-                        **decision_data
-                    }
+            decision_data_json = {
+                'decision_type': 'position_management',
+                'position_data': position_data,
+                'current_price': float(current_price),
+                'raw_action': raw_action,  # Preserve original action
+                **decision_data
+            }
 
-                    cur.execute("""
-                        INSERT INTO decisions (
-                            decision_id, user_id, config_id, symbol, action, status,
-                            confidence, reasoning, prompt, decision_data,
-                            parent_decision_id, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        decision_id,
-                        self.user_id,
-                        self.config_id,
-                        symbol,
-                        schema_action,  # Use schema-compliant action
-                        'completed',
-                        decision_data.get('confidence', 0.5),
-                        decision_data.get('reasoning', llm_response),
-                        None,  # prompt no longer stored (redundant with activities.market_query)
-                        json.dumps(decision_data_json, cls=DecisionJSONEncoder),
-                        position_data.get('entry_decision_id'),  # Link to original entry decision
-                        datetime.now(timezone.utc).isoformat()
-                    ))
-                    conn.commit()
+            await db_execute("""
+                INSERT INTO decisions (
+                    decision_id, user_id, config_id, symbol, action, status,
+                    confidence, reasoning, prompt, decision_data,
+                    parent_decision_id, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                decision_id,
+                self.user_id,
+                self.config_id,
+                symbol,
+                schema_action,  # Use schema-compliant action
+                'completed',
+                decision_data.get('confidence', 0.5),
+                decision_data.get('reasoning', llm_response),
+                None,  # prompt no longer stored (redundant with activities.market_query)
+                json.dumps(decision_data_json, cls=DecisionJSONEncoder),
+                position_data.get('entry_decision_id'),  # Link to original entry decision
+                datetime.now(timezone.utc).isoformat()
+            ))
 
 
             logger.bind(

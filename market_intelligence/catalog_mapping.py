@@ -177,6 +177,73 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     },
 
     # ========================================================================
+    # AGENTIC INTELLIGENCE — ACP On-Chain (Virtuals ACP protocol)
+    # These generate on-chain ACP transactions for $GG graduation volume.
+    # Per-bot jobs: config_id in service_requirement ensures each bot
+    # triggers its own ACP job, even for global data.
+    # ========================================================================
+
+    # ggbots.ai — Our own market brief via ACP (self-consumption for volume)
+    ('agentic_intelligence', 'ggbots_acp'): {
+        'data_type': 'acp_agent',
+        'params_template': {
+            'agent_name': 'ggbots',
+            'agent_address': '0xREDACTED_AGENT_WALLET',
+            'offering_name': 'marketBrief',
+            'service_requirement': {
+                'focus': 'all',
+                'bot_id': '{config_id}',
+            }
+        },
+        'cache_ttl': 3600,  # 1 hour
+    },
+
+    # Otto AI — Crypto News (per-symbol)
+    # ('agentic_intelligence', 'otto_ai_news'): {
+    #     'data_type': 'acp_agent',
+    #     'params_template': {
+    #         'agent_name': 'otto_ai',
+    #         'agent_address': '',  # TODO: discover via browse_agents()
+    #         'offering_name': 'Crypto News',
+    #         'service_requirement': {
+    #             'symbol': '{symbol}',
+    #             'request_type': 'crypto_news',
+    #         }
+    #     },
+    #     'cache_ttl': 3600,
+    # },
+
+    # Wolfpack Intelligence — Composite Risk Score (per-symbol)
+    # ('agentic_intelligence', 'wolfpack_risk'): {
+    #     'data_type': 'acp_agent',
+    #     'params_template': {
+    #         'agent_name': 'wolfpack',
+    #         'agent_address': '',  # TODO: discover via browse_agents()
+    #         'offering_name': 'Composite Risk Score',
+    #         'service_requirement': {
+    #             'symbol': '{symbol}',
+    #             'request_type': 'risk_score',
+    #         }
+    #     },
+    #     'cache_ttl': 3600,
+    # },
+
+    # BlackSwan — Prediction Market Monitor (global, per-bot for volume)
+    # ('agentic_intelligence', 'blackswan_predictions'): {
+    #     'data_type': 'acp_agent',
+    #     'params_template': {
+    #         'agent_name': 'blackswan',
+    #         'agent_address': '',  # TODO: discover via browse_agents()
+    #         'offering_name': 'Prediction Market Monitor',
+    #         'service_requirement': {
+    #             'request_type': 'prediction_monitor',
+    #             'bot_id': '{config_id}',
+    #         }
+    #     },
+    #     'cache_ttl': 3600,
+    # },
+
+    # ========================================================================
     # LEGACY CATEGORY ALIASES (for backward compatibility)
     # Maps old category names to correct catalog entries
     # ========================================================================

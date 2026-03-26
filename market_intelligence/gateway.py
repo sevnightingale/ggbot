@@ -5,6 +5,7 @@ This is the main entry point for querying market intelligence. It coordinates
 catalog lookup, validation, caching, adapter routing, and response formatting.
 """
 
+import asyncio
 import time
 import importlib
 from typing import Dict, Any, Optional
@@ -33,6 +34,11 @@ class MarketIntelligence:
     Provides unified query interface for 150+ data sources with automatic
     caching, fallback, and formatting.
     """
+
+    # Class-level single-flight locks — shared across ALL instances.
+    # Each bot cycle creates a new MarketIntelligence(), but the locks
+    # must be shared so 40 bots don't all fetch the same Grok data.
+    _inflight: Dict[str, asyncio.Lock] = {}
 
     def __init__(self, catalog_dir: Optional[str] = None, redis_url: Optional[str] = None):
         """
@@ -178,57 +184,98 @@ class MarketIntelligence:
                 from_cache=True
             )
 
-        # Cache miss - fetch from source
-        self._log.debug(f"Cache miss for {data_type}: {cache_key}")
+        # Cache miss — use single-flight lock to prevent thundering herd.
+        # Only the first coroutine fetches; others wait and read cache.
+        if cache_key not in self._inflight:
+            self._inflight[cache_key] = asyncio.Lock()
+        lock = self._inflight[cache_key]
 
-        # Try sources in priority order
-        query_params_obj = QueryParams(validated_params)
-        last_error = None
-
-        for source_config in catalog_entry.sources:
-            try:
-                # Get adapter instance
-                adapter = await self._get_adapter(source_config.adapter)
-
-                # Fetch data
-                self._log.debug(f"Fetching {data_type} from {source_config.adapter}")
-                adapter_response = await adapter.fetch(query_params_obj)
-
-                # Cache the result (use cache_config which may have TTL override)
-                await self.cache_manager.set(cache_key, adapter_response, cache_config)
-
-                # Calculate total latency
+        async with lock:
+            # Re-check cache — another coroutine may have populated it while we waited
+            cached_data = await self.cache_manager.get(cache_key, cache_config)
+            if cached_data:
                 latency_ms = (time.time() - start_time) * 1000
-
-                self._log.debug(
-                    f"Fetched {data_type} from {source_config.adapter} "
-                    f"({latency_ms:.0f}ms)"
-                )
-
-                # Format and return response
+                self._log.info(f"Cache hit after lock wait for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
+                if isinstance(cached_data, AdapterResponse):
+                    adapter_response = cached_data
+                else:
+                    if data_type == 'ohlcv' and isinstance(cached_data, list):
+                        df = pd.DataFrame(cached_data)
+                        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                        df = df.sort_values('timestamp').reset_index(drop=True)
+                        limit = validated_params.get('limit', 200)
+                        if len(df) > limit:
+                            df = df.tail(limit).reset_index(drop=True)
+                        data = df
+                    else:
+                        data = cached_data
+                    adapter_response = AdapterResponse(
+                        data=data,
+                        metadata={"cache_hit": True, "source": "coalesced_cache"},
+                        confidence=1.0,
+                        related_queries=[]
+                    )
                 return self.formatter.format_response(
                     data_type=data_type,
                     query_params=validated_params,
                     adapter_response=adapter_response,
                     catalog_entry=catalog_entry,
                     format_mode=format,
-                    source=source_config.adapter,
+                    source="cache",
                     latency_ms=latency_ms,
-                    from_cache=False
+                    from_cache=True
                 )
 
-            except Exception as e:
-                last_error = e
-                self._log.warning(
-                    f"Adapter {source_config.adapter} failed for {data_type}: {e}"
-                )
-                # Continue to next source
-                continue
+            self._log.debug(f"Cache miss for {data_type}: {cache_key} — fetching from source")
 
-        # All sources failed
-        raise DataSourceError(
-            f"All sources failed for {data_type}. Last error: {last_error}"
-        )
+            # Try sources in priority order
+            query_params_obj = QueryParams(validated_params)
+            last_error = None
+
+            for source_config in catalog_entry.sources:
+                try:
+                    # Get adapter instance
+                    adapter = await self._get_adapter(source_config.adapter)
+
+                    # Fetch data
+                    self._log.debug(f"Fetching {data_type} from {source_config.adapter}")
+                    adapter_response = await adapter.fetch(query_params_obj)
+
+                    # Cache the result (use cache_config which may have TTL override)
+                    await self.cache_manager.set(cache_key, adapter_response, cache_config)
+
+                    # Calculate total latency
+                    latency_ms = (time.time() - start_time) * 1000
+
+                    self._log.debug(
+                        f"Fetched {data_type} from {source_config.adapter} "
+                        f"({latency_ms:.0f}ms)"
+                    )
+
+                    # Format and return response
+                    return self.formatter.format_response(
+                        data_type=data_type,
+                        query_params=validated_params,
+                        adapter_response=adapter_response,
+                        catalog_entry=catalog_entry,
+                        format_mode=format,
+                        source=source_config.adapter,
+                        latency_ms=latency_ms,
+                        from_cache=False
+                    )
+
+                except Exception as e:
+                    last_error = e
+                    self._log.warning(
+                        f"Adapter {source_config.adapter} failed for {data_type}: {e}"
+                    )
+                    # Continue to next source
+                    continue
+
+            # All sources failed
+            raise DataSourceError(
+                f"All sources failed for {data_type}. Last error: {last_error}"
+            )
 
     async def _get_adapter(self, adapter_name: str) -> DataAdapter:
         """
@@ -304,6 +351,8 @@ class MarketIntelligence:
             category = 'signals'
         elif 'funding' in snake_case or 'derivatives' in snake_case:
             category = 'derivatives'
+        elif 'acp' in snake_case:
+            category = 'acp'
         elif 'account_performance' in snake_case or 'market_conditions' in snake_case:
             category = 'internal'
         else:

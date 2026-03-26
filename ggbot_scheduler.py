@@ -13,6 +13,7 @@ PM2:      pm2 start ecosystem.config.js --only ggbot-scheduler
 """
 
 import asyncio
+import concurrent.futures
 import signal
 import sys
 
@@ -26,6 +27,12 @@ from core.common.logger import logger
 
 async def main():
     """Start scheduler, initialize orchestrator, enter reconciliation loop."""
+    # Dedicated thread pool for asyncio.to_thread() DB calls.
+    # Prevents sync psycopg2 queries from blocking the event loop when
+    # 30+ bot coroutines fire simultaneously at candle boundaries.
+    loop = asyncio.get_event_loop()
+    loop.set_default_executor(concurrent.futures.ThreadPoolExecutor(max_workers=32))
+
     logger.info("Starting GGBot Scheduler process")
 
     scheduler = AsyncIOScheduler()

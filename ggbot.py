@@ -211,6 +211,7 @@ from api.assistant import router as assistant_router
 from api.admin import router as admin_router
 from api.public import router as public_router
 from api.usage import router as usage_router
+from api.virtuals_arena import router as virtuals_arena_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
@@ -219,6 +220,7 @@ app.include_router(assistant_router)
 app.include_router(admin_router)
 app.include_router(public_router)
 app.include_router(usage_router)
+app.include_router(virtuals_arena_router)
 
 
 # Orchestrator instance (used by "Run Now" and signal validation endpoints)

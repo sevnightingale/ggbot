@@ -41,9 +41,10 @@ class MarketConditionsAdapter(DataAdapter):
         formatted for LLM consumption.
         """
         try:
+            import asyncio
             data = self._read_from_redis()
             if not data:
-                data = self._read_from_db()
+                data = await asyncio.to_thread(self._read_from_db)
 
             if not data:
                 raise AdapterError("No market conditions report available. Sebastian may not have run yet.")

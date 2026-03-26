@@ -24,10 +24,10 @@ class OpenRouterProvider(LLMProvider):
     # Model + Reasoning Tier → OpenRouter model ID
     # Tiers: economy (cheap/fast), standard (balanced), premium (best quality)
     MODEL_TIER_MAP = {
-        # Grok (xAI)
+        # Grok (xAI) - Updated 2026-03-26: premium → grok-4.20-beta
         ('grok', 'economy'): 'x-ai/grok-3-mini',
         ('grok', 'standard'): 'x-ai/grok-4-fast',
-        ('grok', 'premium'): 'x-ai/grok-4',
+        ('grok', 'premium'): 'x-ai/grok-4.20-beta',
 
         # DeepSeek
         ('deepseek', 'economy'): 'deepseek/deepseek-chat',
@@ -39,10 +39,10 @@ class OpenRouterProvider(LLMProvider):
         ('gemini', 'standard'): 'google/gemini-2.5-pro',
         ('gemini', 'premium'): 'google/gemini-3-pro-preview',
 
-        # Claude (Anthropic)
+        # Claude (Anthropic) - Updated 2026-03-26: standard → sonnet-4.6, premium → opus-4.6
         ('claude', 'economy'): 'anthropic/claude-haiku-4.5',
-        ('claude', 'standard'): 'anthropic/claude-sonnet-4.5',
-        ('claude', 'premium'): 'anthropic/claude-opus-4.5',
+        ('claude', 'standard'): 'anthropic/claude-sonnet-4.6',
+        ('claude', 'premium'): 'anthropic/claude-opus-4.6',
 
         # GPT (OpenAI)
         ('gpt', 'economy'): 'openai/gpt-4.1-mini',
@@ -63,7 +63,7 @@ class OpenRouterProvider(LLMProvider):
     # Legacy MODEL_MAP for backward compatibility (maps to standard tier)
     MODEL_MAP = {
         'grok': 'x-ai/grok-4-fast',
-        'claude': 'anthropic/claude-sonnet-4.5',
+        'claude': 'anthropic/claude-sonnet-4.6',
         'gemini': 'google/gemini-2.5-pro',
         'deepseek': 'deepseek/deepseek-v3.2',
         'gpt': 'openai/gpt-5',
@@ -77,7 +77,7 @@ class OpenRouterProvider(LLMProvider):
         # Grok
         'x-ai/grok-3-mini',
         'x-ai/grok-4-fast',
-        'x-ai/grok-4',
+        'x-ai/grok-4.20-beta',
         # DeepSeek
         'deepseek/deepseek-chat',
         'deepseek/deepseek-v3.2',
@@ -88,8 +88,8 @@ class OpenRouterProvider(LLMProvider):
         'google/gemini-3-pro-preview',
         # Claude
         'anthropic/claude-haiku-4.5',
-        'anthropic/claude-sonnet-4.5',
-        'anthropic/claude-opus-4.5',
+        'anthropic/claude-sonnet-4.6',
+        'anthropic/claude-opus-4.6',
         # GPT
         'openai/gpt-4.1-mini',
         'openai/gpt-5',
@@ -105,7 +105,7 @@ class OpenRouterProvider(LLMProvider):
         # Grok
         'x-ai/grok-3-mini',
         'x-ai/grok-4-fast',
-        'x-ai/grok-4',
+        'x-ai/grok-4.20-beta',
         # DeepSeek
         'deepseek/deepseek-chat',
         'deepseek/deepseek-v3.2',
@@ -116,8 +116,8 @@ class OpenRouterProvider(LLMProvider):
         'google/gemini-3-pro-preview',
         # Claude
         'anthropic/claude-haiku-4.5',
-        'anthropic/claude-sonnet-4.5',
-        'anthropic/claude-opus-4.5',
+        'anthropic/claude-sonnet-4.6',
+        'anthropic/claude-opus-4.6',
         # Kimi
         'moonshotai/kimi-k2',
         'moonshotai/kimi-k2.5',

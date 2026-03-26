@@ -200,6 +200,39 @@ module.exports = {
       max_restarts: 20,
       restart_delay: 4000
     },
+    // Sebastian Virtuals — ACP buyer/provider + DGClaw arena trades
+    {
+      name: 'sebastian-virtuals',
+      script: '/home/sev/ggbot/sebastian_virtuals.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        ACP_WALLET_ADDRESS: process.env.ACP_WALLET_ADDRESS,
+        ACP_WALLET_PRIVATE_KEY: process.env.ACP_WALLET_PRIVATE_KEY,
+        ACP_EOA_ADDRESS: process.env.ACP_EOA_ADDRESS,
+        ACP_ENTITY_ID: process.env.ACP_ENTITY_ID,
+        DGCLAW_AGENT_ADDRESS: process.env.DGCLAW_AGENT_ADDRESS,
+        DGCLAW_HL_SUBACCOUNT: process.env.DGCLAW_HL_SUBACCOUNT,
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        REDIS_URL: process.env.REDIS_URL
+      },
+      error_file: 'logs/sebastian-virtuals-error.log',
+      out_file: 'logs/sebastian-virtuals-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 10000
+    },
     // Scheduler process — runs bot cycles independently of API
     {
       name: 'ggbot-scheduler',
@@ -220,7 +253,8 @@ module.exports = {
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
-        REDIS_URL: process.env.REDIS_URL
+        REDIS_URL: process.env.REDIS_URL,
+        ARENA_ENABLED_CONFIGS: process.env.ARENA_ENABLED_CONFIGS
       },
       error_file: '/dev/null',
       out_file: '/dev/null',

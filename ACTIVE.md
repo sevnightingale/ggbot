@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-03-21 06:06:40 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-25 16:47:25 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,61 +12,61 @@
 - **Users with Bots**: 338 (96.6%)
 
 ### Bot Statistics
-- **Total Bots**: 541
-- **Active Bots**: 28 (5.2%)
-  - Paper: 25
+- **Total Bots**: 543
+- **Active Bots**: 37 (6.8%)
+  - Paper: 34
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 3
-- **Inactive Bots**: 513
+- **Inactive Bots**: 506
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,572
-  - Wins: 2,543
-  - Losses: 5,029
-  - Platform Win Rate: 33.58%
-  - Total P&L: $129,689.97
+- **Total Trades (All Time)**: 7,590
+  - Wins: 2,551
+  - Losses: 5,039
+  - Platform Win Rate: 33.61%
+  - Total P&L: $132,384.06
 - **Recent Activity**:
-  - Last 24 hours: 6 trades
-  - Last 7 days: 91 trades
-  - Last 30 days: 474 trades
+  - Last 24 hours: 7 trades
+  - Last 7 days: 81 trades
+  - Last 30 days: 428 trades
 
 ### Open Positions
-- **Open Positions**: 4
+- **Open Positions**: 5
 - **Unique Symbols**: 2
-- **Total Exposure**: $113,563.59
+- **Total Exposure**: $73,333.98
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,220.10
+- **Average Balance**: $10,224.28
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **ETH/USDT**: 14 bots
-- **BTC/USDT**: 13 bots
+- **ETH/USDT**: 25 bots
+- **BTC/USDT**: 11 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 789 decisions (avg confidence: 36.6%)
-- **enter**: 13 decisions (avg confidence: 67.1%)
-- **exit**: 7 decisions (avg confidence: 69.3%)
+- **wait**: 524 decisions (avg confidence: 31.7%)
+- **enter**: 10 decisions (avg confidence: 84.5%)
+- **exit**: 5 decisions (avg confidence: 57.7%)
 - **close**: 1 decisions (avg confidence: 65.0%)
 
 ### System Health
-- **Decisions (last hour)**: 53
+- **Decisions (last hour)**: 27
 - **Status**: 🟢 HEALTHY
 
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $624.26 (margin: $257.04, 41.2%)
-- **Last 30d Revenue**: $112.35 from 38 users
-- **Month-to-Date**: $67.55 (projected: ~$96.50)
-- **Avg LTV (paid)**: $18.87
+- **All-Time Revenue**: $636.46 (margin: $262.07, 41.2%)
+- **Last 30d Revenue**: $101.71 from 38 users
+- **Month-to-Date**: $79.75 (projected: ~$95.70)
+- **Avg LTV (paid)**: $19.30
 
 ### Conversion Funnel
 - **Signup → Created Bot**: 96.0%
@@ -75,14 +75,14 @@
 - **Post-Monetization (Jan+)**: 22.4% (19/85)
 
 ### Engagement
-- **DAU/WAU/MAU**: 10/13/38
-- **DAU/WAU Stickiness**: 76.9%
-- **Power Users (4+/8wk)**: 15
+- **DAU/WAU/MAU**: 8/11/38
+- **DAU/WAU Stickiness**: 72.7%
+- **Power Users (4+/8wk)**: 12
 
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 4
 - **Active Bots**: 3
-- **Total Volume**: $15,824.25
+- **Total Volume**: $24,396.74
 
 ## 🖥️ System Resources
 
@@ -90,25 +90,41 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 18MB | 7h 24m | 0 |
-| ggbot | 🟢 online | 0.9% | 245MB | 6h 32m | 2 |
-| account-monitor | 🟢 online | 1.3% | 36MB | 7h 24m | 0 |
-| sebastian-chrome | 🟢 online | 0.3% | 70MB | 7h 24m | 0 |
-| sebastian-bot | 🟢 online | 0.2% | 46MB | 7h 24m | 0 |
-| market-data-ws | 🟢 online | 0.7% | 36MB | 7h 24m | 0 |
-| sebastian-telegram | 🟢 online | 0% | 24MB | 7h 24m | 0 |
-| ggbot-scheduler | 🟢 online | 0% | 283MB | 7h 24m | 0 |
+| error-alerts | 🟢 online | 0% | 18MB | 1d 7h | 3 |
+| ggbot | 🟢 online | 2.2% | 230MB | 1d 7h | 6 |
+| account-monitor | 🟢 online | 0.7% | 27MB | 1d 7h | 3 |
+| sebastian-bot | 🟢 online | 0.2% | 42MB | 1d 7h | 3 |
+| sebastian-virtuals | 🟢 online | 0% | 86MB | new | 0 |
+| market-data-ws | 🟢 online | 1.3% | 15MB | 1d 7h | 3 |
+| sebastian-telegram | 🟢 online | 0% | 13MB | 1d 7h | 3 |
+| ggbot-scheduler | 🟢 online | 0% | 274MB | 1d 7h | 3 |
 
 ### VM Resources
 
-- **Disk**: 61G / 78G (78%)
-- **Memory**: 2.2Gi / 3.8Gi
-- **CPU Load**: 0.45 / 0.30 / 0.18 (1m/5m/15m)
+- **Disk**: 61G / 78G (79%)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.50 / 0.22 / 0.07 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 21.21M)
+- **Redis**: 🟢 connected (Memory: 23.57M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
+
+### Scheduler Capacity
+
+Bot execution uses async DB (`asyncio.to_thread`) since 2026-03-26. All sync psycopg2 calls run in thread pool — event loop never blocks.
+
+| Component | Current Setting | Max Safe | Tune When |
+|-----------|----------------|----------|-----------|
+| Execution semaphore | 30 | 50 | 60+ active bots |
+| Thread pool | 32 workers | 48 | 60+ active bots |
+| DB connection pool | 50 maxconn | 80 | PgBouncer contention |
+| Cycle timeout | 180s | — | Adjust if legitimate slow cycles get killed |
+| Supabase PgBouncer | ~200 client slots | — | Hard limit, shared across all PM2 processes |
+
+**Current capacity**: ~100 active bots, zero changes needed. At 300+ bots, migrate to `asyncpg`.
+
+**Connection chain**: App ThreadedPool(50) → Supabase PgBouncer(~200 slots, port 6543) → PostgreSQL(60 direct). Three PM2 processes (ggbot, ggbot-scheduler, account-monitor) each maintain own pool.
 
 ---
 
@@ -550,7 +566,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-21 06:06:41 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-25 16:47:26 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -750,7 +766,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-03-21 06:06:41 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-25 16:47:26 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

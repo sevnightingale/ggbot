@@ -36,24 +36,24 @@ All 18 RLS policies now use `(SELECT auth.uid())` subquery pattern. 7 bare `auth
 - [ ] `data_points` — `reference_data_points_read` + `service_manages_data_points`
 - [ ] `data_sources` — `reference_data_sources_read` + `service_manages_data_sources`
 
-### **Async DB Migration** (Before 100+ Active Bots)
+### ~~Async DB Migration — Phase 1~~ ✅ (2026-03-26)
 
-Currently 36 active bots, 10/50 connections used. Not urgent — defer until 60+ active or next deadlock.
+Bot execution pipeline migrated to `asyncio.to_thread()`. 20 call sites across 6 files. See CHANGELOG 2026-03-26.
 
-Sync `get_db_connection()` (psycopg2) blocks asyncio event loop when pool is contended. Wrap hot-path calls in `asyncio.to_thread()` so DB I/O runs in thread pool.
+### **Async DB — Phase 2: Trading Pipeline** (Lower Priority)
 
-**Phase 1 — Bot execution pipeline** (~15 call sites):
-- [ ] `core/orchestrator/orchestrator.py` — 4 calls (ggshot query, market_data cleanup, config loading)
-- [ ] `decision/engine_v2.py` — 6 calls (decision save, position queries, config load)
-- [ ] `core/common/activity_logger.py` — 3 calls (activity logging)
-- [ ] Set `ThreadPoolExecutor(max_workers=32)` as default executor in scheduler entry point
-
-**Phase 2 — Trading pipeline** (fires only on actual trades, lower priority):
+Only fires on actual trades (not every cycle). Wrap in `asyncio.to_thread()`:
 - [ ] `trading/paper/positions.py` — 5 calls (position CRUD)
 - [ ] `trading/paper/supabase_service.py` — 2 calls (account updates)
 - [ ] `trading/live/hyperliquid_service.py` — position/trade DB ops
 
-**Long-term** (500+ bots): migrate to asyncpg (async PostgreSQL driver). Separate project.
+### **Scaling Capacity Tuning** (At 60+ Active Bots)
+
+Current capacity: ~100 bots with zero changes. Tuning knobs when needed:
+- [ ] Raise `Semaphore(30)` → 50 in `bot_runner.py`
+- [ ] Raise `ThreadPoolExecutor(32)` → 48 in `ggbot_scheduler.py`
+- [ ] Raise pool `maxconn=50` → 80 in `core/common/db.py`
+- [ ] At 300+ bots: migrate to `asyncpg` (native async PostgreSQL driver)
 
 ---
 
@@ -92,24 +92,62 @@ New MI category: "Agent Intelligence" — curated Virtuals ACP agents as data so
 - [x] Butler survey: 6 agents identified, 3 strong candidates (Otto AI, Wolfpack, BlackSwan)
 - [x] Marketplace is active — Otto AI has 55K jobs, real ecosystem
 
-### ~~Agent Registration~~ ✅ (2026-03-21)
-- [x] "Sebastian by ggbots.ai" registered as Hybrid agent (entity_id: 29537)
-- [x] Smart wallet: `0xDAD56...422612`, EOA whitelisted: `0xFF0ab...19bbD`
-- [x] Job offering: marketBrief ($0.01, 10min SLA)
-- [x] Credentials in `.env` (`ACP_WALLET_ADDRESS`, `ACP_WALLET_PRIVATE_KEY`, `ACP_ENTITY_ID`)
-- [x] `virtuals-acp` SDK installed
+### ~~Agent Registration~~ ✅ (2026-03-24, revised)
+- [x] ggbots.ai registered as $GG token agent (`isVirtualAgent: true`, entity 40623)
+- [x] Smart wallet: `0x2E48f...A2DFE8`, funded $9 USDC
+- [x] Sebastian registered as separate provider (wallet `0xDAD56...422612`)
+- [x] Shared EOA: `0xFF0ab...19bbD`, on-chain entity_id: **2** (not API ID!)
+- [x] Job offering: marketBrief ($0.07, 20min SLA)
+- [x] `virtuals-acp==0.3.23` SDK installed
+- [x] First ACP transactions: Otto AI crypto_news + self-consumption (ggbots→Sebastian)
 
-### **Workstream 1: ACP Buyer Integration** (~2-3 days)
-- [ ] Fund smart wallet with USDC on Base ($5-10 for testing)
-- [ ] `core/services/acp_client.py` — ACP client wrapper (wallet, job lifecycle, polling mode)
-- [ ] `market_intelligence/adapters/acp/acp_agent_adapter.py` — MI adapter for ACP agents
-- [ ] Catalog YAML + `catalog_mapping.py` entries for curated agents (Otto, Wolfpack, BlackSwan)
-- [ ] DB seed: additional `data_points` under `agentic_intelligence` for each curated agent
+### ~~Workstream 1: ACP Buyer + Provider Code~~ ✅ (2026-03-24)
+- [x] `core/services/acp_client.py` — dual-client wrapper (buyer=ggbots.ai, provider=Sebastian)
+- [x] `market_intelligence/adapters/acp/acp_agent_adapter.py` — cache-first MI adapter
+- [x] Catalog YAML + `catalog_mapping.py` entries (ggbots_acp active, Otto/Wolfpack/BlackSwan commented)
+- [x] `sebastian_virtuals.py` — PM2 background service (provider + buyer queue + monitor)
+- [x] `ecosystem.config.js` — sebastian-virtuals PM2 entry
+- [x] DB seed: `ggbots_acp` data point under `agentic_intelligence`
 
-### **Workstream 2: ACP Provider Service**
-- [ ] Provider process: listen for ACP jobs → read latest report from Supabase → deliver
-- [ ] Self-consumption: wire our agent into Agentic Intelligence category via ACP
+### **Remaining: ACP Activation** (~1 day)
+- [ ] Create separate EOA wallet for Sebastian provider (fixes `OnlyCounterParty` revert on evaluate)
+- [ ] Whitelist new EOA on Sebastian agent, update `.env` with separate provider key
+- [ ] Start `sebastian-virtuals` PM2 service, verify automated provider + buyer lifecycle
+- [ ] Discover third-party agent wallet addresses (`browse_agents` for Otto, Wolfpack, BlackSwan)
+- [ ] Uncomment third-party entries in `catalog_mapping.py`, run seed SQL
+- [ ] Enable ACP data points on test bots, verify end-to-end via bot cycle
 - [ ] Submit for graduation review (7 working days)
+
+---
+
+## 🏟️ **Virtuals DGClaw Arena** ($GG Graduation — Volume Driver)
+
+**Status**: 🟡 IN PROGRESS — Phase 1 deployed, awaiting first automated trade
+**Architecture Doc**: [trading/virtuals/README.md](trading/virtuals/README.md)
+
+AI trading arena on Virtuals Protocol. Every trade = on-chain ACP transaction = $GG volume. Arena is a parallel execution layer — bot runs normally (paper/live), arena mirrors trade intents to DGClaw via ACP.
+
+### ~~DGClaw Registration~~ ✅ (2026-03-25)
+### ~~Phase 1: Arena Execution Layer~~ ✅ (2026-03-26)
+
+Sev's live HL bot (`b9d9bf00...`) mirrors trades to DGClaw. `dgclaw_service.py` handles ACP lifecycle, orchestrator enqueues to `arena:trade_queue`, `sebastian-virtuals` processes. Balance $35.79 in DGClaw account.
+
+### **Phase 1: Remaining**
+- [ ] Verify first automated arena trade end-to-end
+- [ ] Arena position monitoring/logging
+- [ ] Keep ACP wallet funded for $0.01/trade fees
+
+### **Phase 2: Any User Can Enter** (major feature — VALIDATED)
+
+Lite agent pool model — claw REST API control (no EOA needed). Full flow validated 2026-03-26: create → tokenize → fund → register → deposit → trade. See [trading/virtuals/README.md](trading/virtuals/README.md) for full scoping.
+
+- [ ] Agent pool creation script (batch lite API + tokenize + DGClaw join_leaderboard)
+- [ ] `arena_agents` table + assignment logic
+- [ ] Claw API adapter for per-user arena trades (POST /acp/jobs with user's apiKey)
+- [ ] `/virtuals-arena` frontend page (leaderboard, deposit address, bot selector, positions)
+- [ ] Deposit detection (poll claw API `/acp/wallet-balances`, trigger perp_deposit)
+- [ ] Per-user arena trading (orchestrator routes to claw API per assigned agent)
+- [ ] Withdrawal flow (perp_withdraw via claw API → USDC back to user)
 
 ---
 

@@ -125,18 +125,27 @@ self._log_bind(symbol=symbol).error("Market data fetch failed")
 **V2 uses Supabase for all database operations**. Use direct PostgreSQL connections via `core.common.db` for V2 orchestrator.
 
 ```python
-# V2 standard - Direct Supabase PostgreSQL
+# ASYNC context (scheduler bot cycles) — ALWAYS use async helpers
+# Runs psycopg2 in thread pool, never blocks the event loop
+from core.common.db import db_fetch_one, db_fetch_all, db_execute
+
+row = await db_fetch_one("SELECT * FROM table WHERE id = %s", (id,))
+rows = await db_fetch_all("SELECT * FROM table")
+await db_execute("INSERT INTO table (...) VALUES (%s)", (val,))
+
+# For sync functions called from async code, wrap the call:
+await asyncio.to_thread(some_sync_function, arg1, arg2)
+
+# SYNC context (API endpoints, monitors) — use get_db_connection directly
 from core.common.db import get_db_connection
 
 with get_db_connection() as conn:
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM table")
         results = cur.fetchall()
-
-# For specific integrations - Supabase client
-from trading.paper.supabase_service import SupabasePaperTradingService
-service = SupabasePaperTradingService()
 ```
+
+**CRITICAL**: In the scheduler process, NEVER use bare `get_db_connection()` in async code — it blocks the event loop and causes bot deadlocks at candle boundaries. Always use `db_fetch_one`/`db_fetch_all`/`db_execute` or `asyncio.to_thread()`.
 
 ### Two-Process Architecture
 ```

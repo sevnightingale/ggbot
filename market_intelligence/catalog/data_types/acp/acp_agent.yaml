@@ -1,0 +1,14 @@
+name: acp_agent
+category: acp
+description: Intelligence from curated Virtuals ACP agents (crypto news, risk scores, prediction markets, market briefs)
+
+sources:
+  - adapter: ACPAgentAdapter
+    priority: 1
+    cost: variable
+    notes: $0.01-0.07 per ACP job, cached 1hr+
+
+cache:
+  backend: redis
+  ttl: 3600
+  key_pattern: "intel:acp:{agent_name}"

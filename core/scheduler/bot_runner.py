@@ -24,8 +24,18 @@ from core.scheduler.utils import (
     extract_timeframe_from_config,
 )
 
-# Limit concurrent bot executions to prevent resource exhaustion
-execution_semaphore = asyncio.Semaphore(50)
+# Limit concurrent bot executions.
+# With async DB (asyncio.to_thread), sync calls no longer block the event loop,
+# so the semaphore's main purpose is connection pool headroom (maxconn=50).
+# 30 concurrent bots × ~2 connections each = 60 peak, but interleaved LLM awaits
+# keep actual concurrent connections well under 50.
+execution_semaphore = asyncio.Semaphore(30)
+
+# Maximum time a single bot cycle can run before being killed.
+# Normal cycles complete in 25-40s. At peak boundaries (4h = 40+ bots fire),
+# Grok API contention pushes MI phase to 2-3 min, so total cycle can reach 4+ min.
+# 300s gives headroom for peak contention while still catching true hangs.
+CYCLE_TIMEOUT_SECONDS = 300
 
 # These are set by the scheduler entry point after initialization
 _scheduler: Optional[AsyncIOScheduler] = None
@@ -68,11 +78,23 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
 
             try:
                 run_id = uuid.uuid4().hex[:6]
-                result = await _orchestrator.run_autonomous_cycle(config_id, user_id, run_id=run_id)
+                result = await asyncio.wait_for(
+                    _orchestrator.run_autonomous_cycle(config_id, user_id, run_id=run_id),
+                    timeout=CYCLE_TIMEOUT_SECONDS,
+                )
 
                 await redis_client.set(key, "completed", ex=ttl)
                 logger.bind(run_id=run_id, config_id=config_id).info(
                     f"Completed execution for {timeframe}:{close_ts} in {result.execution_time_ms}ms"
+                )
+
+            except asyncio.TimeoutError:
+                # Kill hung cycles so APScheduler's max_instances=1 slot is freed.
+                # Delete idempotency key so the NEXT scheduled fire can retry.
+                await redis_client.delete(key)
+                logger.error(
+                    f"TIMEOUT after {CYCLE_TIMEOUT_SECONDS}s for {user_id}:{config_id}:{timeframe}:{close_ts} "
+                    f"run={run_id} — cycle killed, will retry next fire"
                 )
 
             except Exception as e:
@@ -146,21 +168,25 @@ async def reconcile_loop(scheduler: AsyncIOScheduler, orchestrator, interval: in
     """
     while True:
         try:
-            # Get active scheduled_trading bots from DB
-            db_active = set()  # {(user_id, config_id, timeframe)}
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT user_id, config_id, config_type, config_data
-                        FROM configurations
-                        WHERE state = 'active'
-                          AND (config_type = 'scheduled_trading' OR config_type IS NULL)
-                    """)
-                    for row in cur.fetchall():
-                        user_id, config_id, config_type, config_data = row
-                        tf = extract_timeframe_from_config(config_data)
-                        if tf and tf != 'signal_driven':
-                            db_active.add((str(user_id), str(config_id), tf))
+            # Get active scheduled_trading bots from DB (run in thread to avoid blocking event loop)
+            def _query_active_bots():
+                result = set()
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT user_id, config_id, config_type, config_data
+                            FROM configurations
+                            WHERE state = 'active'
+                              AND (config_type = 'scheduled_trading' OR config_type IS NULL)
+                        """)
+                        for row in cur.fetchall():
+                            user_id, config_id, config_type, config_data = row
+                            tf = extract_timeframe_from_config(config_data)
+                            if tf and tf != 'signal_driven':
+                                result.add((str(user_id), str(config_id), tf))
+                return result
+
+            db_active = await asyncio.to_thread(_query_active_bots)
 
             # Get current scheduler jobs
             sched_active = set()
