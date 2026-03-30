@@ -369,6 +369,9 @@ def _replace_param_templates(params: Dict[str, Any], **replacements) -> Dict[str
         if isinstance(value, str) and '{' in value:
             # Replace template
             replaced[key] = value.format(**replacements)
+        elif isinstance(value, dict):
+            # Recurse into nested dicts (e.g., ACP service_requirement with {config_id})
+            replaced[key] = _replace_param_templates(value, **replacements)
         else:
             replaced[key] = value
     return replaced

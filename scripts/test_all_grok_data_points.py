@@ -68,7 +68,7 @@ class GrokDataPointTester:
             self.total_tool_calls += result['metadata']['tool_calls']
 
             print(f"✅ VIX Value: {data.get('value')}")
-            print(f"✅ Signal: {data.get('signal')}")
+            print(f"✅ Risk Regime: {data.get('risk_regime')}")
             print(f"✅ Cost: ${result['metadata']['cost']:.4f}")
 
             return result
@@ -110,7 +110,8 @@ class GrokDataPointTester:
             self.total_tool_calls += result['metadata']['tool_calls']
 
             print(f"✅ DXY Value: {data.get('value')}")
-            print(f"✅ Crypto Impact: {data.get('crypto_impact')}")
+            print(f"✅ Change 24h: {data.get('change_24h')}")
+            print(f"✅ Trend: {data.get('trend')}")
             print(f"✅ Cost: ${result['metadata']['cost']:.4f}")
 
             return result
@@ -152,7 +153,7 @@ class GrokDataPointTester:
             self.total_tool_calls += result['metadata']['tool_calls']
 
             print(f"✅ CPI Value: {data.get('value')}%")
-            print(f"✅ Fed Implications: {data.get('fed_implications')}")
+            print(f"✅ Market Expectation: {data.get('market_expectation')}")
             print(f"✅ Cost: ${result['metadata']['cost']:.4f}")
 
             return result
@@ -282,7 +283,7 @@ class GrokDataPointTester:
 
             print(f"✅ Large Transfers: {data.get('large_transfers_count')}")
             print(f"✅ Net Flow: ${data.get('net_flow_usd', 0):,.0f}")
-            print(f"✅ Signal: {data.get('signal')}")
+            print(f"✅ Summary: {data.get('summary', 'N/A')}")
             print(f"✅ Cost: ${result['metadata']['cost']:.4f}")
 
             return result

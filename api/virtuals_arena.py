@@ -1,14 +1,17 @@
 """
 Virtuals DGClaw Arena API Endpoints
 
-Phase 2: Any user can join the arena. Pre-created pool of lite Virtuals agents,
-assigned on demand. Trades routed via claw REST API (no EOA needed).
+1-bot-1-agent model: each bot (config_id) can independently join the arena.
+Agents assigned from a pre-created pool, controlled via claw REST API.
 """
 
 import asyncio
+import base64
+import time
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+import aiohttp
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
 from core.common.logger import logger
@@ -27,12 +30,14 @@ _log = logger.bind(component="virtuals_arena_api")
 # =========================================================================
 
 class JoinRequest(BaseModel):
-    wallet_address: str  # User's wallet they'll send USDC from (Base chain)
+    config_id: str
+    wallet_address: str  # User's wallet for withdrawals (Base chain)
 
-class SetBotRequest(BaseModel):
+class CheckDepositRequest(BaseModel):
     config_id: str
 
 class WithdrawRequest(BaseModel):
+    config_id: str
     amount: float
 
 
@@ -40,19 +45,20 @@ class WithdrawRequest(BaseModel):
 # Helpers
 # =========================================================================
 
-async def _get_user_arena_agent(user_id: str) -> Optional[Dict[str, Any]]:
-    """Load the user's assigned arena agent with decrypted claw API key."""
-    return await VaultManager.get_arena_credential_by_user(user_id)
+async def _get_config_arena_agent(config_id: str) -> Optional[Dict[str, Any]]:
+    """Load the arena agent assigned to a bot config, with decrypted claw API key."""
+    return await VaultManager.get_arena_credential_by_config(config_id)
 
 
-async def _get_user_arena_agent_basic(user_id: str) -> Optional[Dict[str, Any]]:
-    """Load user's arena agent without vault decryption (basic info only)."""
+async def _get_config_arena_agent_basic(config_id: str) -> Optional[Dict[str, Any]]:
+    """Load arena agent for a config without vault decryption (basic info only)."""
     row = await db_fetch_one("""
         SELECT id, wallet_address, agent_name, token_symbol,
-               user_wallet_address, status, assigned_at
+               user_wallet_address, status, assigned_at,
+               dgclaw_api_key_vault_id IS NOT NULL as is_registered
         FROM arena_agents
-        WHERE assigned_user_id = %s AND status = 'assigned'
-    """, (user_id,))
+        WHERE assigned_config_id = %s AND status = 'assigned'
+    """, (config_id,))
     if not row:
         return None
     return {
@@ -63,7 +69,122 @@ async def _get_user_arena_agent_basic(user_id: str) -> Optional[Dict[str, Any]]:
         'user_wallet_address': row[4],
         'status': row[5],
         'assigned_at': row[6].isoformat() if row[6] else None,
+        'is_registered': row[7],
     }
+
+
+async def _verify_config_ownership(config_id: str, user_id: str) -> bool:
+    """Verify that a config belongs to the authenticated user."""
+    row = await db_fetch_one(
+        "SELECT 1 FROM configurations WHERE config_id = %s AND user_id = %s",
+        (config_id, user_id)
+    )
+    return bool(row)
+
+
+async def _register_on_dgclaw(agent_id: int, wallet: str, claw_api_key: str) -> bool:
+    """
+    Register an arena agent on DGClaw via join_leaderboard.
+
+    Generates RSA keypair, sends public key, decrypts returned DGClaw API key,
+    stores it in vault. Costs $0.01 ACP fee from agent wallet.
+
+    Returns True if registered successfully.
+    """
+    from cryptography.hazmat.primitives.asymmetric import rsa, padding
+    from cryptography.hazmat.primitives import serialization, hashes
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pub_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode('utf-8')
+
+    _log.info(f"Registering agent {agent_id} on DGClaw (join_leaderboard)...")
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{ClawAPIClient.BASE_URL}/acp/jobs",
+            headers={"x-api-key": claw_api_key, "Content-Type": "application/json"},
+            json={
+                "providerWalletAddress": ClawAPIClient.DGCLAW_AGENT,
+                "jobOfferingName": "join_leaderboard",
+                "serviceRequirements": {
+                    "agentAddress": wallet,
+                    "publicKey": pub_pem,
+                },
+            },
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            result = await resp.json()
+            if resp.status not in (200, 201):
+                _log.error(f"DGClaw join_leaderboard failed: {resp.status} {result}")
+                return False
+
+            job_id = result.get("data", {}).get("jobId")
+            if not job_id:
+                _log.error("No jobId returned from join_leaderboard")
+                return False
+
+        _log.info(f"DGClaw join job {job_id} created, polling...")
+
+        start = time.time()
+        while (time.time() - start) < 120:
+            await asyncio.sleep(5)
+            async with session.get(
+                f"{ClawAPIClient.BASE_URL}/acp/jobs/{job_id}",
+                headers={"x-api-key": claw_api_key},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as poll_resp:
+                data = (await poll_resp.json()).get("data", {})
+                phase = data.get("phase", "unknown")
+
+                if phase == "COMPLETED":
+                    deliverable = data.get("deliverable")
+                    _log.info(f"DGClaw registration complete for agent {agent_id}")
+
+                    dgclaw_key = None
+                    if isinstance(deliverable, dict):
+                        encrypted = deliverable.get("encryptedApiKey")
+                        if encrypted:
+                            try:
+                                dgclaw_key = private_key.decrypt(
+                                    base64.b64decode(encrypted),
+                                    padding.OAEP(
+                                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                        algorithm=hashes.SHA256(),
+                                        label=None,
+                                    )
+                                ).decode('utf-8')
+                            except Exception as e:
+                                _log.error(f"Failed to decrypt DGClaw API key: {e}")
+
+                    if dgclaw_key:
+                        await VaultManager.store_arena_credential(
+                            agent_id, claw_api_key, dgclaw_key
+                        )
+                        _log.info(f"DGClaw API key stored for agent {agent_id}")
+                    return True
+
+                elif phase == "REJECTED":
+                    reason = ""
+                    for memo in data.get("memos", []):
+                        if memo.get("nextPhase") == "REJECTED" or memo.get("status") == "REJECTED":
+                            reason = memo.get("signedReason", memo.get("content", ""))
+                    _log.error(f"DGClaw registration rejected for agent {agent_id}: {reason}")
+                    return False
+
+    _log.error(f"DGClaw registration timed out for agent {agent_id}")
+    return False
+
+
+async def _is_registered_on_dgclaw(agent_id: int) -> bool:
+    """Check if agent has a DGClaw API key (= registered)."""
+    row = await db_fetch_one(
+        "SELECT dgclaw_api_key_vault_id FROM arena_agents WHERE id = %s",
+        (agent_id,)
+    )
+    return bool(row and row[0])
 
 
 # =========================================================================
@@ -76,15 +197,18 @@ async def join_arena(
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ) -> Dict[str, Any]:
     """
-    Assign an available arena agent from the pool to this user.
+    Assign an arena agent to a specific bot (config_id).
 
-    The user provides their wallet address (used for withdrawals later).
-    Returns the agent's wallet address for the user to send USDC to.
+    Each bot gets its own arena agent. User provides their wallet address
+    for withdrawals. Returns the agent wallet to send USDC to.
     """
     user_id = current_user.user_id
 
-    # Check if user already has an agent
-    existing = await _get_user_arena_agent_basic(user_id)
+    if not await _verify_config_ownership(body.config_id, user_id):
+        raise HTTPException(status_code=404, detail="Bot not found")
+
+    # Check if this config already has an arena agent
+    existing = await _get_config_arena_agent_basic(body.config_id)
     if existing:
         return {
             "status": "already_joined",
@@ -118,22 +242,22 @@ async def join_arena(
                 cur.execute("""
                     UPDATE arena_agents
                     SET assigned_user_id = %s,
+                        assigned_config_id = %s,
                         status = 'assigned',
                         assigned_at = NOW(),
                         user_wallet_address = %s
                     WHERE id = %s
-                """, (user_id, body.wallet_address, agent_id))
+                """, (user_id, body.config_id, body.wallet_address, agent_id))
 
                 conn.commit()
 
-        _log.info(f"Assigned arena agent {agent_name} to user {user_id[:8]}")
+        _log.info(f"Assigned arena agent {agent_name} to config {body.config_id[:8]}")
 
         return {
             "status": "joined",
             "wallet_address": wallet_address,
             "agent_name": agent_name,
             "token_symbol": token_symbol,
-            "message": f"Send USDC (Base chain) to {wallet_address}. Bridge fee is ~$1.",
         }
 
     except HTTPException:
@@ -145,30 +269,30 @@ async def join_arena(
 
 @router.get("/status")
 async def get_arena_status(
+    config_id: str = Query(...),
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ) -> Dict[str, Any]:
     """
-    Get the user's arena status: balance, positions, active bot, wallet.
+    Get arena status for a specific bot.
     """
-    user_id = current_user.user_id
+    if not await _verify_config_ownership(config_id, current_user.user_id):
+        raise HTTPException(status_code=404, detail="Bot not found")
 
-    agent = await _get_user_arena_agent(user_id)
+    agent = await _get_config_arena_agent(config_id)
     if not agent:
         return {"status": "not_joined"}
 
     client = ClawAPIClient(agent['claw_api_key'])
     wallet = agent['wallet_address']
 
-    # Fetch balance, positions, and active bot in parallel
+    # Fetch balance, positions in parallel
     wallet_balance_task = asyncio.create_task(_safe_wallet_balance(client))
     dgclaw_account_task = asyncio.create_task(_safe_dgclaw_account(client, wallet))
     dgclaw_positions_task = asyncio.create_task(_safe_dgclaw_positions(client, wallet))
-    active_bot_task = asyncio.create_task(_get_active_arena_bot(user_id))
 
     wallet_balance = await wallet_balance_task
     dgclaw_account = await dgclaw_account_task
     positions = await dgclaw_positions_task
-    active_bot = await active_bot_task
 
     dgclaw_balance = dgclaw_account.get('balance', 0) if dgclaw_account else 0
 
@@ -181,25 +305,27 @@ async def get_arena_status(
         "wallet_balance_usdc": wallet_balance,
         "dgclaw_balance": dgclaw_balance,
         "positions": positions,
-        "active_bot": active_bot,
     }
 
 
 @router.post("/check-deposit")
 async def check_deposit(
+    body: CheckDepositRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ) -> Dict[str, Any]:
     """
-    User clicks "I sent it" — check wallet balance and trigger perp_deposit.
+    Check wallet balance and trigger deposit for a specific bot's arena agent.
 
     Retries up to 3 times with 5s delays if balance is zero (network delay).
+    Registers on DGClaw automatically on first deposit.
     Keeps $1 in wallet for ACP transaction fees.
     """
-    user_id = current_user.user_id
+    if not await _verify_config_ownership(body.config_id, current_user.user_id):
+        raise HTTPException(status_code=404, detail="Bot not found")
 
-    agent = await _get_user_arena_agent(user_id)
+    agent = await _get_config_arena_agent(body.config_id)
     if not agent:
-        raise HTTPException(status_code=404, detail="No arena agent assigned")
+        raise HTTPException(status_code=404, detail="No arena agent assigned to this bot")
 
     client = ClawAPIClient(agent['claw_api_key'])
 
@@ -216,27 +342,40 @@ async def check_deposit(
     if balance <= 0:
         return {
             "status": "no_funds",
-            "message": "No USDC detected in agent wallet. It may take a few minutes for the transfer to confirm. Please try again shortly.",
+            "message": "No USDC detected yet. It may take a few minutes to confirm. Try again shortly.",
         }
+
+    # Register on DGClaw if not yet registered (first deposit triggers this)
+    if not await _is_registered_on_dgclaw(agent['agent_id']):
+        _log.info(f"Agent {agent['agent_id']} not registered on DGClaw, registering...")
+        registered = await _register_on_dgclaw(
+            agent['agent_id'], agent['wallet_address'], agent['claw_api_key']
+        )
+        if not registered:
+            return {
+                "status": "error",
+                "balance": balance,
+                "reason": "Failed to register on DGClaw. Please try again.",
+            }
+        # Re-check balance (registration costs $0.01)
+        balance = await client.get_wallet_balance()
 
     # Keep $1 for ACP fees, deposit the rest
     reserve = 1.0
     min_deposit = 5.0
 
-    if balance <= reserve + min_deposit:
-        # Not enough to deposit after reserving for fees
-        if balance < min_deposit:
-            return {
-                "status": "insufficient",
-                "balance": balance,
-                "message": f"Balance ${balance:.2f} is below the $5 minimum deposit.",
-            }
-        # Deposit everything if barely above minimum (user can add more for fees later)
-        deposit_amount = balance - reserve
-    else:
-        deposit_amount = balance - reserve
+    if balance < min_deposit:
+        return {
+            "status": "insufficient",
+            "balance": balance,
+            "message": f"Balance ${balance:.2f} is below the $5 minimum deposit.",
+        }
 
-    _log.info(f"Triggering perp_deposit: ${deposit_amount:.2f} (wallet balance: ${balance:.2f})")
+    deposit_amount = balance - reserve
+    if deposit_amount < 4:
+        deposit_amount = balance - 0.5  # Smaller reserve if tight
+
+    _log.info(f"Triggering perp_deposit: ${deposit_amount:.2f} (wallet: ${balance:.2f})")
 
     result = await client.deposit_to_dgclaw(deposit_amount)
 
@@ -244,60 +383,16 @@ async def check_deposit(
         return {
             "status": "deposited",
             "amount_sent": deposit_amount,
-            "effective_amount": round(deposit_amount - 1, 2),  # ~$1 bridge fee
-            "message": f"Deposited ${deposit_amount:.0f} USDC. After bridge fee (~$1), expect ~${deposit_amount - 1:.0f} in your DGClaw account.",
+            "effective_amount": round(deposit_amount - 1, 2),
+            "message": f"Deposited ${deposit_amount:.0f} USDC. After bridge fee (~$1), expect ~${max(deposit_amount - 1, 0):.0f} in DGClaw.",
         }
     else:
-        _log.error(f"Deposit failed for user {user_id[:8]}: {result}")
+        _log.error(f"Deposit failed: {result}")
         return {
             "status": "error",
             "balance": balance,
             "reason": result.get('reason', 'Deposit failed'),
         }
-
-
-@router.post("/set-bot")
-async def set_arena_bot(
-    body: SetBotRequest,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2),
-) -> Dict[str, Any]:
-    """
-    Select which bot drives arena trades. Only one bot per user.
-    """
-    user_id = current_user.user_id
-
-    # Verify user has an arena agent
-    agent = await _get_user_arena_agent_basic(user_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail="No arena agent assigned")
-
-    # Verify the config belongs to this user
-    config = await db_fetch_one("""
-        SELECT config_id, config_name FROM configurations
-        WHERE config_id = %s AND user_id = %s
-    """, (body.config_id, user_id))
-
-    if not config:
-        raise HTTPException(status_code=404, detail="Bot not found")
-
-    # Disable arena on all user's bots, then enable on selected one
-    await db_execute("""
-        UPDATE configurations SET arena_enabled = false
-        WHERE user_id = %s AND arena_enabled = true
-    """, (user_id,))
-
-    await db_execute("""
-        UPDATE configurations SET arena_enabled = true
-        WHERE config_id = %s AND user_id = %s
-    """, (body.config_id, user_id))
-
-    _log.info(f"User {user_id[:8]} set arena bot to {body.config_id[:8]}")
-
-    return {
-        "status": "success",
-        "config_id": body.config_id,
-        "config_name": config[1],
-    }
 
 
 @router.post("/withdraw")
@@ -307,29 +402,24 @@ async def withdraw_from_arena(
 ) -> Dict[str, Any]:
     """
     Withdraw USDC from DGClaw back to the user's wallet.
-
-    Bridges: Hyperliquid -> Arbitrum -> Base. Minimum $2.
-    Recipient is the wallet address stored during /join.
     """
-    user_id = current_user.user_id
+    if not await _verify_config_ownership(body.config_id, current_user.user_id):
+        raise HTTPException(status_code=404, detail="Bot not found")
 
-    agent = await _get_user_arena_agent(user_id)
+    agent = await _get_config_arena_agent(body.config_id)
     if not agent:
-        raise HTTPException(status_code=404, detail="No arena agent assigned")
+        raise HTTPException(status_code=404, detail="No arena agent assigned to this bot")
 
     recipient = agent.get('user_wallet_address')
     if not recipient:
-        raise HTTPException(
-            status_code=400,
-            detail="No withdrawal address on file. Please contact support."
-        )
+        raise HTTPException(status_code=400, detail="No withdrawal address on file.")
 
     if body.amount < 2:
         raise HTTPException(status_code=400, detail="Minimum withdrawal is $2")
 
     client = ClawAPIClient(agent['claw_api_key'])
 
-    _log.info(f"Withdrawing ${body.amount:.2f} for user {user_id[:8]} to {recipient}")
+    _log.info(f"Withdrawing ${body.amount:.2f} to {recipient}")
     result = await client.withdraw_from_dgclaw(body.amount, recipient)
 
     if result.get('status') == 'success':
@@ -347,14 +437,11 @@ async def withdraw_from_arena(
 
 
 @router.get("/leaderboard")
-async def get_arena_leaderboard(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2),
-) -> Dict[str, Any]:
+async def get_arena_leaderboard() -> Dict[str, Any]:
     """
-    Get DGClaw arena leaderboard, enriched with ggbots user info where matched.
+    Get DGClaw arena leaderboard, enriched with ggbots info.
+    Public endpoint — no auth required.
     """
-    import aiohttp
-
     leaderboard_url = "https://dgclaw-app-production.up.railway.app/leaderboard"
 
     try:
@@ -371,7 +458,6 @@ async def get_arena_leaderboard(
         _log.error(f"Leaderboard fetch failed: {e}")
         return {"entries": [], "error": "Leaderboard unavailable"}
 
-    # Enrich with ggbots agent names where wallet addresses match
     if isinstance(entries, list) and entries:
         wallet_addresses = [e.get("walletAddress", e.get("wallet", "")) for e in entries if isinstance(e, dict)]
         if wallet_addresses:
@@ -383,7 +469,6 @@ async def get_arena_leaderboard(
             """, tuple(wallet_addresses))
 
             ggbots_map = {r[0]: {'agent_name': r[1], 'token_symbol': r[2]} for r in rows} if rows else {}
-
             for entry in entries:
                 wallet = entry.get("walletAddress", entry.get("wallet", ""))
                 if wallet in ggbots_map:
@@ -393,7 +478,7 @@ async def get_arena_leaderboard(
 
 
 # =========================================================================
-# Async helpers (for parallel fetching)
+# Async helpers
 # =========================================================================
 
 async def _safe_wallet_balance(client: ClawAPIClient) -> float:
@@ -416,19 +501,3 @@ async def _safe_dgclaw_positions(client: ClawAPIClient, wallet: str) -> list:
     except Exception as e:
         _log.debug(f"DGClaw positions check failed: {e}")
         return []
-
-async def _get_active_arena_bot(user_id: str) -> Optional[Dict[str, Any]]:
-    """Get the user's arena-enabled bot config."""
-    row = await db_fetch_one("""
-        SELECT config_id, config_name, config_data->>'selected_pair' as symbol
-        FROM configurations
-        WHERE user_id = %s AND arena_enabled = true
-        LIMIT 1
-    """, (user_id,))
-    if not row:
-        return None
-    return {
-        'config_id': row[0],
-        'config_name': row[1],
-        'symbol': row[2],
-    }

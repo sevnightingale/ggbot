@@ -82,6 +82,7 @@ class DGClawArenaService:
         symbol = trade_intent.get("symbol", "")
         confidence = trade_intent.get("confidence", 0.5)
         config_id = trade_intent.get("config_id", "unknown")
+        user_id = trade_intent.get("user_id")
         leverage = trade_intent.get("leverage", 3)
         max_margin_pct = trade_intent.get("max_margin_percent", 20)
 
@@ -158,6 +159,7 @@ class DGClawArenaService:
         if result.get("status") == "success":
             self._log_arena_activity(
                 config_id=config_id,
+                user_id=user_id,
                 action=f"arena_open_{side}",
                 summary=f"Arena: {side.upper()} {pair} ${size_usd:.0f} @ {leverage}x",
                 details={
@@ -307,6 +309,7 @@ class DGClawArenaService:
         # Poll job lifecycle
         start = time.time()
         paid = False
+        memo_delay_done = False
 
         while (time.time() - start) < self.MAX_POLL_TIME:
             try:
@@ -319,8 +322,11 @@ class DGClawArenaService:
 
                 elif phase == ACPJobPhase.NEGOTIATION and not paid:
                     # DGClaw accepted — pay $0.01 fee
-                    # Memo may not be immediately available after phase change,
-                    # so retry once after a short delay if "No negotiation memo" error
+                    # Brief delay for on-chain memo to be indexed (avoids
+                    # "No negotiation memo" race on ~80% of attempts)
+                    if not memo_delay_done:
+                        memo_delay_done = True
+                        time.sleep(3)
                     self._log.info(f"Job {job_id}: DGClaw accepted, paying...")
                     try:
                         self._acp_client.pay_job(job)

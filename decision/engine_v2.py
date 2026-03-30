@@ -1481,23 +1481,38 @@ Take Profit: {take_profit_text}
 
         return "\n".join(lines)
 
+    # Fields to exclude from MI formatting — adapter output should be factual only,
+    # trading interpretation is the decision engine's job (not the data provider's)
+    _MI_SKIP_FIELDS = {'metadata', 'raw_data', '_meta', 'fetched_at',
+                       'signal', 'interpretation', 'crypto_impact',
+                       'trading_implication', 'fed_implications',
+                       'overall_sentiment'}
+
     def _format_macro_data(self, macro: Dict[str, Any]) -> str:
-        """Format macro economic data for LLM prompt."""
+        """Format macro economic data for LLM prompt.
+
+        Renders factual data only — no signal/interpretation fields.
+        The decision LLM interprets trading implications from the raw data.
+        """
         lines = ["## MACRO ECONOMICS", ""]
 
         for point_name, data in macro.items():
-            # Format based on data type
-            if isinstance(data, dict):
-                value = data.get('value', 'N/A')
-                interpretation = data.get('interpretation', '')
-                signal = data.get('signal', '')
+            if not isinstance(data, dict):
+                continue
 
-                lines.append(f"**{point_name.upper().replace('_', ' ')}**: {value}")
-                if interpretation:
-                    lines.append(f"  - {interpretation}")
-                if signal:
-                    lines.append(f"  - Signal: {signal}")
-                lines.append("")
+            label = point_name.upper().replace('_', ' ')
+            value = data.get('value', 'N/A')
+            lines.append(f"**{label}**: {value}")
+
+            # Render all remaining factual fields
+            for key, val in data.items():
+                if key in ('value', 'symbol', 'timestamp') or key in self._MI_SKIP_FIELDS:
+                    continue
+                if val is None or val == '':
+                    continue
+                display_key = key.replace('_', ' ').title()
+                lines.append(f"  - {display_key}: {val}")
+            lines.append("")
 
         return "\n".join(lines)
 
@@ -1509,7 +1524,7 @@ Take Profit: {take_profit_text}
             if isinstance(data, dict):
                 lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
                 for key, value in data.items():
-                    if key not in ['metadata', 'raw_data', '_meta']:
+                    if key not in self._MI_SKIP_FIELDS:
                         lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
 
@@ -1523,7 +1538,7 @@ Take Profit: {take_profit_text}
             if isinstance(data, dict):
                 lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
                 for key, value in data.items():
-                    if key not in ['metadata', 'raw_data', '_meta']:
+                    if key not in self._MI_SKIP_FIELDS:
                         lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
 
@@ -1539,12 +1554,16 @@ Take Profit: {take_profit_text}
 
                 # Handle news headlines
                 if 'headlines' in data:
+                    # Show summary if present
+                    summary = data.get('summary')
+                    if summary:
+                        lines.append(f"  Summary: {summary}")
                     lines.append("  Recent Headlines:")
                     for headline in data['headlines'][:5]:  # Show top 5
                         lines.append(f"    - {headline}")
                 else:
                     for key, value in data.items():
-                        if key not in ['metadata', 'raw_data', '_meta']:
+                        if key not in self._MI_SKIP_FIELDS:
                             lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
 

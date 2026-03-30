@@ -1,88 +1,89 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-03-25 16:47:25 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-03-29 17:47:06 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 350
+- **Total Users**: 357
 - **Prepaid Users**: 22 (22 active subscriptions)
-- **Free Users**: 322
-- **Users with Bots**: 338 (96.6%)
+- **Free Users**: 329
+- **Users with Bots**: 344 (96.4%)
 
 ### Bot Statistics
-- **Total Bots**: 543
-- **Active Bots**: 37 (6.8%)
-  - Paper: 34
+- **Total Bots**: 573
+- **Active Bots**: 40 (7.0%)
+  - Paper: 38
   - Symphony (Live): 0
   - Aster (DEX): 0
-  - Hyperliquid (Live): 3
-- **Inactive Bots**: 506
-- **Avg Bots per User**: 1.6
+  - Hyperliquid (Live): 2
+- **Inactive Bots**: 533
+- **Avg Bots per User**: 1.7
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,590
-  - Wins: 2,551
-  - Losses: 5,039
-  - Platform Win Rate: 33.61%
-  - Total P&L: $132,384.06
+- **Total Trades (All Time)**: 7,687
+  - Wins: 2,580
+  - Losses: 5,107
+  - Platform Win Rate: 33.56%
+  - Total P&L: $127,836.21
 - **Recent Activity**:
-  - Last 24 hours: 7 trades
-  - Last 7 days: 81 trades
-  - Last 30 days: 428 trades
+  - Last 24 hours: 44 trades
+  - Last 7 days: 142 trades
+  - Last 30 days: 453 trades
 
 ### Open Positions
-- **Open Positions**: 5
-- **Unique Symbols**: 2
-- **Total Exposure**: $73,333.98
+- **Open Positions**: 18
+- **Unique Symbols**: 3
+- **Total Exposure**: $171,418.02
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,224.28
+- **Average Balance**: $10,204.46
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
 - **ETH/USDT**: 25 bots
-- **BTC/USDT**: 11 bots
+- **BTC/USDT**: 14 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 524 decisions (avg confidence: 31.7%)
-- **enter**: 10 decisions (avg confidence: 84.5%)
-- **exit**: 5 decisions (avg confidence: 57.7%)
-- **close**: 1 decisions (avg confidence: 65.0%)
+- **wait**: 1550 decisions (avg confidence: 28.5%)
+- **enter**: 44 decisions (avg confidence: 78.1%)
+- **exit**: 16 decisions (avg confidence: 69.3%)
+- **close**: 2 decisions (avg confidence: 62.5%)
+- **short**: 2 decisions (avg confidence: 60.0%)
 
 ### System Health
-- **Decisions (last hour)**: 27
+- **Decisions (last hour)**: 63
 - **Status**: 🟢 HEALTHY
 
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $636.46 (margin: $262.07, 41.2%)
-- **Last 30d Revenue**: $101.71 from 38 users
-- **Month-to-Date**: $79.75 (projected: ~$95.70)
-- **Avg LTV (paid)**: $19.30
+- **All-Time Revenue**: $658.91 (margin: $271.31, 41.2%)
+- **Last 30d Revenue**: $104.52 from 41 users
+- **Month-to-Date**: $102.20 (projected: ~$105.72)
+- **Avg LTV (paid)**: $20.06
 
 ### Conversion Funnel
-- **Signup → Created Bot**: 96.0%
-- **Signup → Ran Bot**: 65.4%
-- **Signup → Paid**: 8.0% (28/350)
-- **Post-Monetization (Jan+)**: 22.4% (19/85)
+- **Signup → Created Bot**: 95.8%
+- **Signup → Ran Bot**: 65.8%
+- **Signup → Paid**: 7.8% (28/357)
+- **Post-Monetization (Jan+)**: 20.7% (19/92)
 
 ### Engagement
-- **DAU/WAU/MAU**: 8/11/38
-- **DAU/WAU Stickiness**: 72.7%
+- **DAU/WAU/MAU**: 10/16/41
+- **DAU/WAU Stickiness**: 62.5%
 - **Power Users (4+/8wk)**: 12
 
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 4
-- **Active Bots**: 3
-- **Total Volume**: $24,396.74
+- **Active Bots**: 2
+- **Total Volume**: $36,127.59
 
 ## 🖥️ System Resources
 
@@ -90,41 +91,25 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 18MB | 1d 7h | 3 |
-| ggbot | 🟢 online | 2.2% | 230MB | 1d 7h | 6 |
-| account-monitor | 🟢 online | 0.7% | 27MB | 1d 7h | 3 |
-| sebastian-bot | 🟢 online | 0.2% | 42MB | 1d 7h | 3 |
-| sebastian-virtuals | 🟢 online | 0% | 86MB | new | 0 |
-| market-data-ws | 🟢 online | 1.3% | 15MB | 1d 7h | 3 |
-| sebastian-telegram | 🟢 online | 0% | 13MB | 1d 7h | 3 |
-| ggbot-scheduler | 🟢 online | 0% | 274MB | 1d 7h | 3 |
+| error-alerts | 🟢 online | 0% | 20MB | 3d 0h | 10 |
+| ggbot | 🟢 online | 2.5% | 268MB | 2d 12h | 14 |
+| account-monitor | 🟢 online | 1.1% | 32MB | 3d 0h | 10 |
+| sebastian-bot | 🟢 online | 0.1% | 56MB | 3d 0h | 10 |
+| market-data-ws | 🟢 online | 0.8% | 121MB | 19h 16m | 11 |
+| sebastian-telegram | 🟢 online | 0% | 41MB | 39m | 11 |
+| ggbot-scheduler | 🟢 online | 0% | 317MB | 19h 16m | 13 |
+| sebastian-virtuals | 🟢 online | 0% | 39MB | 3d 0h | 4 |
 
 ### VM Resources
 
 - **Disk**: 61G / 78G (79%)
-- **Memory**: 2.5Gi / 3.8Gi
-- **CPU Load**: 0.50 / 0.22 / 0.07 (1m/5m/15m)
+- **Memory**: 1.4Gi / 3.8Gi
+- **CPU Load**: 0.15 / 0.17 / 0.08 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 23.57M)
+- **Redis**: 🟢 connected (Memory: 34.69M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
-
-### Scheduler Capacity
-
-Bot execution uses async DB (`asyncio.to_thread`) since 2026-03-26. All sync psycopg2 calls run in thread pool — event loop never blocks.
-
-| Component | Current Setting | Max Safe | Tune When |
-|-----------|----------------|----------|-----------|
-| Execution semaphore | 30 | 50 | 60+ active bots |
-| Thread pool | 32 workers | 48 | 60+ active bots |
-| DB connection pool | 50 maxconn | 80 | PgBouncer contention |
-| Cycle timeout | 180s | — | Adjust if legitimate slow cycles get killed |
-| Supabase PgBouncer | ~200 client slots | — | Hard limit, shared across all PM2 processes |
-
-**Current capacity**: ~100 active bots, zero changes needed. At 300+ bots, migrate to `asyncpg`.
-
-**Connection chain**: App ThreadedPool(50) → Supabase PgBouncer(~200 slots, port 6543) → PostgreSQL(60 direct). Three PM2 processes (ggbot, ggbot-scheduler, account-monitor) each maintain own pool.
 
 ---
 
@@ -566,7 +551,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-25 16:47:26 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-03-29 17:47:07 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -593,6 +578,13 @@ stripe_reported_at timestamptz?, account_balance numeric?, account_pnl numeric?,
 Idx: idx_agent_sessions_last_active(last_active_at), idx_agent_sessions_session_id(session_id)
 config_id uuid, session_id varchar(255), last_active_at timestamp?, created_at timestamp?, updated_at timestamp?
 
+### arena_agents (14 cols) | PK: id | UQ: wallet_address
+Idx: arena_agents_wallet_address_key(wallet_address), idx_arena_agents_config(assigned_config_id), idx_arena_agents_status(status), idx_arena_agents_user(assigned_user_id)
+id int, virtuals_id int, agent_name varchar, wallet_address varchar, claw_api_key_vault_id uuid?
+dgclaw_api_key_vault_id uuid?, token_address varchar?, token_symbol varchar?, assigned_user_id uuid?
+assigned_at timestamptz?, status varchar?=available' varying, created_at timestamptz?, user_wallet_address varchar?
+assigned_config_id uuid?
+
 ### arena_pledges (12 cols) | PK: id | FK: config_id→configurations | UQ: tx_hash
 Idx: arena_pledges_tx_hash_key(tx_hash), idx_arena_pledges_config(config_id), idx_arena_pledges_pledged_at(pledged_at), idx_arena_pledges_user(user_id), idx_arena_pledges_wallet(wallet_address)
 id uuid, user_id uuid?, wallet_address text, config_id uuid?, usx_amount numeric, susx_amount numeric?, tx_hash text
@@ -609,12 +601,13 @@ Idx: idx_bot_telegram_channels_chat_id(telegram_chat_id), idx_bot_telegram_chann
 config_id uuid, telegram_chat_id bigint, channel_name varchar(100)?, enabled bool?=true, created_at timestamptz?
 updated_at timestamptz?
 
-### configurations (17 cols) | PK: config_id
+### configurations (18 cols) | PK: config_id
 Idx: idx_configurations_is_public_performance(is_public_performance), idx_configurations_public(is_public_performance), idx_configurations_state(state), idx_configurations_type(config_type), idx_co...
 config_id uuid, user_id uuid, config_type varchar(50), config_name varchar(100)?, config_data jsonb
 created_at timestamptz, updated_at timestamptz, state text=inactive, symphony_agent_id varchar(255)?
 trading_mode varchar(20)=paper' varying, is_public_performance bool?, profile_image_url text?, description text?
 first_run_used bool?, free_runs_remaining int?=3, arena_registered_at timestamptz?, initial_equity numeric?
+arena_enabled bool?
 
 ### data_points (11 cols) | PK: data_point_id | FK: source_id→data_sources | UQ: source_id,name
 Idx: data_points_source_id_name_key(source_id, name), idx_data_points_name(name), idx_data_points_premium(requires_premium, enabled), idx_data_points_source(source_id, enabled, sort_order)
@@ -766,7 +759,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-03-25 16:47:26 UTC
+Source: `core/config/models.py` | Auto-generated 2026-03-29 17:47:07 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

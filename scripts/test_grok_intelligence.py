@@ -58,8 +58,7 @@ async def test_vix_index():
         assert 'value' in response.data, "VIX value missing from response"
         assert response.data['value'] is not None, "VIX value is null"
         print(f"\n✅ VIX Value: {response.data['value']}")
-        print(f"✅ Signal: {response.data.get('signal', 'N/A')}")
-        print(f"✅ Interpretation: {response.data.get('interpretation', 'N/A')}")
+        print(f"✅ Risk Regime: {response.data.get('risk_regime', 'N/A')}")
 
         return response
 
@@ -105,7 +104,7 @@ async def test_twitter_sentiment():
 
         print(f"\n✅ Sentiment Score: {response.data['sentiment_score']:.2f}")
         print(f"✅ Sample Size: {response.data['sample_size']} posts")
-        print(f"✅ Signal: {response.data.get('signal', 'N/A')}")
+        print(f"✅ Summary: {response.data.get('summary', 'N/A')}")
         print(f"✅ Themes: {response.data.get('key_themes', [])}")
 
         return response
@@ -145,7 +144,8 @@ async def test_dxy_index():
         assert 'value' in response.data, "DXY value missing"
 
         print(f"\n✅ DXY Value: {response.data['value']}")
-        print(f"✅ Crypto Impact: {response.data.get('crypto_impact', 'N/A')}")
+        print(f"✅ Change 24h: {response.data.get('change_24h', 'N/A')}")
+        print(f"✅ Trend: {response.data.get('trend', 'N/A')}")
 
         return response
 

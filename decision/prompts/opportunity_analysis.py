@@ -77,4 +77,6 @@ REASONING:
 - RISK: [Main concern or counter-signal to watch]
 - SUMMARY: [One sentence explaining the decision logic, max 25 words]
 
+CRITICAL: Your ACTION must be consistent with your REASONING. If your analysis concludes there is sufficient confluence or a valid setup per your strategy's rules, you MUST output the corresponding trade action (long or short) — not wait. Only output wait when your reasoning genuinely concludes there is no actionable opportunity. Do not second-guess a conclusion you already reached.
+
 STOP_LOSS and TAKE_PROFIT are optional. Default levels are already configured as safety guardrails. Only include them when your analysis or strategy suggests specific price levels that would be more appropriate than the defaults."""

@@ -4,20 +4,48 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 ---
 
-## 🏟️ **ggArena Season 2 — Phase B: Database + API** (URGENT — Before Apr 1)
+## 🥋 **The Dojo** (ACTIVE — Primary Focus)
 
-**Status**: 🔴 NOT STARTED — Phase A shipped (Mar 10), Phase B deadline Apr 1
-**Planning Doc**: [DOCS/todo/ARENA_SEASON2.md](DOCS/todo/ARENA_SEASON2.md)
+**Status**: 🟡 PLANNING COMPLETE — Implementation ready
+**Planning Doc**: [DOCS/todo/DOJO.md](DOCS/todo/DOJO.md)
 
-Registration opens Apr 1, competition Apr 7-28. Table `arena_registrations` exists with correct schema, zero registrations.
+Chess.com-inspired competitive environment. ELO on bots directly (no archetype entity). Dojo = third tab in Forge + public leaderboard at `/dojo`. Matches run isolated temp instances ($10k, frozen config). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
 
-- [ ] Season status endpoint (`GET /api/v2/public/arena/season/current`)
-- [ ] Register/unregister endpoints with config lock check
-- [ ] S2 leaderboard endpoint
-- [ ] Registration status in config list response
-- [ ] Frontend registration UI + Forge lock UI
-- [ ] Update `arena_reset.py` for S2
-- [ ] Active days calculation (18/21 eligibility)
+### **Phase 1: Dojo Foundation** (Start Here)
+- [ ] Add `dojo_visible`, `elo_rating`, `is_house_bot` columns to configurations
+- [ ] `GET /api/v2/public/dojo/bots` — all active visible paper bots + performance + ELO
+- [ ] `GET /api/v2/public/dojo/stats` — aggregate stats
+- [ ] `PUT /api/v2/config/{id}/visibility` — toggle dojo visibility
+- [ ] `EloTierBadge` shared component + add to BotRail bot cards
+- [ ] Add `'dojo'` tab to Forge TabNavigation (shell: ELO, tier, placeholder match UI)
+- [ ] Public `/dojo` page (leaderboard, House Bot profiles, S1 results as "Past Seasons")
+
+### **Phase 2: ELO Engine**
+- [ ] `elo_history` table
+- [ ] `core/arena/elo.py` — Sortino-based composite score + ELO update functions
+- [ ] Weekly rolling ELO scheduler job (Sundays midnight UTC)
+- [ ] Real ELO values replace placeholder on leaderboard + bot rail
+
+### **Phase 3: House Bots**
+- [ ] Create The Arbiter Standard config (Sev tunes)
+- [ ] Create Rapid + Blitz variants
+- [ ] Mark `is_house_bot = true`, featured on public `/dojo` + Forge challenge UI
+
+### **Phase 4: 1v1 Matches**
+- [ ] `dojo_matches` table (with config snapshots + temp instance references)
+- [ ] `core/arena/matches.py` — full lifecycle (challenge → temp instance → complete → ELO update)
+- [ ] Cost estimation endpoint
+- [ ] Match lifecycle scheduler job (start, complete, forfeit)
+- [ ] Forge: EnterMatchPanel, ChallengeModal, ActiveMatchCard, MatchHistoryList
+- [ ] Public: active match spectating on `/dojo`
+
+---
+
+## 🏟️ **ggArena Season 2** (DEFERRED)
+
+**Planning Doc**: [DOCS/todo/ARENA_S2_DEFERRED.md](DOCS/todo/ARENA_S2_DEFERRED.md)
+
+Postponed — Virtuals Degen Arena ($100K/week) is the active competitive event. Entry package ($75 bundle), referral system, seat-based registration all designed and ready to build when timing is right. Existing infrastructure: `arena_registrations` table, register/unregister endpoints, config lock, reset script.
 
 ---
 

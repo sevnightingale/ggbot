@@ -55,17 +55,16 @@ Return a JSON object with this EXACT structure:
 {{
     "value": <number>,
     "timestamp": "<ISO 8601 datetime>",
-    "interpretation": "<brief interpretation for crypto traders>",
-    "signal": "<bullish|bearish|neutral>",
     "risk_regime": "<low_volatility|moderate|high_volatility|extreme>"
 }}
 
-Interpretation guidelines:
-- VIX < 15: Low volatility, risk-on environment (bullish for crypto)
-- VIX 15-20: Moderate volatility (neutral)
-- VIX 20-30: Elevated volatility (cautious)
-- VIX > 30: High fear, risk-off (bearish for crypto)
+Classification thresholds:
+- VIX < 15: low_volatility
+- VIX 15-20: moderate
+- VIX 20-30: high_volatility
+- VIX > 30: extreme
 
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
         'dxy_index': """Get the current DXY (US Dollar Index) value.
@@ -77,17 +76,12 @@ Return a JSON object with this EXACT structure:
     "value": <number>,
     "timestamp": "<ISO 8601 datetime>",
     "change_24h": <number or null>,
-    "interpretation": "<brief interpretation for crypto traders>",
-    "signal": "<bullish|bearish|neutral>",
-    "crypto_impact": "<how dollar strength affects crypto>"
+    "trend": "<rising|falling|flat>"
 }}
 
-Interpretation guidelines:
-- DXY rising: Dollar strength, typically bearish for crypto (inverse correlation)
-- DXY falling: Dollar weakness, typically bullish for crypto
-- Strong moves (>1%): Significant crypto impact
-- DXY > 105: Strong dollar pressure on crypto
+Classify trend based on recent price action (24h-7d direction).
 
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
         'cpi_inflation': """Get the most recent CPI (Consumer Price Index) inflation reading for the United States.
@@ -99,16 +93,12 @@ Return a JSON object with this EXACT structure:
     "value": <number (percent)>,
     "release_date": "<ISO 8601 date>",
     "previous_value": <number or null>,
-    "interpretation": "<brief interpretation for crypto and Fed policy>",
-    "signal": "<bullish|bearish|neutral>",
-    "fed_implications": "<how this affects Fed rate policy>"
+    "market_expectation": "<brief factual summary of current market consensus on Fed rate path>"
 }}
 
-Interpretation guidelines:
-- High inflation (>4%): Fed hawkish, bearish for crypto
-- Declining inflation: Fed dovish pivot possible, bullish for crypto
-- Target range (2-3%): Neutral, Fed on hold
+For market_expectation, summarize what markets are pricing in (e.g. "Markets pricing 2 rate cuts by year-end" or "Fed expected to hold rates through Q3"). State consensus only, not trading implications.
 
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
         'nfp_jobs': """Get the most recent NFP (Nonfarm Payrolls) jobs report for the United States.
@@ -121,16 +111,15 @@ Return a JSON object with this EXACT structure:
     "release_date": "<ISO 8601 date>",
     "previous_value": <number or null>,
     "unemployment_rate": <number (percent) or null>,
-    "interpretation": "<brief interpretation for crypto markets>",
-    "signal": "<bullish|bearish|neutral>",
     "economic_health": "<strong|moderate|weak>"
 }}
 
-Interpretation guidelines:
-- Strong jobs (+300k+): Fed may stay hawkish, bearish for crypto
-- Weak jobs (<100k): Fed may pivot dovish, bullish for crypto
-- Moderate (100-250k): Goldilocks scenario, neutral
+Classification thresholds for economic_health:
+- 300k+ jobs added: strong
+- 100-300k jobs added: moderate
+- <100k jobs added: weak
 
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
         'twitter_sentiment': """Analyze current Twitter/X sentiment for {symbol} cryptocurrency over the last 24 hours.
@@ -154,8 +143,7 @@ Return a JSON object with this EXACT structure:
     "neutral_ratio": <number 0-1>,
     "key_themes": [<list of strings>],
     "influencer_sentiment": "<bullish|bearish|neutral|mixed>",
-    "interpretation": "<brief analysis>",
-    "signal": "<bullish|bearish|neutral>",
+    "summary": "<brief factual summary of what people are discussing and the overall tone>",
     "confidence": "<high|medium|low>"
 }}
 
@@ -166,6 +154,8 @@ Sentiment scoring:
 - -0.5 to -0.2: Moderately bearish
 - < -0.5: Very bearish
 
+For summary, describe what the community is talking about and the overall tone of discussion. Do NOT provide trading recommendations or signal interpretations.
+
 Return ONLY the JSON object, no markdown formatting.""",
 
         'crypto_news': """Find recent breaking crypto news for {symbol} in the last 6 hours.
@@ -174,8 +164,8 @@ Search crypto news sites and X for important headlines about {symbol}.
 
 Tasks:
 1. Search for recent news (last 6h)
-2. Identify most important/market-moving headlines
-3. Classify each by sentiment and importance
+2. Identify most important headlines
+3. Classify each by tone and importance
 4. Categorize news types
 
 Return a JSON object with this EXACT structure:
@@ -187,17 +177,16 @@ Return a JSON object with this EXACT structure:
             "source": "<source name>",
             "url": "<URL>",
             "published": "<ISO 8601 datetime>",
-            "sentiment": "<bullish|bearish|neutral>",
+            "tone": "<positive|negative|neutral>",
             "importance": "<high|medium|low>",
             "category": "<regulation|technology|adoption|market|partnership|other>"
         }}
     ],
-    "overall_sentiment": "<bullish|bearish|neutral|mixed>",
     "high_importance_count": <number>,
-    "interpretation": "<brief summary of news impact>",
-    "signal": "<bullish|bearish|neutral>"
+    "summary": "<brief factual summary of the key news developments>"
 }}
 
+For summary, describe what is happening in the news. Do NOT provide trading signals or market impact interpretation.
 Return top 5 most important headlines only.
 Return ONLY the JSON object, no markdown formatting.""",
 
@@ -211,16 +200,12 @@ Return a JSON object with this EXACT structure:
     "timestamp": "<ISO 8601 datetime>",
     "change_24h_pct": <number or null>,
     "change_7d_pct": <number or null>,
-    "interpretation": "<brief analysis of TVL trend>",
-    "signal": "<bullish|bearish|neutral>",
     "trend": "<increasing|stable|decreasing>"
 }}
 
-Interpretation guidelines:
-- Rising TVL: More BTC locked in DeFi, bullish (reduced sell pressure)
-- Falling TVL: BTC being withdrawn, bearish (potential selling)
-- Significant changes (>10%): Strong signal
+Classify trend based on recent TVL direction (7d).
 
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
         'whale_activity': """Analyze recent whale activity for {symbol} in the last 24 hours.
@@ -229,7 +214,7 @@ Search whale alert services, on-chain analytics, and crypto news for large trans
 
 Tasks:
 1. Find large transfers (>$1M) to/from exchanges
-2. Identify accumulation vs distribution patterns
+2. Track exchange inflows vs outflows
 3. Note any significant wallet movements
 
 Return a JSON object with this EXACT structure:
@@ -238,23 +223,19 @@ Return a JSON object with this EXACT structure:
     "large_transfers_count": <number>,
     "exchange_inflows_usd": <number or null>,
     "exchange_outflows_usd": <number or null>,
-    "net_flow_usd": <number (positive = accumulation, negative = distribution)>,
-    "interpretation": "<analysis of whale behavior>",
-    "signal": "<bullish|bearish|neutral>",
+    "net_flow_usd": <number (positive = net outflow from exchanges, negative = net inflow to exchanges)>,
+    "summary": "<brief factual description of observed whale movements>",
     "confidence": "<high|medium|low>"
 }}
 
-Interpretation:
-- Net outflows (positive): Whales withdrawing to cold storage = accumulation = bullish
-- Net inflows (negative): Whales sending to exchanges = distribution = bearish
-- Large magnitude (>$50M): High confidence signal
+For summary, describe the observed on-chain movements factually (e.g. "3 transfers totaling $45M moved to Binance, 1 transfer of $20M moved to cold storage"). Do NOT provide trading signals or interpretation.
 
 Return ONLY the JSON object, no markdown formatting.""",
 
         # ========================================================================
         # ASTROLOGY / TIMING SIGNALS (2026-01-23)
         # ========================================================================
-        'lunar_phase': """Get the current lunar phase and its trading implications.
+        'lunar_phase': """Get the current lunar phase.
 
 Tasks:
 1. Determine the current moon phase (New Moon, Waxing Crescent, First Quarter, Waxing Gibbous, Full Moon, Waning Gibbous, Third Quarter, Waning Crescent)
@@ -270,16 +251,10 @@ Return a JSON object with this EXACT structure:
     "days_to_new_moon": <number or null if currently new>,
     "waxing": <true if growing, false if shrinking>,
     "next_major_event": "<description of next New/Full Moon or eclipse>",
-    "next_event_date": "<ISO 8601 date>",
-    "trading_implication": "<brief note on traditional lunar trading patterns>"
+    "next_event_date": "<ISO 8601 date>"
 }}
 
-Context for trading_implication:
-- New Moon: Fresh starts, good for new positions
-- Waxing phases: Growth energy, bullish bias
-- Full Moon: Culmination, emotional peaks, potential reversals
-- Waning phases: Consolidation energy, cautious bias
-
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
         'move_index': """Get the current MOVE Index (ICE BofA MOVE Index) value.
@@ -292,28 +267,24 @@ Return a JSON object with this EXACT structure:
 {{
     "value": <number>,
     "timestamp": "<ISO 8601 datetime>",
-    "interpretation": "<brief interpretation for crypto traders>",
-    "signal": "<bullish|bearish|neutral>",
-    "risk_regime": "<low_stress|moderate|high_stress|extreme_stress>",
-    "bond_stress_level": "<low|moderate|elevated|high|extreme>"
+    "risk_regime": "<low_stress|moderate|high_stress|extreme_stress>"
 }}
 
-Interpretation guidelines:
-- MOVE < 80: Low bond volatility, stable rates environment, risk-on (bullish for crypto)
-- MOVE 80-120: Moderate bond volatility (neutral)
-- MOVE 120-150: High bond stress, rate uncertainty, risk-off pressure (bearish for crypto)
-- MOVE > 150: Extreme bond stress, potential crisis conditions (very bearish for crypto)
+Classification thresholds:
+- MOVE < 80: low_stress
+- MOVE 80-120: moderate
+- MOVE 120-150: high_stress
+- MOVE > 150: extreme_stress
 
-Context: When MOVE spikes, it signals Treasury market instability which cascades into crypto via risk-off flows, margin calls, and liquidity withdrawal.
-
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
 
-        'mercury_status': """Get the current Mercury retrograde status and its trading implications.
+        'mercury_status': """Get the current Mercury retrograde status.
 
 Tasks:
 1. Check if Mercury is currently in retrograde
 2. Find the dates of the current or next retrograde period
-3. Note any other significant planetary retrogrades affecting markets (Venus, Mars)
+3. Note any other significant planetary retrogrades (Venus, Mars)
 
 Return a JSON object with this EXACT structure:
 {{
@@ -324,15 +295,10 @@ Return a JSON object with this EXACT structure:
         "end": "<ISO 8601 date or null>"
     }},
     "days_until_change": <number of days until Mercury changes direction>,
-    "other_retrogrades": ["<list of other planets currently retrograde>"],
-    "trading_implication": "<brief note on Mercury retrograde trading patterns>"
+    "other_retrogrades": ["<list of other planets currently retrograde>"]
 }}
 
-Context for trading_implication:
-- Mercury Retrograde: Communication/tech issues, market reversals, choppy action, review positions rather than new entries
-- Mercury Direct: Clearer signals, good for new positions
-- Stationing periods (2-3 days before/after): Most volatile
-
+Return ONLY the factual data. Do NOT include trading signals or interpretation.
 Return ONLY the JSON object, no markdown formatting.""",
     }
 

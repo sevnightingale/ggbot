@@ -869,12 +869,7 @@ class VaultManager:
     async def get_arena_credential_by_user(user_id: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve the arena agent assigned to a user, with decrypted claw API key.
-
-        Args:
-            user_id: UUID of the user
-
-        Returns:
-            Dict with 'claw_api_key', 'wallet_address', 'agent_id', etc. or None
+        Legacy — use get_arena_credential_by_config for the 1-bot-1-agent model.
         """
         try:
             with get_db_connection() as conn:
@@ -915,6 +910,57 @@ class VaultManager:
 
         except Exception as e:
             logger.bind(user_id=user_id).error(f"Failed to retrieve arena credential: {e}")
+            return None
+
+    @staticmethod
+    async def get_arena_credential_by_config(config_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve the arena agent assigned to a bot config, with decrypted claw API key.
+
+        1-bot-1-agent model: each config_id maps to at most one arena agent.
+
+        Returns:
+            Dict with 'claw_api_key', 'wallet_address', 'agent_id', etc. or None
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT aa.id, aa.claw_api_key_vault_id, aa.wallet_address,
+                               aa.agent_name, aa.token_symbol, aa.user_wallet_address,
+                               aa.assigned_user_id
+                        FROM arena_agents aa
+                        WHERE aa.assigned_config_id = %s AND aa.status = 'assigned'
+                    """, (config_id,))
+
+                    result = cur.fetchone()
+                    if not result or not result[1]:
+                        return None
+
+                    agent_id, claw_vault_id, wallet_address, agent_name, token_symbol, user_wallet, user_id = result
+
+                    cur.execute("""
+                        SELECT decrypted_secret
+                        FROM vault.decrypted_secrets
+                        WHERE id = %s
+                    """, (claw_vault_id,))
+                    vault_result = cur.fetchone()
+                    if not vault_result:
+                        logger.error(f"Vault secret not found for arena agent {agent_id}")
+                        return None
+
+                    return {
+                        'agent_id': agent_id,
+                        'claw_api_key': vault_result[0],
+                        'wallet_address': wallet_address,
+                        'agent_name': agent_name,
+                        'token_symbol': token_symbol,
+                        'user_wallet_address': user_wallet,
+                        'user_id': user_id,
+                    }
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve arena credential for config {config_id}: {e}")
             return None
 
 
@@ -982,3 +1028,7 @@ async def get_arena_credential(agent_id: int) -> Optional[Dict[str, Any]]:
 async def get_arena_credential_by_user(user_id: str) -> Optional[Dict[str, Any]]:
     """Get arena agent for a user. Convenience wrapper."""
     return await VaultManager.get_arena_credential_by_user(user_id)
+
+async def get_arena_credential_by_config(config_id: str) -> Optional[Dict[str, Any]]:
+    """Get arena agent for a bot config. Convenience wrapper."""
+    return await VaultManager.get_arena_credential_by_config(config_id)

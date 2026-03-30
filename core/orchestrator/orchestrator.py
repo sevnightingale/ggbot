@@ -964,6 +964,7 @@ class GGBotOrchestrator:
             arena_intent = {
                 'config_id': config.config_id,
                 'config_name': config.config_name,
+                'user_id': config.user_id,
                 'symbol': decision_result.get('symbol') or config.selected_pair,
                 'action': action,
                 'confidence': decision_result.get('confidence', 0),
@@ -989,20 +990,17 @@ class GGBotOrchestrator:
 
     async def _get_user_arena_agent(self, config: BotConfigV2) -> Optional[Dict[str, Any]]:
         """
-        Check if this config's user has an arena agent AND this config is arena_enabled.
+        Check if this config has an arena agent assigned (1-bot-1-agent model).
 
         Returns dict with claw_api_key and wallet_address, or None.
         """
-        if not getattr(config, 'arena_enabled', False):
-            return None
-
         from core.common.db import db_fetch_one
 
         result = await db_fetch_one("""
             SELECT aa.wallet_address, aa.claw_api_key_vault_id, aa.agent_name
             FROM arena_agents aa
-            WHERE aa.assigned_user_id = %s AND aa.status = 'assigned'
-        """, (config.user_id,))
+            WHERE aa.assigned_config_id = %s AND aa.status = 'assigned'
+        """, (config.config_id,))
 
         if not result or not result[1]:
             return None

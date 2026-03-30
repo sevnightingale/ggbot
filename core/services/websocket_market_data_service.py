@@ -2,7 +2,7 @@
 WebSocket Market Data Service
 
 Real-time market data streaming service using Binance WebSocket API.
-Fetches historical candles on startup, then maintains 200-candle windows
+Fetches historical candles on startup, then maintains 300-candle windows
 via real-time WebSocket updates.
 
 This replaces polling-based approaches with push-based streaming for:
@@ -32,9 +32,9 @@ class WebSocketMarketDataService:
     Real-time market data service using Binance WebSocket streams.
 
     Architecture:
-    1. Startup: Fetch 200 historical candles via REST (one-time)
+    1. Startup: Fetch 300 historical candles via REST (one-time)
     2. Runtime: Subscribe to WebSocket streams for real-time updates
-    3. Storage: Maintain 200-candle rolling windows in Redis
+    3. Storage: Maintain 300-candle rolling windows in Redis
     """
 
     # 100 overlapping symbols (ggbots + Symphony compatible)
@@ -136,7 +136,7 @@ class WebSocketMarketDataService:
         self._log.info("✅ Binance client created")
 
     async def _fetch_historical_candles(self):
-        """Fetch 200 historical candles for all symbols/timeframes via REST API."""
+        """Fetch 300 historical candles for all symbols/timeframes via REST API."""
         self._log.info(f"📥 Fetching historical candles for {len(self.SYMBOLS)} symbols × {len(self.TIMEFRAMES)} timeframes...")
 
         start_time = datetime.now()
@@ -158,7 +158,7 @@ class WebSocketMarketDataService:
         self._log.info(f"✅ Historical fetch complete: {successes} success, {failures} failed in {elapsed:.1f}s")
 
     async def _fetch_and_store_historical(self, symbol: str, timeframe: str):
-        """Fetch and store 200 historical candles for one symbol/timeframe."""
+        """Fetch and store 300 historical candles for one symbol/timeframe."""
         try:
             # Get Binance REST API timeframe format
             binance_tf = self.BINANCE_REST_TF_MAP.get(timeframe)
@@ -166,11 +166,11 @@ class WebSocketMarketDataService:
                 self._log.warning(f"Unsupported timeframe: {timeframe}")
                 return
 
-            # Fetch 200 historical candles
+            # Fetch 300 historical candles (supports EMA200 which needs 250+)
             klines = await self.binance_client.get_klines(
                 symbol=symbol,
                 interval=binance_tf,
-                limit=200
+                limit=300
             )
 
             if not klines:
@@ -192,7 +192,7 @@ class WebSocketMarketDataService:
 
             # Store in Redis with slash format for consistency
             symbol_slash = f"{symbol[:-4]}/{symbol[-4:]}"  # BTCUSDT -> BTC/USDT
-            key = f"ws:candles:{symbol_slash}:{timeframe}:200"  # ws: prefix to avoid collision
+            key = f"ws:candles:{symbol_slash}:{timeframe}:300"  # ws: prefix to avoid collision
 
             # Use timeframe-aware TTL to ensure data survives between candle closes
             ttl = self.TIMEFRAME_TTL.get(timeframe, 3600)
@@ -365,10 +365,10 @@ class WebSocketMarketDataService:
                 await self._store_live_candle(symbol_slash, timeframe, candle)
                 return
 
-            # Closed candle - store in 200-candle window
+            # Closed candle - store in 300-candle window
             self.candles_received += 1
 
-            # Update rolling 200-candle window
+            # Update rolling 300-candle window
             await self._update_candle_window(symbol_slash, timeframe, candle)
 
             self.candles_stored += 1
@@ -382,9 +382,9 @@ class WebSocketMarketDataService:
             self.errors += 1
 
     async def _update_candle_window(self, symbol: str, timeframe: str, new_candle: Dict[str, Any]):
-        """Update 200-candle rolling window in Redis."""
+        """Update 300-candle rolling window in Redis."""
         try:
-            key = f"ws:candles:{symbol}:{timeframe}:200"  # ws: prefix to avoid collision with extraction cache
+            key = f"ws:candles:{symbol}:{timeframe}:300"  # ws: prefix to avoid collision with extraction cache
 
             # Get existing candles
             existing_data = await self.redis_client.get(key)
@@ -397,8 +397,8 @@ class WebSocketMarketDataService:
             # Append new candle
             candles.append(new_candle)
 
-            # Keep only last 200
-            candles = candles[-200:]
+            # Keep only last 300
+            candles = candles[-300:]
 
             # Store back to Redis with timeframe-aware TTL
             ttl = self.TIMEFRAME_TTL.get(timeframe, 3600)

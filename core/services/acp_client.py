@@ -263,7 +263,11 @@ class ACPClient:
             _log.info(f"ACP job {job.id} paid: txn={txn_hash}")
             return txn_hash
         except Exception as e:
-            _log.error(f"Failed to pay for job {job.id}: {e}")
+            # "No negotiation memo" is a transient timing race — caller retries
+            if "memo" in str(e).lower():
+                _log.warning(f"Pay job {job.id}: memo not ready (will retry)")
+            else:
+                _log.error(f"Failed to pay for job {job.id}: {e}")
             raise ACPClientError(f"Job payment failed: {e}") from e
 
     def get_deliverable(self, job) -> Optional[Any]:

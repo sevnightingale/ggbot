@@ -6,6 +6,31 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-03-28 - Production Fixes: Candle Cache, ACP Adapter, Prompt Consistency
+
+**Error log audit** covering 16h of production logs. Five issues identified, all fixed.
+
+**WebSocket candle cache 200→300** (`core/services/websocket_market_data_service.py`, `market_intelligence/adapters/market_data/redis_websocket.py`):
+- EMA200 (shipped 2026-03-21) needs 250 candles; WS cache only stored 200 → every bot cycle fell back to Binance REST
+- Hundreds of daily warnings eliminated. Also reduces blast radius of Binance REST outages (e.g., 08:01 UTC cascade: 34 extraction failures when REST also timed out)
+- Redis key changed `:200`→`:300`; old keys TTL away naturally
+
+**ACP adapter KeyError fix** (`market_intelligence/catalog/data_types/acp/acp_agent.yaml`, `market_intelligence/orchestrator.py`):
+- `acp_agent.yaml` had no `query_params` schema → `validate_params()` returned empty dict → `build_cache_key()` failed formatting `{agent_name}` → 14 errors/day
+- Added `query_params` section (agent_name, agent_address, offering_name, service_requirement)
+- Also fixed `_replace_param_templates()` to recurse into nested dicts — `{config_id}` inside ACP `service_requirement.bot_id` was unreplaced (literal string)
+
+**Opportunity analysis prompt consistency** (`decision/prompts/opportunity_analysis.py`):
+- ggRapid bot outputting only `wait` despite reasoning concluding "sufficient confluence for long/short" with SL/TP prices
+- LLM reasoning-action disconnect: model builds trade case then hedges at ACTION line
+- Added CRITICAL instruction: ACTION must match REASONING conclusion. If confluence found, output trade action
+
+**Stale MI source names** (DB fix, 2 configs):
+- Saa Moja: `on_chain_analytics` → `onchain_analytics` (source renamed, config not migrated)
+- The Analyst: `sentiment.sentiment` → `sentiment_social.twitter_sentiment`
+
+---
+
 ## 2026-03-26 - DGClaw Arena Phase 1 + Phase 2 Validation
 
 **Architecture Doc**: [trading/virtuals/README.md](trading/virtuals/README.md)
@@ -65,12 +90,23 @@ Arena is parallel execution layer — bot trades normally (paper/live), same dec
 - `core/scheduler/bot_runner.py` — reconcile loop DB query wrapped
 
 **Scheduler hardening** (`core/scheduler/bot_runner.py`, `ggbot_scheduler.py`):
-- `asyncio.wait_for(cycle, timeout=180)` — kills hung cycles, frees APScheduler slot, deletes Redis idempotency key for retry
+- `asyncio.wait_for(cycle, timeout=300)` — kills hung cycles, frees APScheduler slot, deletes Redis idempotency key for retry
 - `ThreadPoolExecutor(max_workers=32)` as default executor
 - `Semaphore(30)` — concurrency cap with headroom for connection pool (maxconn=50)
 - TCP keepalive on connection pool (`keepalives_idle=30`) — prevents Supabase PgBouncer from closing idle connections
 
-**Result**: 36 bots at boundary complete in 25-36s. Zero hangs. Timeout mechanism works (1 slow bot correctly killed and retried).
+**Single-flight pattern** (`market_intelligence/gateway.py`):
+- Class-level `_inflight: Dict[str, asyncio.Lock]` prevents thundering herd on cache misses
+- When 40 bots request same Grok data simultaneously, only first triggers API call; rest wait and read cache
+- Reduces peak Grok API calls from ~320 (40 bots × 8 data points) to ~12 unique calls per boundary
+- Verified working: "Cache hit after lock wait" entries in logs for funding_rate and Grok data
+
+**LLM model updates** (`decision/llm_providers/openrouter_provider.py`, `llm_models` DB):
+- Claude standard: `sonnet-4.5` → `sonnet-4.6` (same $3/$15, 1M context)
+- Claude premium: `opus-4.5` → `opus-4.6` (same $5/$25, now 1M context vs 200K)
+- Grok premium: `grok-4` → `grok-4.20-beta` ($2/$6 vs $3/$15, 2M context vs 256K)
+
+**Result**: 16:00 4h mega-boundary (40+ bots): 36 completed, 2 timed out (slow Kimi LLM, not infra). Non-peak boundaries: 28-30/30 complete in 28-47s. Zero permanent hangs.
 
 **Capacity**: ~100 bots with zero changes. Tuning knobs: semaphore (30→50), ThreadPool (32→48), pool maxconn (50→80). Asyncpg migration at 300+ bots.
 

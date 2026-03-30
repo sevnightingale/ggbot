@@ -150,18 +150,26 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
    - **Orchestrator** = User-facing routing (config → queries)
    - **Gateway** = Infrastructure (catalog, caching, adapter routing)
    - **Adapters** = Data acquisition (each source has specialized logic)
+   - **Decision Engine** = Trading interpretation (the ONLY layer that makes bullish/bearish/signal calls)
 
-2. **Shared Cache Economics**
+2. **Data Providers, Not Analysts**
+   - Adapters (especially Grok agentic) return **factual data and research synthesis only**
+   - No `signal`, `interpretation`, or `crypto_impact` fields in adapter output
+   - Classification of the data point itself is fine (`risk_regime: high_volatility`, `trend: falling`)
+   - Extrapolation to trading impact is NOT fine (`signal: bearish`, `crypto_impact: ...`)
+   - The decision LLM has full context (strategy, positions, risk, all indicators) — it makes the call
+
+3. **Shared Cache Economics**
    - VIX is same for all users → 1 API call serves 1000 users
    - Cost per user **decreases** as platform grows
    - Custom TTL per data type (fast-moving vs static data)
 
-3. **Graceful Degradation**
+4. **Graceful Degradation**
    - Individual data point failures don't crash the system
    - Parallel execution with exception handling
    - Decision engine receives partial data if some sources fail
 
-4. **Extensibility Without Breaking Changes**
+5. **Extensibility Without Breaking Changes**
    - Adding new data sources = new catalog YAML + mapping entry
    - No changes to orchestrator or gateway code
    - Frontend auto-populates from database (data_sources table)
@@ -303,9 +311,9 @@ Adapters are specialized modules that fetch data from specific sources.
 ---
 
 #### **Type 2: GrokAgenticAdapter** (`adapters/agentic/grok_agentic.py`)
-**Purpose**: Twitter/on-chain intelligence via XAI's autonomous agentic API
+**Purpose**: Universal market intelligence via XAI's autonomous agentic API
 
-**Revolutionary Approach**: Native X/Twitter access + code execution + web search:
+**Approach**: Native X/Twitter access + code execution + web search:
 - X (Twitter) search and NLP analysis (xAI owns Twitter)
 - On-chain data aggregation with code execution
 - Breaking news via web search
@@ -318,6 +326,45 @@ Adapters are specialized modules that fetch data from specific sources.
 
 **Cost Per Query**: $0.0017 (BTC TVL) to $0.0637 (Twitter sentiment with NLP)
 
+##### Agentic Output Philosophy: Data Provider, Not Analyst
+
+Grok serves as a **data provider** — its job is to research, retrieve, and synthesize factual information. It must **not** make trading interpretations or provide directional signals. That responsibility belongs to the **decision engine**, which has full context (strategy, positions, risk, other indicators).
+
+**Principle**: Grok answers "what is happening" — the decision LLM answers "what does it mean for this trade."
+
+**Output field guidelines**:
+- **Factual data** (always include): values, timestamps, dates, percentages, counts
+- **Research synthesis** (include where Grok adds value): summaries of findings, key themes, sentiment scores from aggregation, trend classification of the data point itself
+- **Trading interpretation** (never include): `signal`, `interpretation`, `crypto_impact`, `trading_implication`, or any field framing data in terms of bullish/bearish/trading action
+
+**Example — correct DXY output**:
+```json
+{"value": 99.48, "timestamp": "...", "change_24h": -0.31, "trend": "falling"}
+```
+The decision LLM interprets what DXY at 99.48 and falling means for the specific trade, given the user's strategy.
+
+**Example — correct Twitter sentiment output**:
+```json
+{"sentiment_score": 0.3, "sample_size": 62, "key_themes": ["ETF inflows", "whale accumulation"], "summary": "Moderately positive discussion driven by ETF flow data"}
+```
+Grok synthesizes what people are saying. The decision LLM decides if that matters for entry/exit.
+
+**Structured output fields by query type**:
+
+| Query Type | Output Fields |
+|---|---|
+| `vix_index` | `value`, `timestamp`, `risk_regime` |
+| `dxy_index` | `value`, `timestamp`, `change_24h`, `trend` |
+| `cpi_inflation` | `value`, `release_date`, `previous_value`, `market_expectation` |
+| `nfp_jobs` | `value`, `release_date`, `previous_value`, `unemployment_rate`, `economic_health` |
+| `twitter_sentiment` | `symbol`, `sentiment_score`, `sample_size`, `bullish_ratio`, `bearish_ratio`, `neutral_ratio`, `key_themes`, `influencer_sentiment`, `summary`, `confidence` |
+| `crypto_news` | `symbol`, `headlines[]` (title, source, url, published, tone, importance, category), `high_importance_count`, `summary` |
+| `btc_tvl` | `tvl_usd`, `timestamp`, `change_24h_pct`, `change_7d_pct`, `trend` |
+| `whale_activity` | `symbol`, `large_transfers_count`, `exchange_inflows_usd`, `exchange_outflows_usd`, `net_flow_usd`, `summary`, `confidence` |
+| `move_index` | `value`, `timestamp`, `risk_regime` |
+| `lunar_phase` | `phase`, `phase_emoji`, `illumination_pct`, `days_to_full_moon`, `days_to_new_moon`, `waxing`, `next_major_event`, `next_event_date` |
+| `mercury_status` | `mercury_retrograde`, `current_status`, `retrograde_period`, `days_until_change`, `other_retrogrades` |
+
 ---
 
 #### **Macro Data (VIX, DXY, CPI, NFP, USDT.D, MOVE)**
@@ -326,15 +373,15 @@ Macro economic indicators use two adapter types:
 - **GrokAgenticAdapter** (`grok-4-1-fast` + web search) for indices requiring real-time web lookup
 - **CoinGeckoGlobalAdapter** (`adapters/macro/coingecko_global.py`) for deterministic API data
 
-All marked `global: True` in `catalog_mapping.py` — shared cache across all bots.
+All marked `global: True` in `catalog_mapping.py` — shared cache across all bots. Grok returns **factual data only** (values, timestamps, regime classifications) — no trading signals or crypto-impact interpretation. The decision engine handles all trading interpretation.
 
 **6 Query Types**:
-1. `vix_index` - VIX volatility index (4h cache, Grok)
-2. `dxy_index` - US Dollar strength (4h cache, Grok)
-3. `cpi_inflation` - Latest CPI inflation data (24h cache, Grok)
-4. `nfp_jobs` - Nonfarm payrolls report (24h cache, Grok)
+1. `vix_index` - VIX volatility index (4h cache, Grok) → `value`, `risk_regime`
+2. `dxy_index` - US Dollar strength (4h cache, Grok) → `value`, `change_24h`, `trend`
+3. `cpi_inflation` - Latest CPI inflation data (24h cache, Grok) → `value`, `previous_value`, `market_expectation`
+4. `nfp_jobs` - Nonfarm payrolls report (24h cache, Grok) → `value`, `unemployment_rate`, `economic_health`
 5. `usdt_dominance` - USDT market cap % of total crypto (4h cache, CoinGecko, **FREE**)
-6. `move_index` - ICE BofA MOVE bond volatility index (4h cache, Grok)
+6. `move_index` - ICE BofA MOVE bond volatility index (4h cache, Grok) → `value`, `risk_regime`
 
 **Cost Per Query**: $0 (CoinGecko) to ~$0.003-0.006 (Grok)
 
@@ -491,7 +538,7 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
    Check Redis: key='intel:grok_agentic:{query_type:vix_index}'
 
    ── Cache HIT (within 15min) ──────────────────
-   Return cached: {"value": 15.98, "signal": "neutral", ...}
+   Return cached: {"value": 15.98, "risk_regime": "moderate", ...}
    Latency: <1ms
 
    ── Cache MISS (>15min) ───────────────────────
@@ -500,8 +547,8 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
    Grok autonomously:
      1. Web search (CBOE, Bloomberg, Yahoo)
      2. Extract VIX value (15.98)
-     3. Interpret for crypto impact
-     4. Return structured JSON
+     3. Classify risk regime
+     4. Return structured JSON (facts only, no trading interpretation)
    ↓
    Store in Redis (TTL=900s / 15min)
    Latency: ~18-20s
@@ -513,16 +560,15 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
        "macro_economics": {
          "vix": {
            "value": 15.98,
-           "signal": "neutral",
-           "interpretation": "Moderate volatility...",
+           "timestamp": "2026-03-29T17:00:00Z",
            "risk_regime": "moderate"
          }
        }
      }
    }
    ↓
-   LLM considers VIX in trading decision:
-   "VIX 15.88 moderate, neutral for crypto traders..."
+   LLM interprets VIX in context of user strategy and other data:
+   "VIX at 15.98 (moderate regime) — low fear environment supports risk-on positioning..."
 ```
 
 ---
@@ -573,11 +619,13 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
    ↓
    Response:
    {
+     "symbol": "BTC",
      "sentiment_score": 0.3,
      "sample_size": 62,
      "bullish_ratio": 0.4,
      "key_themes": ["Institutional Adoption", "ETF Approvals"],
-     "signal": "bullish"
+     "summary": "Moderately positive discussion driven by ETF inflow data and institutional announcements",
+     "confidence": "medium"
    }
    ↓
    Store in Redis (TTL=1800s / 30min)
@@ -592,7 +640,8 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
      }
    }
    ↓
-   Agent reasoning: "Twitter sentiment at 0.3 (bullish) suggests positive momentum..."
+   Agent interprets sentiment data in context of strategy:
+   "Twitter sentiment at 0.3 with ETF-driven themes — social momentum aligns with technical setup..."
 ```
 
 ---
@@ -690,6 +739,8 @@ Do you need to fetch data from a NEW external API/source?
 
 ```python
 # 1. Add to grok_agentic.py PROMPT_TEMPLATES
+# NOTE: Output must be factual data only — no signal/interpretation fields.
+# Grok is a data provider; the decision engine interprets trading implications.
 PROMPT_TEMPLATES = {
     # ... existing templates ...
     'fear_greed_index': """
@@ -699,10 +750,10 @@ PROMPT_TEMPLATES = {
     {
       "value": <int 0-100>,
       "classification": <string: "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed">,
-      "timestamp": <ISO 8601>,
-      "interpretation": <string: crypto market psychology and implications>,
-      "signal": <"bullish" | "bearish" | "neutral">
+      "timestamp": <ISO 8601>
     }
+
+    Return ONLY the factual data. Do NOT include trading signals or interpretation.
     """
 }
 

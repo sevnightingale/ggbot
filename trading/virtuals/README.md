@@ -251,54 +251,93 @@ All controlled via `x-api-key: <agent_api_key>` header on `https://claw-api.virt
 
 ### Phase 2: Agent Pool Creation (admin, batch)
 
+**Step 1: Authenticate**
+```bash
+# Get auth URL, click link in browser, script polls for JWT
+python scripts/create_arena_pool.py auth
 ```
-1. Sev opens https://acpx.virtuals.io/api/auth/lite/auth-url → authUrl
-2. Sev authenticates in browser → polls until JWT token returned (30min window)
-3. Script loops 50 times:
-   POST /api/agents/lite/key + Bearer token + {name: "ggbots-arena-NNN"}
-   → {id, name, walletAddress, apiKey}
-   → Store in arena_agents table
-4. Tokenize each agent on Virtuals dashboard (manual — assign ticker)
-5. For each agent: POST /acp/jobs with join_leaderboard + RSA public key
-   → Decrypt returned encryptedApiKey → DGClaw API key
-6. All 50 agents registered on DGClaw, each with own API key
+Under the hood:
+- `GET https://acpx.virtuals.io/api/auth/lite/auth-url` → `{authUrl, requestId}`
+- Open `authUrl` in browser → Privy auth
+- Poll `GET /api/auth/lite/auth-status?requestId=...` → `{token}` (30min window)
+
+**Step 2: Create agents**
+```bash
+python scripts/create_arena_pool.py create --count 10 --start-index 2
+```
+- `POST https://acpx.virtuals.io/api/agents/lite/key` + Bearer token + `{data: {name: "ggbot-NNN"}}`
+- Returns `{id, walletAddress, apiKey}`
+- Inserts into `arena_agents`, stores claw API key in Supabase Vault
+
+**Step 3: Tokenize via claw API** (NOT the Virtuals dashboard)
+```
+POST https://claw-api.virtuals.io/acp/me/tokens
+Header: x-api-key: <agent_claw_api_key>
+Body: {"symbol": "GGBOT004", "description": "ggbots.ai arena agent #004"}
+
+Returns: {symbol, tokenAddress, txHash, launchedAt}
+```
+**IMPORTANT**: The Virtuals dashboard tokenization is broken (sends numeric agent ID, endpoint expects UUID). Always use the claw API `POST /acp/me/tokens` endpoint instead. Each agent can only have one token.
+
+**Step 4: DGClaw registration** — handled automatically on first user deposit by `_register_on_dgclaw()` in `api/virtuals_arena.py`. Creates `join_leaderboard` ACP job, decrypts returned DGClaw API key via RSA, stores in vault. Costs $0.01 from agent wallet.
+
+**Step 5: Verify pool**
+```bash
+python scripts/create_arena_pool.py status
 ```
 
-When pool runs low, Sev authenticates again and tops up. ~10min admin task.
+**Current pool (2026-03-30):** 30 ggbot agents (ggbot-001 to ggbot-030) + 10 Denis agents. ggbot-001 retired, ggbot-002 + ggbot-004 tokenized, rest need tokenization.
 
-**Validated test** (2026-03-26): Created `ggbots-arena-test-001`, tokenized as GGBOT001, funded $6, registered on DGClaw, deposited $4.99 to HL, opened ETH long $12 @ 3x — all programmatically via claw API.
+### External Agent Onboarding (Denis model)
 
-### Phase 2: User Flow
+Agents can also be created externally via OpenClaw ACP (`npm run acp -- setup`). To integrate:
+1. Get from agent creator: wallet address, claw API key (`acp-...`), token address, token symbol
+2. DGClaw API key (`dgc_...`) if they registered — otherwise auto-registration handles it
+3. Insert into `arena_agents` with `assigned_config_id` pointing to the ggbot config
+4. Vault both keys via `VaultManager.store_arena_credential(agent_id, claw_key, dgclaw_key)`
+
+OpenClaw stores everything in its local `config.json` — agent creators can export from there.
+
+### Phase 2: User Flow (1-bot-1-agent model)
 
 ```
-User clicks "Join Virtuals Arena" on /virtuals-arena page
-  → Backend assigns unassigned agent from pool (ggbots-arena-017)
-  → User sends $25 USDC to agent's smart wallet address (Base network)
-  → Backend detects deposit via claw API (GET /acp/wallet-balances)
-  → Backend triggers perp_deposit via claw API (POST /acp/jobs)
-  → DGClaw bridges Base → Arbitrum → HL, credits agent (~$21 after bridge fees)
-  → User picks which bot drives the arena
-  → Bot cycles create trades via claw API (POST /acp/jobs with perp_trade)
-  → User appears on DGClaw leaderboard individually
+User clicks "Degen Arena" on a specific bot's ActivationBar in Forge
+  → Modal opens, user enters their wallet address (Base, for withdrawals)
+  → Backend assigns an available agent from pool to this config_id
+  → User sends USDC to the agent's smart wallet (Base network)
+  → User clicks "Check / Deposit" in modal
+  → Backend auto-registers on DGClaw (join_leaderboard, first time only)
+  → Backend triggers perp_deposit via claw API
+  → DGClaw bridges Base → Arbitrum → HL (~$1 bridge fee)
+  → Bot cycles mirror trades to DGClaw automatically
+  → Each bot has its own independent arena agent + track record
 ```
 
-**No Virtuals login, no MetaMask signing, no wallet setup.** User just sends USDC and picks a bot.
+**1-bot-1-agent**: each bot (config_id) gets its own arena agent. Users can enter multiple bots. No separate page — everything lives in a modal on the Forge page.
 
 ### Phase 2: Deposit Flow Detail
 
 ```
 User sends USDC to agent wallet (Base)
-  → Claw API detects balance (GET /acp/wallet-balances)
-  → Backend triggers: POST /acp/jobs {perp_deposit, amount: "25"}
+  → User clicks "I've Sent USDC" in Degen Arena modal
+  → Backend checks wallet balance (retry 3x with 5s delays)
+  → If first deposit: auto-registers on DGClaw (join_leaderboard, $0.01)
+  → Backend triggers: POST /acp/jobs {perp_deposit, amount}
   → Claw API signs via Privy-managed signer → ACP job on-chain
-  → DGClaw bridges: Base → Arbitrum → Hyperliquid (~17% bridge fee)
+  → DGClaw bridges: Base → Arbitrum → Hyperliquid (~$1 bridge fee)
   → DGClaw credits agent's internal balance
-  → $0.01 ACP fee auto-paid from agent wallet
+  → $1 kept in wallet as reserve for future ACP trade fees ($0.01/trade)
 ```
 
-No platform float — user's USDC goes from agent wallet → DGClaw. We control via API key.
+**Fee breakdown for $20 deposit:**
+- $1.00 reserved in wallet for ACP fees (~100 trades)
+- $0.01 registration fee (first time only)
+- ~$1.00 bridge fee (Base → Arb → HL)
+- **~$18 effective trading balance** on Degen Claw
 
-**Bridge fee note**: $6 deposit → $4.99 received (~17% fee). Users need to know effective deposit is less. $25 deposit → ~$21 effective.
+**Bridge timing**: Typically 1-3 minutes. Can take longer when DGClaw processes multiple deposits. Our polling timeout is 90s — jobs continue processing on DGClaw's side even if we time out.
+
+**IMPORTANT: Use `base.llamarpc.com` for on-chain balance checks**, not `mainnet.base.org`. The default Base RPC frequently returns stale data. The claw API `GET /acp/wallet-balances` can also lag — always verify critical balances via direct RPC.
 
 ### Phase 2: Trading via Claw API (differs from Phase 1)
 
@@ -312,73 +351,81 @@ Phase 1 uses the **Python ACP SDK** (EOA signing) via `sebastian_virtuals.py`. P
 | **Trade execution** | `sebastian_virtuals.py` section D | New: claw API adapter in orchestrator |
 | **Position data** | Railway backend `/users/{wallet}/account` | Same Railway backend |
 
-### Phase 2: Frontend — `/virtuals-arena` page
+### Phase 2: Frontend — Degen Arena Modal
 
-Separate from existing ggArena. Dedicated page with:
-- DGClaw leaderboard (from `GET /api/leaderboard`)
-- User's arena status (balance, positions from Railway backend)
-- Bot selector (which of their bots drives the arena agent)
-- Entry: display agent wallet address for USDC deposit (Base network)
-- Position monitoring (open positions, PnL, trade history)
+Integrated into Forge page via `DegenArenaModal` on each bot's ActivationBar. No separate page.
+
+**Button on ActivationBar:** "Degen Arena" → opens modal for that specific bot.
+
+**Modal states:**
+1. **Not joined**: Explanation of arena mirroring, 3 steps, fee breakdown, wallet input → "Enter Arena"
+2. **Joined, needs funding**: Deposit address, "$20+ USDC on Base", "I've Sent USDC" button with retry
+3. **Funded**: Arena balance (hero number), positions, deposit more, withdraw, leaderboard link
+
+**Key UX decisions:**
+- 1-bot-1-agent: each bot independently joins the arena
+- Modal auto-refreshes every 10s when open
+- Bot must be active for trades to mirror (inactive bot = agent keeps position but no new trades)
+- "Arena Balance" = what the bot trades with on Degen Claw
+- "Pending" = USDC in agent wallet not yet bridged
+- Leaderboard link: `https://degen.virtuals.io/#leaderboard`
+- "Your bot will appear on the leaderboard after its first trade"
 
 ### Phase 2: DB Schema
 
-**New table: `arena_agents`** (agent pool)
+**Table: `arena_agents`** (agent pool, 1-bot-1-agent)
 ```
-agent_id          varchar      PK — Virtuals agent ID
-agent_name        varchar      Display name (e.g., "ggbots-arena-017")
-wallet_address    varchar      Agent smart wallet on Base
-claw_api_key      varchar      Claw API key for agent control (encrypted)
-dgclaw_api_key    varchar      DGClaw API key (encrypted, from join_leaderboard)
+id                serial       PK
+virtuals_id       integer      Virtuals agent ID
+agent_name        varchar      Display name (e.g., "ggbot-002")
+wallet_address    varchar      UNIQUE, agent smart wallet on Base
+claw_api_key_vault_id  uuid    Supabase Vault ref for claw REST API key
+dgclaw_api_key_vault_id uuid   Supabase Vault ref for DGClaw API key (from join_leaderboard)
 token_address     varchar      Token contract address (from tokenization)
-token_symbol      varchar      Token ticker (e.g., "GGBOT017")
-assigned_user_id  uuid         FK to user_profiles (NULL = unassigned)
-assigned_at       timestamptz  When user was assigned this agent
+token_symbol      varchar      Token ticker (e.g., "GGBOT002")
+assigned_user_id  uuid         FK to auth.users (ownership for auth checks)
+assigned_config_id uuid        FK to configurations (the bot this agent serves)
+user_wallet_address varchar    User's Base wallet (withdrawal destination)
+assigned_at       timestamptz  When assigned
 status            varchar      'available' | 'assigned' | 'retired'
 created_at        timestamptz
 ```
 
-**`configurations` column**: `arena_enabled` boolean — which bot drives the user's arena agent.
-
-**`user_profiles` columns**: `arena_agent_id` FK to arena_agents (shortcut lookup).
-
-### Phase 2: Remaining Questions
-- Can user change which bot drives the arena mid-season?
-- What happens to arena positions when bot is deactivated?
-- Deposit detection: poll agent wallet balance on claw API, or webhook?
-- Withdrawal flow: user requests, POST /acp/jobs with perp_withdraw, USDC back to user wallet
-- Agent pool replenishment: automated alert when pool < 10 available?
-- Tokenization: can it be automated via API, or always manual dashboard?
-- Bridge fee UX: show estimated effective deposit amount before user sends
+**Key**: `assigned_config_id` is the primary lookup. If a config has an arena agent, trades are mirrored.
+**No `arena_enabled` column needed** — agent assignment IS enablement.
+**Deactivated bots** keep their agent but stop routing trades (user can still withdraw).
 
 ---
 
-## Current Status (2026-03-25)
+## Current Status (2026-03-30)
 
-### Completed
-- [x] ggbots.ai registered on DGClaw, deposited $36, first trade, leaderboard #12
-- [x] `dgclaw_service.py` — arena execution service (open/close via ACP SDK, account via Railway)
+### Phase 1: Admin Bot — COMPLETE
+- [x] ggbots.ai registered on DGClaw, balance $73+, automated trades verified
+- [x] `dgclaw_service.py` — arena execution service (ACP SDK, Railway backend for balance)
 - [x] Orchestrator arena hook → `arena:trade_queue` → `sebastian-virtuals` section D
-- [x] Arena-enabled via `ARENA_ENABLED_CONFIGS` env var (Sev's live HL bot)
-- [x] Discovered Railway backend (`dgclaw-app-production.up.railway.app`) for real balance
-- [x] **Phase 2 validation (2026-03-26)**: Full programmatic flow proven with lite agent
-  - Created `ggbots-arena-test-001` via lite API (claw API key control, no EOA needed)
-  - Tokenized as GGBOT001 on dashboard
-  - Funded $6, registered on DGClaw (join_leaderboard → RSA decrypt → API key)
-  - Deposited $4.99 to HL via perp_deposit
-  - Opened ETH long $12 @ 3x via perp_trade
-  - All via claw REST API with `x-api-key` header — zero SDK/EOA involvement
+- [x] Arena-enabled via `ARENA_ENABLED_CONFIGS` env var (Sev's live BTC/USDT bot)
+- [x] Multiple BTC trades mirrored successfully
 
-### Phase 1: Remaining
-- [ ] Verify automated arena trade end-to-end (restart services, wait for bot cycle)
-- [ ] Position monitoring dashboard/logging
-- [ ] Keep ACP wallet funded (need USDC buffer for $0.01/trade fees)
-
-### Phase 2: Any User Can Enter
-- [ ] Virtuals auth flow (auth-url → poll → agent creation)
-- [ ] Entry ticket purchase (Stripe/credits → platform deposits USDC)
-- [ ] `/arena` frontend page (leaderboard, positions, bot selection)
-- [ ] Per-user DGClaw registration + agent storage in user_profiles
+### Phase 2: Any User Can Enter — IN PROGRESS
+- [x] Lite agent pool model validated (claw API control, no EOA needed)
+- [x] 30 ggbot agents created (ggbot-001 through ggbot-030), API keys vaulted
+- [x] 10 Denis agents onboarded (BB RSI Reversion, etc.), assigned to SZN2 configs
+- [x] Tokenization via claw API validated (`POST /acp/me/tokens` — dashboard is broken)
+- [x] ggbot-001 (GGBOT001), ggbot-002 (GGBOT002), ggbot-004 (GGBOT004) tokenized
+- [x] Denis's 10 agents: 6 funded on DGClaw ($15 each), 4 bridging
+- [x] `trading/virtuals/claw_api.py` — async HTTP client for claw REST API
+- [x] `api/virtuals_arena.py` — config-based API endpoints (join, status, check-deposit, withdraw, leaderboard)
+- [x] `core/auth/vault_utils.py` — arena credential vault methods (by agent_id, by config_id)
+- [x] Orchestrator Phase 2 — direct claw API trade routing by `assigned_config_id`
+- [x] `scripts/create_arena_pool.py` — admin batch agent creation + auth flow
+- [x] DGClaw auto-registration on first deposit (join_leaderboard + RSA decrypt)
+- [x] `DegenArenaModal` — integrated into ActivationBar in Forge (1-bot-1-agent)
+- [x] `acp_client.py` memo error demoted to WARNING (was triggering false alerts)
+- [x] `dgclaw_service.py` 3s delay before first pay attempt (reduces memo race)
+- [ ] Tokenize remaining ggbot agents (005-030, minus 004) via `POST /acp/me/tokens`
+- [ ] Modal UI/UX polish and copy refinement
+- [ ] Verify Denis's 4 bridging agents land on DGClaw
+- [ ] End-to-end automated trade test (bot cycle → claw API → DGClaw position)
 
 ---
 
@@ -386,10 +433,15 @@ created_at        timestamptz
 
 | File | Purpose |
 |---|---|
-| `trading/virtuals/__init__.py` | Package init |
 | `trading/virtuals/README.md` | This file — full context |
-| `trading/virtuals/dgclaw_service.py` | Arena execution service (open/close via ACP, account via Railway backend) |
-| `core/services/acp_client.py` | ACP SDK wrapper (buyer + provider) |
-| `core/orchestrator/orchestrator.py` | Arena hook: `_is_arena_enabled()` + `_enqueue_arena_trade()` |
-| `sebastian_virtuals.py` | ACP background service + section D arena trades |
+| `trading/virtuals/claw_api.py` | Async HTTP client for claw REST API (Phase 2 user agents) |
+| `trading/virtuals/dgclaw_service.py` | Phase 1 arena service (ACP SDK, admin bot) |
+| `api/virtuals_arena.py` | Phase 2 API endpoints (join, status, deposit, withdraw, leaderboard) |
+| `core/auth/vault_utils.py` | Arena credential vault (store/get by agent_id, config_id) |
+| `core/orchestrator/orchestrator.py` | Arena hooks: Phase 2 (claw API by config) + Phase 1 (ACP SDK fallback) |
+| `core/services/acp_client.py` | ACP SDK wrapper (Phase 1 admin bot) |
+| `sebastian_virtuals.py` | ACP background service + Phase 1 arena trade queue |
+| `scripts/create_arena_pool.py` | Admin tool: auth, create, register, seed, status |
+| `frontend/components/degen-arena-modal.tsx` | DegenArenaModal (Forge ActivationBar integration) |
+| `frontend/app/virtuals-arena/` | Standalone page (deprecated — modal is primary UX) |
 | `ecosystem.config.js` | PM2 config for scheduler (ARENA_ENABLED_CONFIGS) + sebastian-virtuals (DGClaw env) |

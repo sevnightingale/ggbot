@@ -27,7 +27,7 @@ from core.auth.vault_utils import VaultManager
 
 
 # Virtuals API
-VIRTUALS_API = "https://api.virtuals.io/api"
+VIRTUALS_API = "https://acpx.virtuals.io/api"
 DGCLAW_BACKEND = "https://dgclaw-app-production.up.railway.app"
 
 # Stored JWT (file-based, short-lived ~30min)
@@ -35,19 +35,66 @@ TOKEN_FILE = "/tmp/virtuals_jwt.txt"
 
 
 def cmd_auth(args):
-    """Store a Virtuals JWT for subsequent commands."""
-    print("Paste your Virtuals JWT token (from browser Network tab):")
-    print("  1. Go to app.virtuals.io and log in")
-    print("  2. Open DevTools -> Network -> any API request -> Headers")
-    print("  3. Copy the Authorization: Bearer <token> value")
-    print()
+    """Authenticate with Virtuals via browser link."""
+    import time as _time
+
+    AUTH_URL_ENDPOINT = "https://acpx.virtuals.io/api/auth/lite/auth-url"
+    TOKEN_ENDPOINT = "https://acpx.virtuals.io/api/auth/lite/auth-status"
+
+    # Step 1: Get auth URL
+    print("Requesting auth URL from Virtuals...")
+    resp = requests.get(AUTH_URL_ENDPOINT, timeout=10)
+    if resp.status_code != 200:
+        print(f"Failed to get auth URL: {resp.status_code} {resp.text[:200]}")
+        print("\nFallback: paste a JWT token manually.")
+        token = input("JWT token: ").strip()
+        if token.startswith("Bearer "):
+            token = token[7:]
+        with open(TOKEN_FILE, 'w') as f:
+            f.write(token)
+        print(f"Token saved.")
+        return
+
+    data = resp.json().get("data", {})
+    auth_url = data.get("authUrl")
+    request_id = data.get("requestId")
+
+    print(f"\nOpen this link in your browser and authenticate:\n")
+    print(f"  {auth_url}\n")
+    print("Waiting for authentication (polling every 3s, 5min timeout)...")
+
+    # Step 2: Poll for token
+    start = _time.time()
+    while (_time.time() - start) < 300:
+        _time.sleep(3)
+        try:
+            token_resp = requests.get(
+                f"{TOKEN_ENDPOINT}?requestId={request_id}",
+                timeout=5,
+            )
+            if token_resp.status_code == 200:
+                token_data = token_resp.json().get("data", {})
+                token = token_data.get("token") or token_data.get("accessToken")
+                if token:
+                    with open(TOKEN_FILE, 'w') as f:
+                        f.write(token)
+                    print(f"\nAuthenticated! Token saved.")
+                    print("Note: Virtuals JWTs expire in ~30 minutes.")
+                    return
+        except Exception:
+            pass
+        elapsed = int(_time.time() - start)
+        if elapsed % 15 == 0:
+            print(f"  Still waiting... ({elapsed}s)")
+
+    print("\nTimed out after 5 minutes. Try again or paste token manually:")
     token = input("JWT token: ").strip()
     if token.startswith("Bearer "):
         token = token[7:]
-    with open(TOKEN_FILE, 'w') as f:
-        f.write(token)
-    print(f"Token saved to {TOKEN_FILE}")
-    print("Note: Virtuals JWTs expire in ~30 minutes. Re-run auth if needed.")
+    if token:
+        with open(TOKEN_FILE, 'w') as f:
+            f.write(token)
+        print(f"Token saved.")
 
 
 def _get_token():
@@ -71,16 +118,13 @@ def cmd_create(args):
 
     created = []
     for i in range(start, start + count):
-        name = f"ggbots-arena-{i:03d}"
+        name = f"ggbot-{i:03d}"
         print(f"Creating agent {name}...", end=" ")
 
         resp = requests.post(
             f"{VIRTUALS_API}/agents/lite/key",
             headers=headers,
-            json={
-                "name": name,
-                "description": f"ggbots.ai arena agent #{i}",
-            },
+            json={"data": {"name": name}},
             timeout=30,
         )
 
@@ -231,7 +275,7 @@ def main():
 
     create_parser = subparsers.add_parser("create", help="Batch-create lite agents")
     create_parser.add_argument("--count", type=int, default=5, help="Number of agents")
-    create_parser.add_argument("--start-index", type=int, default=1, help="Starting index for naming")
+    create_parser.add_argument("--start-index", type=int, default=2, help="Starting index for naming")
 
     subparsers.add_parser("register", help="Register agents on DGClaw")
 

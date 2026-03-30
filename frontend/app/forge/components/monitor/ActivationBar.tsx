@@ -9,6 +9,7 @@ import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 import { BotImageUpload } from '@/components/BotImageUpload'
 import { ArenaRegistrationModal } from '@/components/arena-registration-modal'
+import { DegenArenaModal } from '@/components/degen-arena-modal'
 import { estimateDailyCost } from '@/lib/cost-estimation'
 
 interface AccountMetrics {
@@ -72,6 +73,7 @@ export function ActivationBar({
   const [addCreditsOpen, setAddCreditsOpen] = useState(false)
   const [riskModalOpen, setRiskModalOpen] = useState(false)
   const [arenaModalOpen, setArenaModalOpen] = useState(false)
+  const [degenArenaOpen, setDegenArenaOpen] = useState(false)
 
   // Check if user is prepaid tier with no credits
   const isPrepaidNoCredits = userProfile?.subscription_tier === 'prepaid' &&
@@ -272,6 +274,15 @@ export function ActivationBar({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {/* Degen Arena (DGClaw) */}
+              <button
+                onClick={() => setDegenArenaOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] transition-colors"
+              >
+                <Trophy className="h-4 w-4" />
+                <span>Degen Arena</span>
+              </button>
+
               {/* Enter Arena Button — disabled during training, re-enable when S2 registration API is ready (Phase B) */}
               {false && isPaperTrading && (
                 isRegisteredForArena ? (
@@ -434,6 +445,17 @@ export function ActivationBar({
           // Trigger a refresh - the SSE will pick up the change
           window.location.reload()
         }}
+        isBotActive={isActive}
+        onActivateBot={onStart}
+        isActivating={isStarting}
+      />
+
+      {/* Degen Arena (DGClaw) Modal */}
+      <DegenArenaModal
+        isOpen={degenArenaOpen}
+        onClose={() => setDegenArenaOpen(false)}
+        configId={selectedBot.config_id}
+        configName={selectedBot.config_name || 'Untitled Bot'}
         isBotActive={isActive}
         onActivateBot={onStart}
         isActivating={isStarting}

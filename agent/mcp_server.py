@@ -1390,21 +1390,33 @@ async def query_market_data_for_rei(args: Dict[str, Any]) -> Dict[str, Any]:
         else:
             summary_parts.append("Technical: No data")
 
-        # Summarize intelligence
+        # Summarize intelligence — extract key factual values (not trading signals)
         if market_intel and isinstance(market_intel, dict):
             intel_summaries = []
             for category, points in market_intel.items():
                 if isinstance(points, dict):
                     for point_name, point_data in points.items():
                         if isinstance(point_data, dict):
-                            # Safely extract signal from either top level or nested interpretation
-                            signal = point_data.get("signal", "")
-                            if not signal:
-                                interpretation = point_data.get("interpretation", {})
-                                if isinstance(interpretation, dict):
-                                    signal = interpretation.get("signal", "")
-                            if signal and isinstance(signal, str):
-                                intel_summaries.append(f"{point_name}={signal}")
+                            # Summarize with the most relevant factual field
+                            value = point_data.get("value")
+                            if value is not None:
+                                # Index-type data (VIX, DXY, CPI, MOVE, etc.)
+                                regime = point_data.get("risk_regime") or point_data.get("trend") or point_data.get("economic_health", "")
+                                suffix = f" ({regime})" if regime else ""
+                                intel_summaries.append(f"{point_name}={value}{suffix}")
+                            elif "sentiment_score" in point_data:
+                                intel_summaries.append(f"{point_name}={point_data['sentiment_score']:.1f}")
+                            elif "tvl_usd" in point_data:
+                                tvl = point_data["tvl_usd"]
+                                intel_summaries.append(f"{point_name}=${tvl/1e9:.1f}B" if tvl > 1e9 else f"{point_name}=${tvl/1e6:.0f}M")
+                            elif "net_flow_usd" in point_data:
+                                flow = point_data["net_flow_usd"]
+                                direction = "out" if flow > 0 else "in"
+                                intel_summaries.append(f"{point_name}=${abs(flow)/1e6:.0f}M {direction}")
+                            elif "phase" in point_data:
+                                intel_summaries.append(f"{point_name}={point_data['phase']}")
+                            elif "mercury_retrograde" in point_data:
+                                intel_summaries.append(f"{point_name}={'retro' if point_data['mercury_retrograde'] else 'direct'}")
             if intel_summaries:
                 summary_parts.append(f"Intelligence: {', '.join(intel_summaries[:5])}")
         else:
