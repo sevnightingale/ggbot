@@ -823,11 +823,21 @@ def _snapshot_config(cur, config_id: str) -> Dict[str, Any]:
 def _create_match_instance(cur, source_config_id: str, user_id: str,
                            match_id: str, role: str) -> str:
     """
-    Create a minimal config (config_type='dojo_match') as a paper account container.
+    Create a match instance config (config_type='dojo_match') as a paper account container.
 
-    No scheduler job. Invisible in bot rail (filtered by config_type guard).
-    config_data stores the match reference for traceability.
+    Copies trading settings (leverage, position sizing, risk management) from
+    the source config so mirror trades use the same parameters. No scheduler job.
+    Invisible in bot rail (filtered by config_type guard).
     """
+    # Read source config's trading settings for mirror trade execution
+    cur.execute("""
+        SELECT config_data FROM configurations WHERE config_id = %s
+    """, (source_config_id,))
+    source_row = cur.fetchone()
+    source_data = source_row[0] if source_row and isinstance(source_row[0], dict) else {}
+    # Handle nested config_data structure
+    inner = source_data.get('config_data', source_data)
+
     instance_id = str(uuid.uuid4())
     cur.execute("""
         INSERT INTO configurations (
@@ -842,6 +852,10 @@ def _create_match_instance(cur, source_config_id: str, user_id: str,
             'source_config_id': source_config_id,
             'role': role,
             'schema_version': '2.2',
+            # Copy trading settings so mirror trades use correct leverage/sizing/risk
+            'selected_pair': inner.get('selected_pair'),
+            'trading': inner.get('trading', {}),
+            'decision': inner.get('decision', {}),
         }),
     ))
     return instance_id

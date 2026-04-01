@@ -247,9 +247,7 @@ async def _close_mirror_position(
         try:
             await service.close_position(
                 trade_id=trade_id,
-                config_id=instance_id,
-                user_id=user_id,
-                close_reason=close_reason,
+                reason=close_reason,
             )
             _log.debug(f"Dojo mirror close: instance={instance_id[:8]} trade={trade_id[:8]}")
         except Exception as e:
