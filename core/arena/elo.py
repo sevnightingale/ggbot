@@ -1,5 +1,5 @@
 """
-ELO Engine — Composite scoring and ELO rating system for The Dojo.
+Elo Engine — Composite scoring and Elo rating system for The Dojo.
 
 Pure computation functions. No external dependencies beyond stdlib + DB.
 
@@ -9,8 +9,8 @@ Composite Match Score:
   Drawdown    — 20% / 20% / 20%
   Win Rate    — 15% / 15% / 15%
 
-ELO uses standard formula with K-factor scaling:
-  K=32 (< 10 rated events), K=24 (10-30), K=16 (> 30 AND > 1600 ELO)
+Elo uses standard formula with K-factor scaling:
+  K=32 (< 10 rated events), K=24 (10-30), K=16 (> 30 AND > 1600 Elo)
 """
 
 import json
@@ -37,7 +37,7 @@ FORMAT_DURATIONS = {
     'standard': 21,
 }
 
-# Starting ELO for all bots
+# Starting Elo for all bots
 DEFAULT_ELO = 1200
 
 # Sortino cap when no negative returns exist
@@ -214,10 +214,10 @@ def calculate_composite_score(
     }
 
 
-# ─── ELO Update ──────────────────────────────────────────────────────────────
+# ─── Elo Update ──────────────────────────────────────────────────────────────
 
 def _get_k_factor(config_id: str) -> int:
-    """Determine K-factor based on number of rated events and current ELO."""
+    """Determine K-factor based on number of rated events and current Elo."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -252,10 +252,10 @@ def update_elo(
     k_b: int = 24,
 ) -> Tuple[int, int]:
     """
-    Standard ELO update for two players.
+    Standard Elo update for two players.
 
     score_a/score_b: composite match scores (higher = better performance).
-    The actual ELO outcome is derived from who scored higher:
+    The actual Elo outcome is derived from who scored higher:
       winner gets S=1, loser gets S=0, draw gives S=0.5 each.
 
     Returns (new_rating_a, new_rating_b).
@@ -280,7 +280,7 @@ def update_elo(
     return max(new_a, 0), max(new_b, 0)
 
 
-# ─── Record ELO Change ───────────────────────────────────────────────────────
+# ─── Record Elo Change ───────────────────────────────────────────────────────
 
 def record_elo_change(
     config_id: str,
@@ -311,23 +311,23 @@ def record_elo_change(
 
             conn.commit()
 
-    _log.info(f"ELO updated: config={config_id[:8]} {elo_before}→{elo_after} ({'+' if change >= 0 else ''}{change}) reason={reason}")
+    _log.info(f"Elo updated: config={config_id[:8]} {elo_before}→{elo_after} ({'+' if change >= 0 else ''}{change}) reason={reason}")
 
 
-# ─── Weekly Rolling ELO ──────────────────────────────────────────────────────
+# ─── Weekly Rolling Elo ──────────────────────────────────────────────────────
 
 async def weekly_rolling_update():
     """
-    Swiss-system weekly ELO update for all active Dojo-visible paper bots.
+    Swiss-system weekly Elo update for all active Dojo-visible paper bots.
 
     Runs Sundays at midnight UTC. Calculates trailing 7-day composite score
-    for all eligible bots, pairs them by rank, and updates ELO.
+    for all eligible bots, pairs them by rank, and updates Elo.
 
-    Bots with zero trades in the window are excluded (no ELO change for idle bots).
+    Bots with zero trades in the window are excluded (no Elo change for idle bots).
     """
     import asyncio
 
-    _log.info("Starting weekly rolling ELO update")
+    _log.info("Starting weekly rolling Elo update")
     now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
 
@@ -346,7 +346,7 @@ async def weekly_rolling_update():
             bots = [(str(row[0]), row[1] or DEFAULT_ELO) for row in cur.fetchall()]
 
     if len(bots) < 2:
-        _log.info(f"Weekly ELO: only {len(bots)} eligible bots, skipping")
+        _log.info(f"Weekly Elo: only {len(bots)} eligible bots, skipping")
         return
 
     # Calculate composite scores for each bot (trailing 7 days)
@@ -357,7 +357,7 @@ async def weekly_rolling_update():
             scored_bots.append((config_id, elo, score['composite_score'], score))
 
     if len(scored_bots) < 2:
-        _log.info(f"Weekly ELO: only {len(scored_bots)} bots with trades, skipping")
+        _log.info(f"Weekly Elo: only {len(scored_bots)} bots with trades, skipping")
         return
 
     # Sort by composite score (Swiss-system: pair adjacent)
@@ -388,4 +388,4 @@ async def weekly_rolling_update():
             })
             updates += 1
 
-    _log.info(f"Weekly ELO: {updates} rating changes across {len(scored_bots)} bots")
+    _log.info(f"Weekly Elo: {updates} rating changes across {len(scored_bots)} bots")

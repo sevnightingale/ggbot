@@ -261,6 +261,11 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'elo_rating', COALESCE(bc.elo_rating, 1200),
                 'dojo_visible', COALESCE(bc.dojo_visible, true),
                 'is_house_bot', COALESCE(bc.is_house_bot, false),
+                'dojo_locked', EXISTS(
+                    SELECT 1 FROM dojo_matches dm
+                    WHERE dm.status = 'active'
+                      AND (dm.challenger_config_id = bc.config_id OR dm.opponent_config_id = bc.config_id)
+                ),
                 'created_at', bc.created_at,
                 'updated_at', bc.updated_at
             )

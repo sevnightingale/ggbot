@@ -477,6 +477,17 @@ class HyperliquidAccountAdapter(AccountAdapter):
                 except Exception:
                     pass
 
+                # Mirror close to Dojo match accounts (fire-and-forget)
+                try:
+                    from core.arena.dojo_mirror import mirror_close_to_dojo
+                    asyncio.create_task(mirror_close_to_dojo(
+                        config_id=config_id,
+                        symbol=platform_symbol,
+                        close_reason=inferred_close_reason,
+                    ))
+                except Exception:
+                    pass
+
                 for h in agg['hashes']:
                     self._logged_closes.add(h)
                 self._log.info(

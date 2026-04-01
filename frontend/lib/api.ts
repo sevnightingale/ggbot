@@ -111,9 +111,36 @@ export interface BotConfiguration {
   elo_rating?: number
   dojo_visible?: boolean
   is_house_bot?: boolean
-  dojo_locked?: boolean  // Derived from active dojo matches (Phase 4)
+  dojo_locked?: boolean
+  dojo_matches_active?: Array<{
+    match_id: string
+    format: string
+    ends_at: string | null
+    opponent_name: string | null
+  }>
   created_at: string
   updated_at: string
+}
+
+export interface DojoMatch {
+  match_id: string
+  format: string
+  status: string
+  challenger_config_id: string
+  opponent_config_id: string
+  challenger_name?: string
+  opponent_name?: string
+  opponent_is_house_bot?: boolean
+  winner_config_id?: string | null
+  challenger_score?: number | null
+  opponent_score?: number | null
+  challenger_elo?: { before: number; after: number }
+  opponent_elo?: { before: number; after: number }
+  starts_at?: string | null
+  ends_at?: string | null
+  completed_at?: string | null
+  created_at?: string | null
+  result_details?: Record<string, unknown>
 }
 
 export interface DataSource {
@@ -306,7 +333,7 @@ export class ApiClient {
     )
     if (!response.ok) {
       const error = await response.text()
-      throw new Error(`Failed to fetch ELO history: ${error}`)
+      throw new Error(`Failed to fetch Elo history: ${error}`)
     }
     return response.json()
   }
@@ -342,6 +369,63 @@ export class ApiClient {
       throw new Error(`Failed to toggle visibility: ${error}`)
     }
 
+    return response.json()
+  }
+
+  // ─── Dojo Match Methods ─────────────────────────────────────────────────
+
+  async checkDojoEntry(configId: string): Promise<{ eligible: boolean; reason?: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/can-enter/${configId}`)
+    if (!response.ok) throw new Error('Failed to check entry eligibility')
+    return response.json()
+  }
+
+  async createDojoChallenge(configId: string, opponentConfigId: string, format: string): Promise<{
+    match_id: string; status: string; auto_started?: boolean
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/challenge`, {
+      method: 'POST',
+      body: JSON.stringify({ config_id: configId, opponent_config_id: opponentConfigId, format })
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Challenge failed' }))
+      throw new Error(error.detail || 'Challenge failed')
+    }
+    return response.json()
+  }
+
+  async forfeitDojoMatch(matchId: string): Promise<{ match_id: string; status: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/match/${matchId}/forfeit`, {
+      method: 'POST'
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Forfeit failed' }))
+      throw new Error(error.detail || 'Forfeit failed')
+    }
+    return response.json()
+  }
+
+  async getDojoMatchHistory(configId: string, limit: number = 20, offset: number = 0): Promise<{
+    status: string; matches: DojoMatch[]
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/dojo/matches/${configId}?limit=${limit}&offset=${offset}`
+    )
+    if (!response.ok) throw new Error('Failed to load match history')
+    return response.json()
+  }
+
+  async getDojoBotStats(configId: string): Promise<{
+    total_matches: number; wins: number; draws: number; losses: number; active_matches: number
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/stats/${configId}`)
+    if (!response.ok) throw new Error('Failed to load Dojo stats')
+    return response.json()
+  }
+
+  async getDojoActiveMatches(configId: string): Promise<{ status: string; matches: DojoMatch[] }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/active/${configId}`)
+    if (!response.ok) throw new Error('Failed to load active matches')
     return response.json()
   }
 

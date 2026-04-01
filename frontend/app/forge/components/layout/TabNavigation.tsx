@@ -15,7 +15,7 @@ export function TabNavigation({ activeTab, onTabChange, showDojoTab = false, cla
   const tabs: Array<{ key: Tab; label: string; description: string }> = [
     { key: 'monitor', label: 'Monitor', description: 'Real-time bot status and performance' },
     { key: 'configure', label: 'Configure', description: 'Edit bot strategy and settings' },
-    ...(showDojoTab ? [{ key: 'dojo' as Tab, label: 'Dojo', description: 'Competitive matches and ELO rating' }] : [])
+    ...(showDojoTab ? [{ key: 'dojo' as Tab, label: 'Dojo', description: 'Competitive matches and Elo rating' }] : [])
   ]
 
   return (

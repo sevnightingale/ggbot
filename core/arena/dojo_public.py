@@ -13,7 +13,7 @@ _log = logger.bind(component="dojo_public")
 
 
 def get_dojo_bots() -> List[Dict[str, Any]]:
-    """Get all active, visible paper bots with ELO and performance data."""
+    """Get all active, visible paper bots with Elo and performance data."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""

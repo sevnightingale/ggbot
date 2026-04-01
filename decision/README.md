@@ -29,6 +29,18 @@ The Decision Module operates in three primary modes with V2 template-based archi
    - **Strategy Continuity**: Applies user's exit rules to current market conditions
    - **Output**: close/hold/wait with confidence and reasoning
 
+### Awareness Level Routing
+
+The `awareness_level` field in `config_data.decision` controls decision routing:
+
+| Level | Name | Behavior |
+|-------|------|----------|
+| `low` | Signal Mode | Always routes to opportunity analysis. Skips position management entirely. Used by House Bots in The Dojo — they never hold positions, only emit entry signals. |
+| `medium` | Position Aware | Default. Routes to position management when positions exist, opportunity analysis otherwise. |
+| `high` | State Aware | Future: everything in medium + persistent cross-cycle memory. Maps to Bot State v2. |
+
+Routing check is at the top of `_handle_autonomous_trading()` in `engine_v2.py` (~line 398).
+
 ### Data Flow
 
 ```

@@ -302,7 +302,8 @@ case 'live_trading':
 | Position sizing, P&L calculations | `trading/README.md` |
 | Data extraction, indicators, preprocessors | `extraction/v2/README.md` |
 | Market intelligence, Grok sources | `market_intelligence/README.md` |
-| Decision engine, LLM prompts | `decision/README.md` |
+| Decision engine, LLM prompts, awareness_level | `decision/README.md` |
+| The Dojo, Elo, House Bots, 1v1 matches | `DOCS/todo/DOJO.md` |
 | Updating LLM models/tiers | `decision/llm_providers/MODEL_UPDATE.md` |
 | Agent behavior, MCP tools, strategy | `agent/README.md` |
 | Frontend components, SSE, bot rail | `frontend/README.md` |

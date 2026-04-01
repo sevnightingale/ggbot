@@ -183,6 +183,11 @@
 - `GET /api/v2/public/arena/{config_id}/balance-series` - Public bot equity timeline
 - `GET /api/v2/public/arena/{config_id}/activities` - Public bot activity events
 - `GET /api/v2/public/arena/{config_id}/metadata` - Public bot metadata
+- `GET /api/v2/public/dojo/bots` - Dojo leaderboard (active visible paper bots + Elo)
+- `GET /api/v2/public/dojo/stats` - Aggregate Dojo statistics
+- `GET /api/v2/public/dojo/house-bots` - House Bots available for challenges
+- `PUT /api/v2/config/{id}/dojo-visibility` - Toggle dojo_visible flag
+- `GET /api/v2/dojo/elo-history/{config_id}` - Paginated Elo rating history
 
 **Arena Betting** (USX staking on bots, public — wallet = identity)
 - `POST /api/v2/arena/pledge` - Record USX bet after on-chain tx (no auth, validates wallet + tx_hash format)
@@ -603,13 +608,18 @@ Idx: idx_bot_telegram_channels_chat_id(telegram_chat_id), idx_bot_telegram_chann
 config_id uuid, telegram_chat_id bigint, channel_name varchar(100)?, enabled bool?=true, created_at timestamptz?
 updated_at timestamptz?
 
-### configurations (18 cols) | PK: config_id
+### configurations (21 cols) | PK: config_id
 Idx: idx_configurations_is_public_performance(is_public_performance), idx_configurations_public(is_public_performance), idx_configurations_state(state), idx_configurations_type(config_type), idx_co...
 config_id uuid, user_id uuid, config_type varchar(50), config_name varchar(100)?, config_data jsonb
 created_at timestamptz, updated_at timestamptz, state text=inactive, symphony_agent_id varchar(255)?
 trading_mode varchar(20)=paper' varying, is_public_performance bool?, profile_image_url text?, description text?
 first_run_used bool?, free_runs_remaining int?=3, arena_registered_at timestamptz?, initial_equity numeric?
-arena_enabled bool?
+arena_enabled bool?, dojo_visible bool?=true, elo_rating int?=1200, is_house_bot bool?=false
+
+### elo_history (9 cols) | PK: id | FK: config_id→configurations
+Idx: idx_elo_history_config(config_id, created_at DESC)
+id uuid, config_id uuid, elo_before int, elo_after int, change int, reason text
+match_id uuid?, details jsonb?, created_at timestamptz
 
 ### data_points (11 cols) | PK: data_point_id | FK: source_id→data_sources | UQ: source_id,name
 Idx: data_points_source_id_name_key(source_id, name), idx_data_points_name(name), idx_data_points_premium(requires_premium, enabled), idx_data_points_source(source_id, enabled, sort_order)

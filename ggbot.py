@@ -98,6 +98,16 @@ CREDIT_PURCHASE_MAX_CENTS = 50000    # $500
 API_BASE_URL = os.getenv("API_BASE_URL", "https://ggbots-api.nightingale.business")
 
 
+def _check_dojo_lock(config_id: str) -> None:
+    """Raise 400 if bot is locked in an active Dojo match."""
+    from core.arena.matches import is_dojo_locked
+    if is_dojo_locked(config_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Bot is locked for an active Dojo match. Forfeit to unlock."
+        )
+
+
 class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
@@ -520,7 +530,7 @@ async def list_configs(
         for c in config_dicts:
             c['arena_registration'] = arena_map.get(c['config_id'])
 
-        # Enrich with dojo data (elo_rating, dojo_visible)
+        # Enrich with dojo data (elo_rating, dojo_visible, lock state)
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -535,6 +545,38 @@ async def list_configs(
                             if c['config_id'] == cid:
                                 c['elo_rating'] = row[1] or 1200
                                 c['dojo_visible'] = row[2] if row[2] is not None else True
+
+                    # Active matches for lock state
+                    cur.execute("""
+                        SELECT
+                            CASE WHEN challenger_config_id = ANY(%s) THEN challenger_config_id
+                                 ELSE opponent_config_id END AS config_id,
+                            id, format, ends_at,
+                            CASE WHEN challenger_config_id = ANY(%s)
+                                 THEN (SELECT config_name FROM configurations WHERE config_id = opponent_config_id)
+                                 ELSE (SELECT config_name FROM configurations WHERE config_id = challenger_config_id)
+                            END AS opponent_name
+                        FROM dojo_matches
+                        WHERE status = 'active'
+                          AND (challenger_config_id = ANY(%s) OR opponent_config_id = ANY(%s))
+                    """, (config_ids, config_ids, config_ids, config_ids))
+
+                    dojo_lock_map = {}
+                    for row in cur.fetchall():
+                        cid = str(row[0])
+                        if cid not in dojo_lock_map:
+                            dojo_lock_map[cid] = []
+                        dojo_lock_map[cid].append({
+                            'match_id': str(row[1]),
+                            'format': row[2],
+                            'ends_at': row[3].isoformat() if row[3] else None,
+                            'opponent_name': row[4],
+                        })
+
+                    for c in config_dicts:
+                        active = dojo_lock_map.get(c['config_id'], [])
+                        c['dojo_locked'] = len(active) > 0
+                        c['dojo_matches_active'] = active
         except Exception:
             pass  # Non-critical enrichment
 
@@ -580,7 +622,7 @@ async def get_elo_history(
     offset: int = Query(default=0, ge=0),
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get ELO rating history for a bot."""
+    """Get Elo rating history for a bot."""
     from core.common.db import get_db_connection
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -617,6 +659,95 @@ async def get_elo_history(
             total = cur.fetchone()[0]
 
     return {"status": "success", "history": history, "total": total}
+
+
+# ─── Dojo Match Endpoints ────────────────────────────────────────────────────
+
+@app.get("/api/v2/dojo/can-enter/{config_id}")
+async def dojo_can_enter(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Check if a bot is eligible to enter a Dojo match."""
+    from core.arena.matches import check_entry_gate
+    return check_entry_gate(config_id, current_user.user_id)
+
+
+@app.post("/api/v2/dojo/challenge")
+async def dojo_challenge(
+    body: Dict[str, Any],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Issue a Dojo challenge. House Bot opponents auto-accept and auto-start."""
+    from core.arena.matches import create_challenge
+
+    challenger_config_id = body.get('config_id')
+    opponent_config_id = body.get('opponent_config_id')
+    match_format = body.get('format', 'rapid')
+
+    if not challenger_config_id or not opponent_config_id:
+        raise HTTPException(status_code=400, detail="config_id and opponent_config_id required")
+
+    result = create_challenge(
+        challenger_config_id=challenger_config_id,
+        opponent_config_id=opponent_config_id,
+        match_format=match_format,
+        user_id=current_user.user_id,
+    )
+
+    if 'error' in result:
+        raise HTTPException(status_code=400, detail=result['error'])
+
+    return result
+
+
+@app.post("/api/v2/dojo/match/{match_id}/forfeit")
+async def dojo_forfeit(
+    match_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Forfeit an active Dojo match."""
+    from core.arena.matches import forfeit_match
+
+    result = forfeit_match(match_id, current_user.user_id)
+
+    if 'error' in result:
+        raise HTTPException(status_code=400, detail=result['error'])
+
+    return result
+
+
+@app.get("/api/v2/dojo/matches/{config_id}")
+async def dojo_match_history(
+    config_id: str,
+    limit: int = Query(default=20, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get completed match history for a bot."""
+    from core.arena.matches import get_match_history
+    matches = get_match_history(config_id, limit=limit, offset=offset)
+    return {"status": "success", "matches": matches}
+
+
+@app.get("/api/v2/dojo/stats/{config_id}")
+async def dojo_bot_stats(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get aggregate Dojo stats for a bot (wins, losses, draws)."""
+    from core.arena.matches import get_bot_dojo_stats
+    return get_bot_dojo_stats(config_id)
+
+
+@app.get("/api/v2/dojo/active/{config_id}")
+async def dojo_active_matches(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get active/pending matches for a bot."""
+    from core.arena.matches import get_active_matches
+    return {"status": "success", "matches": get_active_matches(config_id)}
 
 
 @app.get("/api/v2/config/{config_id}")
@@ -748,8 +879,12 @@ async def update_config(
     trading_mode = update_data.pop("trading_mode", None)
     profile_image_url = update_data.pop("profile_image_url", None)
 
-    # Check arena lock — block strategy edits for registered bots
+    # Check Dojo lock — block strategy edits for bots in active matches
     strategy_fields_in_update = {k for k in update_data if k in {'selected_pair', 'extraction', 'decision', 'trading', 'llm_config'}}
+    if strategy_fields_in_update:
+        _check_dojo_lock(config_id)
+
+    # Check arena lock — block strategy edits for registered bots
     if strategy_fields_in_update:
         from core.arena.seasons import get_season_phase
         from core.common.db import get_db_connection as _get_db
@@ -865,7 +1000,7 @@ async def delete_config(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """Delete a configuration. Scheduler reconcile loop auto-removes orphaned jobs."""
-    # Delete config from database — scheduler detects and removes job within 10s
+    _check_dojo_lock(config_id)
     success = await config_service.delete_config(config_id, current_user.user_id)
 
     if not success:
@@ -887,6 +1022,7 @@ async def run_orchestration(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> OrchestrationResult:
     """Run autonomous trading cycle or signal validation for a configuration."""
+    _check_dojo_lock(config_id)
     try:
         result = await orchestrator.run_autonomous_cycle(
             config_id,
@@ -2022,6 +2158,8 @@ async def close_hyperliquid_position(
                 if str(user_id) != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Unauthorized")
 
+        _check_dojo_lock(str(config_id))
+
         from trading.live.hyperliquid_service import HyperliquidLiveTradingService
         hl_service = HyperliquidLiveTradingService()
         close_result = await hl_service.close_position(batch_id, current_user.user_id)
@@ -2040,6 +2178,17 @@ async def close_hyperliquid_position(
                 symbol=trade_symbol,
                 close_reason='manual',
                 user_id=current_user.user_id,
+            ))
+        except Exception:
+            pass
+
+        # Mirror close to Dojo match accounts (fire-and-forget)
+        try:
+            from core.arena.dojo_mirror import mirror_close_to_dojo
+            asyncio.create_task(mirror_close_to_dojo(
+                config_id=str(config_id),
+                symbol=trade_symbol,
+                close_reason='manual',
             ))
         except Exception:
             pass
@@ -2826,8 +2975,8 @@ async def stop_bot(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """Stop a bot by setting state to inactive. Scheduler detects within 10s."""
+    _check_dojo_lock(config_id)
     try:
-        # Get bot configuration
         config = await config_service.get_config(config_id, current_user.user_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
@@ -2981,8 +3130,8 @@ async def reset_account(
     but preserves trade history for analysis. Sets last_reset_at timestamp
     to distinguish current run metrics from historical data.
     """
+    _check_dojo_lock(config_id)
     try:
-        # Verify user owns this configuration
         config = await config_service.get_config(config_id, current_user.user_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")

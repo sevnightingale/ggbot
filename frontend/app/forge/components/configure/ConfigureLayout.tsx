@@ -12,6 +12,7 @@ import { MarketDataSelector } from './MarketDataSelector'
 import { StrategyEditor } from './StrategyEditor'
 import { TradeSettings } from './TradeSettings'
 import { EmptyState } from '../shared/EmptyState'
+import { DojoLockBanner } from '../dojo/DojoLockBanner'
 import { Settings } from 'lucide-react'
 
 // DataSource will be passed from parent page.tsx
@@ -188,6 +189,11 @@ export function ConfigureLayout({
           message={globalMessage}
         />
       </div>
+
+      {/* Dojo Lock Banner */}
+      {selectedBot.dojo_locked && (
+        <DojoLockBanner bot={selectedBot} />
+      )}
 
       {/* Strategy Advisor Panel - Always visible for all bot types */}
       <StrategyAdvisorPanel

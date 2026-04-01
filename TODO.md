@@ -6,37 +6,29 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 ## 🥋 **The Dojo** (ACTIVE — Primary Focus)
 
-**Status**: 🟡 PLANNING COMPLETE — Implementation ready
+**Status**: 🟡 IN PROGRESS — Phases 1-3 complete, Phase 4 next
 **Planning Doc**: [DOCS/todo/DOJO.md](DOCS/todo/DOJO.md)
 
-Chess.com-inspired competitive environment. ELO on bots directly (no archetype entity). Dojo = third tab in Forge (paper bots only) + public leaderboard at `/dojo`. Copy-trade model: matches mirror bot decisions to isolated $10k accounts (zero LLM cost). House Bots: decision oracle mode (opportunity-only, no positions, signal dispatch to match accounts with TP/SL-only exits — zero marginal cost per match). Full lock during match (forfeit to unlock). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
+Chess.com-inspired competitive environment. Elo on bots directly (no archetype entity). Dojo = third tab in Forge (paper bots only) + public leaderboard at `/dojo`. Copy-trade model: matches mirror bot decisions to isolated $10k accounts (zero LLM cost). House Bots: decision oracle mode (opportunity-only, no positions, signal dispatch to match accounts with TP/SL-only exits — zero marginal cost per match). Full lock during match (forfeit to unlock). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
 
-### **Phase 1: Dojo Foundation** (Start Here)
-- [ ] Add `dojo_visible`, `elo_rating`, `is_house_bot` columns to configurations
-- [ ] `GET /api/v2/public/dojo/bots` — all active visible paper bots + performance + ELO
-- [ ] `GET /api/v2/public/dojo/stats` — aggregate stats
-- [ ] `PUT /api/v2/config/{id}/visibility` — toggle dojo visibility
-- [ ] `EloTierBadge` shared component + add to BotRail bot cards
-- [ ] Add `'dojo'` tab to Forge TabNavigation (paper bots only — shell: ELO, tier, placeholder match UI)
+### ~~Phase 1: Dojo Foundation~~ ✅ (2026-04-01)
 
-### **Phase 2: ELO Engine**
-- [ ] `elo_history` table
-- [ ] `core/arena/elo.py` — Sortino-based composite score + ELO update functions
-- [ ] Weekly rolling ELO scheduler job (Sundays midnight UTC)
-- [ ] Real ELO values replace placeholder on leaderboard + bot rail
+DB columns (`dojo_visible`, `elo_rating`, `is_house_bot`), public endpoints, `EloTierBadge` component, Dojo tab in Forge, visibility toggle. Forward guards on `config_service` and `dashboard_data` for `config_type != 'dojo_match'`.
 
-### **Phase 3: House Bots**
-- [ ] Clone The Arbiter → new House Bot config (Standard, `awareness_level: 'low'`, BTC/USDT, TP/SL exits)
-- [ ] Clone The Arbiter → Rapid + Blitz variants (adjusted timeframe + strategy, BTC/USDT)
-- [ ] Add `awareness_level` config field to decision engine (`low`=signal mode, `medium`=default, `high`=future bot memory)
-- [ ] Mark `is_house_bot = true`, featured on public `/dojo` + Forge challenge UI
+### ~~Phase 2: Elo Engine~~ ✅ (2026-04-01)
+
+`elo_history` table, `core/arena/elo.py` (Sortino, composite score, Elo update, weekly rolling), Elo history API + frontend section.
+
+### ~~Phase 3: House Bots~~ ✅ (2026-04-01)
+
+3 Arbiter variants created (Standard/Rapid/Blitz), `awareness_level` routing in decision engine, `is_house_bot` on BotConfigV2 model, House Bot public endpoint + DojoTab display.
 
 ### **Phase 4: 1v1 Matches**
 - [ ] `dojo_matches` table (config snapshots + instance refs)
 - [ ] `core/arena/dojo_mirror.py` — copy-trade mirror + House Bot signal dispatch (same hook as DGClaw in orchestrator)
 - [ ] Close mirror in all close paths (alongside `arena_sync`)
 - [ ] House Bot match account state machine (IDLE → entry → IN_POSITION → TP/SL → IDLE)
-- [ ] `core/arena/matches.py` — lifecycle (challenge → start → complete → ELO → archive)
+- [ ] `core/arena/matches.py` — lifecycle (challenge → start → complete → Elo → archive)
 - [ ] Lock guards on 7 endpoints (edit, stop, close, trigger, reset, delete + HL close)
 - [ ] `GET /dojo/can-enter/{config_id}` — entry gate (active? no positions? not locked?)
 - [ ] Match lifecycle scheduler job (start, complete, expire pending, forfeit)

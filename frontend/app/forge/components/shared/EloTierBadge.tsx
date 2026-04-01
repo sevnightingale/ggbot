@@ -38,7 +38,7 @@ export function EloTierBadge({ elo, size = 'sm', showLabel = false, className = 
   return (
     <span
       className={`inline-flex items-center rounded-md border border-[var(--border)] ${tier.bgClass} ${sizeClasses[size]} ${className}`}
-      title={`${tier.name} — ELO ${elo}`}
+      title={`${tier.name} — Elo ${elo}`}
     >
       <span className={tier.textClass}>{tier.icon}</span>
       <span className={`font-mono ${tier.textClass}`}>{elo.toLocaleString()}</span>

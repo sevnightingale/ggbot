@@ -29,9 +29,10 @@ interface PositionsTableProps {
   className?: string
   selectedConfigId?: string
   onPositionClosed?: () => void
+  dojoLocked?: boolean
 }
 
-export function PositionsTable({ positions = [], className = '', selectedConfigId, onPositionClosed }: PositionsTableProps) {
+export function PositionsTable({ positions = [], className = '', selectedConfigId, onPositionClosed, dojoLocked = false }: PositionsTableProps) {
   // Track price changes for slide animations
   const [animatingPrices, setAnimatingPrices] = useState<Record<string, boolean>>({})
   const [displayPrices, setDisplayPrices] = useState<Record<string, { current: string; pnl: string; percentage: string }>>({})
@@ -360,9 +361,9 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                   <td className="py-3 px-2 text-right">
                     <button
                       onClick={() => handleClosePosition(positionId, positionSource)}
-                      disabled={closingPositions[positionId]}
+                      disabled={closingPositions[positionId] || dojoLocked}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--loss-color)] hover:bg-red-500/10 border border-[var(--loss-color)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Close position"
+                      title={dojoLocked ? 'Locked for Dojo match' : 'Close position'}
                     >
                       <X className="h-3 w-3" />
                       {closingPositions[positionId] ? 'Closing...' : 'Close'}

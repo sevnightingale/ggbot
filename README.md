@@ -58,6 +58,7 @@ Agent (Claude SDK) → MCP Tools → Market Data / Trading / Observations
 - **Paper Trading Engine** - Professional-grade simulation with real market data
 - **Hyperliquid Live Trading** - Non-custodial DEX execution via API wallets (228 perp markets, up to 50x leverage)
 - **Virtuals DGClaw Arena** - Competitive trading arena on Virtuals Protocol, trades mirrored via ACP (Agent Commerce Protocol)
+- **The Dojo** - Chess-inspired competitive environment: Elo ratings, 1v1 matches (Blitz/Rapid/Standard), House Bots as benchmarks
 - **Dynamic Position Sizing** - Real-time account balance queries with config-based calculations
 - **Agent Override Support** - Autonomous agents can control position size and leverage independently
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
@@ -73,7 +74,7 @@ The ggbot repository is organized into the following top-level directories:
 | Directory | Purpose | Status | Key Files |
 |-----------|---------|--------|-----------|
 | **agent/** | Autonomous trading agent foundation (MCP server, tools, chat) | ✅ Active | README.md, run_agent.py, mcp_server.py, service_client.py |
-| **api/** | API endpoints for agent operations | ✅ Active | agent.py, paper_trading.py, symbols.py |
+| **api/** | API endpoints for agent operations and public APIs | ✅ Active | agent.py, paper_trading.py, public.py, symbols.py |
 | **core/** | Core business logic (auth, config, domain, services) | ✅ Active | 16 subdirectories |
 | **decision/** | AI decision engine with V2 template system | ✅ Active | README.md, prompts/, engine_v2.py |
 | **extraction/** | Market data extraction with 21 preprocessors | ✅ Active | v2/ with README.md |

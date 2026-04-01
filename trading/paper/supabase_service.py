@@ -689,6 +689,18 @@ class SupabasePaperTradingService:
             except Exception:
                 pass
 
+            # Mirror close to Dojo match accounts (fire-and-forget)
+            try:
+                import asyncio
+                from core.arena.dojo_mirror import mirror_close_to_dojo
+                asyncio.create_task(mirror_close_to_dojo(
+                    config_id=str(trade['config_id']),
+                    symbol=trade['symbol'],
+                    close_reason=reason,
+                ))
+            except Exception:
+                pass
+
             # Publish exit notification to Telegram (skip for account_reset)
             if reason != 'account_reset':
                 try:

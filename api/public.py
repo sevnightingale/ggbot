@@ -736,7 +736,7 @@ async def get_season_leaderboard(season_id: int) -> Dict[str, Any]:
 
 @router.get("/dojo/bots")
 async def get_dojo_bots_endpoint() -> Dict[str, Any]:
-    """Public leaderboard: all active, visible paper bots with ELO and performance."""
+    """Public leaderboard: all active, visible paper bots with Elo and performance."""
     from core.arena.dojo_public import get_dojo_bots
     bots = get_dojo_bots()
     return {"status": "success", "bots": bots, "count": len(bots)}
@@ -744,7 +744,7 @@ async def get_dojo_bots_endpoint() -> Dict[str, Any]:
 
 @router.get("/dojo/stats")
 async def get_dojo_stats_endpoint() -> Dict[str, Any]:
-    """Aggregate Dojo statistics: total bots, average ELO, active matches."""
+    """Aggregate Dojo statistics: total bots, average Elo, active matches."""
     from core.arena.dojo_public import get_dojo_stats
     stats = get_dojo_stats()
     return {"status": "success", **stats}
@@ -756,3 +756,13 @@ async def get_house_bots_endpoint() -> Dict[str, Any]:
     from core.arena.dojo_public import get_house_bots
     bots = get_house_bots()
     return {"status": "success", "bots": bots, "count": len(bots)}
+
+
+@router.get("/dojo/match/{match_id}")
+async def get_dojo_match_detail(match_id: str) -> Dict[str, Any]:
+    """Public match detail — shareable match result."""
+    from core.arena.matches import get_match_detail
+    detail = get_match_detail(match_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return {"status": "success", "match": detail}

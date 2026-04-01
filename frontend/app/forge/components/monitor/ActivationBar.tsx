@@ -68,6 +68,7 @@ export function ActivationBar({
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
+  const dojoLocked = selectedBot.dojo_locked ?? false
   const { canAccess, userProfile } = usePermissions()
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [addCreditsOpen, setAddCreditsOpen] = useState(false)
@@ -305,13 +306,13 @@ export function ActivationBar({
 
               <button
                 onClick={handleManualTrigger}
-                disabled={isManualTriggering || isStarting || isStopping || !canRunOnce}
+                disabled={isManualTriggering || isStarting || isStopping || !canRunOnce || dojoLocked}
                 className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed ${
-                  !canRunOnce
+                  !canRunOnce || dojoLocked
                     ? 'opacity-50'
                     : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
                 }`}
-                title={!canRunOnce ? 'No free test runs remaining. Subscribe to run your bot.' : undefined}
+                title={dojoLocked ? 'Locked for Dojo match' : !canRunOnce ? 'No free test runs remaining. Subscribe to run your bot.' : undefined}
               >
                 {!canAccess('bot_activation') && freeRunsRemaining === 0 ? (
                   <Crown className="h-4 w-4" />
@@ -330,7 +331,8 @@ export function ActivationBar({
 
               <button
                 onClick={isActive ? onStop : handleActivate}
-                disabled={isStarting || isStopping}
+                disabled={isStarting || isStopping || (isActive && dojoLocked)}
+                title={isActive && dojoLocked ? 'Locked for Dojo match — forfeit to unlock' : undefined}
                 className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
                   isActive
                     ? 'bg-rose-600/90 hover:bg-rose-700 ring-rose-500 text-white'

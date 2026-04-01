@@ -429,7 +429,7 @@ function BotRow({
           )}
         </div>
 
-        {/* Metadata badges: model, pair, performance, ELO */}
+        {/* Metadata badges: model, pair, performance, Elo */}
         <div className="flex flex-wrap gap-1 mb-2">
           {logoPath && (
             <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">

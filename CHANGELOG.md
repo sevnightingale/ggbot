@@ -6,6 +6,35 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-01 - The Dojo: Phases 1-3 (Foundation, Elo Engine, House Bots)
+
+**Phase 1: Foundation** (`core/arena/dojo_public.py`, `core/sse/dashboard_data.py`, `ggbot.py`, frontend):
+- DB migration: `dojo_visible`, `elo_rating`, `is_house_bot` columns on `configurations`
+- Forward guards: `config_type != 'dojo_match'` filter added to `config_service.list_configs()` and `dashboard_data.py` CTE
+- Public endpoints: `GET /api/v2/public/dojo/bots`, `GET /api/v2/public/dojo/stats`
+- Visibility toggle: `PUT /api/v2/config/{id}/dojo-visibility`
+- Frontend: `EloTierBadge` shared component (6 tiers: Novice→Grandmaster), Elo badges on BotRail, `'dojo'` tab in TabNavigation + MobileNav (paper bots only), `DojoTab` shell with visibility toggle
+
+**Phase 2: Elo Engine** (`core/arena/elo.py`, `ggbot.py`):
+- `elo_history` table + index. Stores all rating changes with reason, match reference, details JSONB
+- `calculate_sortino_ratio()` — downside-only volatility, handles all edge cases (empty, all-positive, single trade)
+- `calculate_composite_score()` — PnL + Sortino + max drawdown + win rate, format-specific weights (Blitz: PnL 60%, Standard: balanced 40/25/20/15), sigmoid normalization to 0-1
+- `update_elo()` — standard formula, K-factor scaling (K=32 new, K=24 mid, K=16 established+high)
+- `weekly_rolling_update()` — Swiss-system: trailing 7d scores, pair adjacent by rank, update Elo
+- `GET /api/v2/dojo/elo-history/{config_id}` — paginated, auth-required
+- Frontend: `DojoTab` rating history section with change indicators
+
+**Phase 3: House Bots** (`decision/engine_v2.py`, `core/services/config_service.py`):
+- `awareness_level` routing in `_handle_autonomous_trading()` — `low` = Signal Mode (opportunity analysis only, no position management). Used by House Bots. `medium` = default behavior (unchanged)
+- `is_house_bot` added to `BotConfigV2` model, `get_config()`, `list_configs()` queries + dict construction
+- 3 House Bot configs created: The Arbiter (Standard/4h), The Arbiter: Rapid (1h), The Arbiter: Blitz (15m). All BTC/USDT, `awareness_level: 'low'`, Elo 1500, inactive until tuned
+- `GET /api/v2/public/dojo/house-bots` endpoint
+- Frontend: DojoTab House Bots section with format labels, Elo badges, disabled Challenge buttons
+
+**Planning Doc**: [DOCS/todo/DOJO.md](DOCS/todo/DOJO.md) — full design (790 lines). Phase 4 (1v1 Matches) pending.
+
+---
+
 ## 2026-04-01 - ACP Agent Intelligence + Error Alerting + Frontend Fixes
 
 **ACP Agent Adapter Fix** (`market_intelligence/gateway.py`, `adapters/acp/`):

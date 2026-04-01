@@ -27,6 +27,7 @@ export function BotManagementMenu({
   hasUnsavedChanges = false,
   isLiveBot = false
 }: BotManagementMenuProps) {
+  const dojoLocked = bot.dojo_locked ?? false
   const [isOpen, setIsOpen] = useState(false)
   const [isRenamingLocal, setIsRenamingLocal] = useState(false)
   const [newName, setNewName] = useState(bot.config_name)
@@ -307,7 +308,8 @@ export function BotManagementMenu({
             {onResetAccount && (
               <button
                 onClick={handleResetClick}
-                disabled={isBotAction}
+                disabled={isBotAction || dojoLocked}
+                title={dojoLocked ? 'Locked for Dojo match' : undefined}
                 className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -319,7 +321,8 @@ export function BotManagementMenu({
                 <hr className="my-1 border-[var(--border)]" />
                 <button
                   onClick={handleDeleteClick}
-                  disabled={isBotAction}
+                  disabled={isBotAction || dojoLocked}
+                  title={dojoLocked ? 'Locked for Dojo match' : undefined}
                   className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

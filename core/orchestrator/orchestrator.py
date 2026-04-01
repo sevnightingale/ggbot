@@ -262,6 +262,20 @@ class GGBotOrchestrator:
             elif self._is_arena_enabled(config):
                 await self._enqueue_arena_trade(config, decision_result, run_id)
 
+            # Dojo mirror: copy-trade to match accounts / House Bot signal dispatch
+            try:
+                from core.arena.dojo_mirror import mirror_trade_to_dojo, dispatch_house_bot_signal
+                if config.is_house_bot:
+                    asyncio.create_task(dispatch_house_bot_signal(
+                        config.config_id, decision_result
+                    ))
+                else:
+                    asyncio.create_task(mirror_trade_to_dojo(
+                        config.config_id, decision_result, trading_result
+                    ))
+            except Exception:
+                pass
+
             if await self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
                     config, {}, decision_result
@@ -363,6 +377,20 @@ class GGBotOrchestrator:
                 )
             elif self._is_arena_enabled(config):
                 await self._enqueue_arena_trade(config, decision_result, run_id)
+
+            # Dojo mirror: copy-trade to match accounts / House Bot signal dispatch
+            try:
+                from core.arena.dojo_mirror import mirror_trade_to_dojo, dispatch_house_bot_signal
+                if config.is_house_bot:
+                    asyncio.create_task(dispatch_house_bot_signal(
+                        config.config_id, decision_result
+                    ))
+                else:
+                    asyncio.create_task(mirror_trade_to_dojo(
+                        config.config_id, decision_result, trading_result
+                    ))
+            except Exception:
+                pass
 
             if await self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
