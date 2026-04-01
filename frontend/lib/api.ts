@@ -108,6 +108,10 @@ export interface BotConfiguration {
   first_run_used?: boolean  // Tracks if free first run has been used
   free_runs_remaining?: number  // Number of free manual "Run Once" clicks remaining (default 3)
   pause_reason?: string | null  // Reason bot was paused by system (e.g., 'prepaid_credits_exhausted')
+  elo_rating?: number
+  dojo_visible?: boolean
+  is_house_bot?: boolean
+  dojo_locked?: boolean  // Derived from active dojo matches (Phase 4)
   created_at: string
   updated_at: string
 }
@@ -282,6 +286,63 @@ export class ApiClient {
 
     const result = await response.json()
     return result.config
+  }
+
+  async getEloHistory(configId: string, limit: number = 20, offset: number = 0): Promise<{
+    history: Array<{
+      id: string
+      elo_before: number
+      elo_after: number
+      change: number
+      reason: string
+      match_id: string | null
+      details: Record<string, unknown> | null
+      created_at: string
+    }>
+    total: number
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/dojo/elo-history/${configId}?limit=${limit}&offset=${offset}`
+    )
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to fetch ELO history: ${error}`)
+    }
+    return response.json()
+  }
+
+  async getHouseBots(): Promise<{
+    bots: Array<{
+      config_id: string
+      config_name: string
+      elo_rating: number
+      state: string
+      selected_pair: string
+      frequency: string
+      format: 'blitz' | 'rapid' | 'standard'
+      profile_image_url: string | null
+      match_record: { wins: number; losses: number; draws: number }
+    }>
+  }> {
+    const response = await fetch(`${this.baseUrl}/api/v2/public/dojo/house-bots`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch house bots')
+    }
+    return response.json()
+  }
+
+  async toggleDojoVisibility(configId: string, visible: boolean): Promise<{ dojo_visible: boolean }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/config/${configId}/dojo-visibility`, {
+      method: 'PUT',
+      body: JSON.stringify({ dojo_visible: visible })
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to toggle visibility: ${error}`)
+    }
+
+    return response.json()
   }
 
   async getConfig(configId: string): Promise<BotConfiguration> {

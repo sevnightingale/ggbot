@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Bot, X, BarChart3, Settings } from 'lucide-react'
+import { Bot, X, BarChart3, Settings, Swords } from 'lucide-react'
 import { BotRail } from './BotRail'
 import { BotConfiguration } from '@/lib/api'
 
@@ -23,8 +23,9 @@ interface MobileNavProps {
   onResetAccount?: (configId: string) => void
   isBotAction: boolean
   // Tab navigation props
-  activeTab?: 'monitor' | 'configure'
-  onTabChange?: (tab: 'monitor' | 'configure') => void
+  activeTab?: 'monitor' | 'configure' | 'dojo'
+  onTabChange?: (tab: 'monitor' | 'configure' | 'dojo') => void
+  showDojoTab?: boolean
 }
 
 export function MobileNav({
@@ -44,7 +45,8 @@ export function MobileNav({
   onResetAccount,
   isBotAction,
   activeTab = 'monitor',
-  onTabChange
+  onTabChange,
+  showDojoTab = false
 }: MobileNavProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
@@ -82,6 +84,19 @@ export function MobileNav({
             <Settings className="h-5 w-5" />
             <span>Configure</span>
           </button>
+          {showDojoTab && (
+            <button
+              onClick={() => onTabChange?.('dojo')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 text-xs transition-colors ${
+                activeTab === 'dojo'
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-primary)] hover:text-[var(--accent)]'
+              }`}
+            >
+              <Swords className="h-5 w-5" />
+              <span>Dojo</span>
+            </button>
+          )}
         </div>
       </nav>
 

@@ -113,6 +113,16 @@ class ErrorAlertService:
         # Track recently seen errors to avoid duplicates
         self.recent_errors = deque(maxlen=100)
 
+        # Transient error threshold: only alert if 3+ occurrences within 5 minutes
+        # These are infrastructure blips (PgBouncer resets, network hiccups) that self-heal
+        self.transient_patterns = [
+            'SSL connection has been closed unexpectedly',
+            'Connection error.',
+        ]
+        self.transient_window = 300  # 5 minutes
+        self.transient_threshold = 3  # occurrences before alerting
+        self.transient_hits = {}  # pattern → list of timestamps
+
         self.logger = logger.bind(service='error_alerts')
 
     async def start(self):
@@ -209,11 +219,28 @@ class ErrorAlertService:
 
             self.logger.debug(f"Processing {level} from {location[:30]}")
 
+            # Check if this is a transient error — only alert after threshold
+            current_time = time.time()
+            for pattern in self.transient_patterns:
+                if pattern in message:
+                    hits = self.transient_hits.setdefault(pattern, [])
+                    # Prune old hits outside the window
+                    hits[:] = [t for t in hits if current_time - t < self.transient_window]
+                    hits.append(current_time)
+                    if len(hits) < self.transient_threshold:
+                        self.logger.debug(
+                            f"Transient error ({len(hits)}/{self.transient_threshold}): {pattern[:40]}"
+                        )
+                        return
+                    # Threshold reached — alert with count context, then reset
+                    message = f"[{len(hits)}x in {self.transient_window//60}min] {message}"
+                    hits.clear()
+                    break
+
             # Extract error pattern for rate limiting (first 50 chars of message)
             error_pattern = message[:50]
 
             # Check rate limiting
-            current_time = time.time()
             last_time = self.last_alert_time.get(error_pattern, 0)
             time_since_last = current_time - last_time
 

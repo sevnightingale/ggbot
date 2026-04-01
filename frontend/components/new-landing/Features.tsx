@@ -73,10 +73,10 @@ export default function Features() {
             Ready to see these features in action?
           </p>
           <a
-            href="https://app.ggbots.ai/arena"
+            href="https://app.ggbots.ai/forge"
             className="inline-flex items-center gap-2 border-2 border-brass text-brass hover:bg-brass hover:text-obsidian px-8 py-4 rounded-sm font-medium transition-colors"
           >
-            Watch live bots compete in ggArena
+            Build your bot in Forge
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>

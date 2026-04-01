@@ -40,6 +40,7 @@ class BotConfigV2:
         free_runs_remaining: int = 3,
         rei_enabled: bool = False,
         arena_enabled: bool = False,
+        is_house_bot: bool = False,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -64,6 +65,7 @@ class BotConfigV2:
         self.free_runs_remaining = free_runs_remaining
         self.rei_enabled = rei_enabled
         self.arena_enabled = arena_enabled
+        self.is_house_bot = is_house_bot
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -81,6 +83,7 @@ class BotConfigV2:
             "is_public_performance": self.is_public_performance,
             "first_run_used": self.first_run_used,
             "free_runs_remaining": self.free_runs_remaining,
+            "is_house_bot": self.is_house_bot,
             "config_data": {
                 "schema_version": self.schema_version,
                 "selected_pair": self.selected_pair,
@@ -139,6 +142,7 @@ class BotConfigV2:
             free_runs_remaining=data.get("free_runs_remaining", 3),
             rei_enabled=data.get("rei_enabled", False),
             arena_enabled=data.get("arena_enabled", False),
+            is_house_bot=data.get("is_house_bot", False),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -301,7 +305,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used, free_runs_remaining, arena_enabled
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used, free_runs_remaining, arena_enabled, is_house_bot
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -320,6 +324,7 @@ class ConfigService:
                     first_run_used = result[9] if result[9] is not None else False
                     free_runs_remaining = result[10] if result[10] is not None else 3
                     arena_enabled = result[11] if result[11] is not None else False
+                    is_house_bot = result[12] if result[12] is not None else False
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -346,6 +351,7 @@ class ConfigService:
                             "first_run_used": first_run_used,
                             "free_runs_remaining": free_runs_remaining,
                             "arena_enabled": arena_enabled,
+                            "is_house_bot": is_house_bot,
                             "created_at": result[2].isoformat() if result[2] else None,
                             "updated_at": result[3].isoformat() if result[3] else None
                         }
@@ -366,6 +372,7 @@ class ConfigService:
                         flattened_config["first_run_used"] = first_run_used
                         flattened_config["free_runs_remaining"] = free_runs_remaining
                         flattened_config["arena_enabled"] = arena_enabled
+                        flattened_config["is_house_bot"] = is_house_bot
                         if "created_at" not in flattened_config and result[2]:
                             flattened_config["created_at"] = result[2].isoformat()
                         if "updated_at" not in flattened_config and result[3]:
@@ -394,14 +401,15 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
-                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled
+                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled, is_house_bot
                         FROM configurations
                         WHERE user_id = %s
+                          AND (config_type IS NULL OR config_type != 'dojo_match')
                         ORDER BY created_at DESC
                     """, (user_id,))
 
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled, is_house_bot_val = row
 
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -431,6 +439,7 @@ class ConfigService:
                                 "first_run_used": first_run_used if first_run_used is not None else False,
                                 "free_runs_remaining": free_runs_remaining if free_runs_remaining is not None else 3,
                                 "arena_enabled": arena_enabled if arena_enabled is not None else False,
+                                "is_house_bot": is_house_bot_val if is_house_bot_val is not None else False,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -450,6 +459,7 @@ class ConfigService:
                             flattened_config["is_public_performance"] = is_public_performance or False
                             flattened_config["first_run_used"] = first_run_used if first_run_used is not None else False
                             flattened_config["free_runs_remaining"] = free_runs_remaining if free_runs_remaining is not None else 3
+                            flattened_config["is_house_bot"] = is_house_bot_val if is_house_bot_val is not None else False
                             flattened_config["arena_enabled"] = arena_enabled if arena_enabled is not None else False
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()

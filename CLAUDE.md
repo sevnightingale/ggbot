@@ -297,7 +297,8 @@ case 'live_trading':
 
 | Issue Type | Primary Documentation |
 |------------|----------------------|
-| Trading mode behavior (paper/symphony/aster) | `trading/README.md` |
+| Trading mode behavior (paper/hyperliquid) | `trading/README.md` |
+| Virtuals DGClaw arena, ACP, claw API | `trading/virtuals/README.md` |
 | Position sizing, P&L calculations | `trading/README.md` |
 | Data extraction, indicators, preprocessors | `extraction/v2/README.md` |
 | Market intelligence, Grok sources | `market_intelligence/README.md` |

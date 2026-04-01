@@ -9,7 +9,7 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 **Status**: 🟡 PLANNING COMPLETE — Implementation ready
 **Planning Doc**: [DOCS/todo/DOJO.md](DOCS/todo/DOJO.md)
 
-Chess.com-inspired competitive environment. ELO on bots directly (no archetype entity). Dojo = third tab in Forge + public leaderboard at `/dojo`. Matches run isolated temp instances ($10k, frozen config). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
+Chess.com-inspired competitive environment. ELO on bots directly (no archetype entity). Dojo = third tab in Forge (paper bots only) + public leaderboard at `/dojo`. Copy-trade model: matches mirror bot decisions to isolated $10k accounts (zero LLM cost). House Bots: decision oracle mode (opportunity-only, no positions, signal dispatch to match accounts with TP/SL-only exits — zero marginal cost per match). Full lock during match (forfeit to unlock). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
 
 ### **Phase 1: Dojo Foundation** (Start Here)
 - [ ] Add `dojo_visible`, `elo_rating`, `is_house_bot` columns to configurations
@@ -17,8 +17,7 @@ Chess.com-inspired competitive environment. ELO on bots directly (no archetype e
 - [ ] `GET /api/v2/public/dojo/stats` — aggregate stats
 - [ ] `PUT /api/v2/config/{id}/visibility` — toggle dojo visibility
 - [ ] `EloTierBadge` shared component + add to BotRail bot cards
-- [ ] Add `'dojo'` tab to Forge TabNavigation (shell: ELO, tier, placeholder match UI)
-- [ ] Public `/dojo` page (leaderboard, House Bot profiles, S1 results as "Past Seasons")
+- [ ] Add `'dojo'` tab to Forge TabNavigation (paper bots only — shell: ELO, tier, placeholder match UI)
 
 ### **Phase 2: ELO Engine**
 - [ ] `elo_history` table
@@ -27,17 +26,23 @@ Chess.com-inspired competitive environment. ELO on bots directly (no archetype e
 - [ ] Real ELO values replace placeholder on leaderboard + bot rail
 
 ### **Phase 3: House Bots**
-- [ ] Create The Arbiter Standard config (Sev tunes)
-- [ ] Create Rapid + Blitz variants
+- [ ] Clone The Arbiter → new House Bot config (Standard, `awareness_level: 'low'`, BTC/USDT, TP/SL exits)
+- [ ] Clone The Arbiter → Rapid + Blitz variants (adjusted timeframe + strategy, BTC/USDT)
+- [ ] Add `awareness_level` config field to decision engine (`low`=signal mode, `medium`=default, `high`=future bot memory)
 - [ ] Mark `is_house_bot = true`, featured on public `/dojo` + Forge challenge UI
 
 ### **Phase 4: 1v1 Matches**
-- [ ] `dojo_matches` table (with config snapshots + temp instance references)
-- [ ] `core/arena/matches.py` — full lifecycle (challenge → temp instance → complete → ELO update)
-- [ ] Cost estimation endpoint
-- [ ] Match lifecycle scheduler job (start, complete, forfeit)
-- [ ] Forge: EnterMatchPanel, ChallengeModal, ActiveMatchCard, MatchHistoryList
-- [ ] Public: active match spectating on `/dojo`
+- [ ] `dojo_matches` table (config snapshots + instance refs)
+- [ ] `core/arena/dojo_mirror.py` — copy-trade mirror + House Bot signal dispatch (same hook as DGClaw in orchestrator)
+- [ ] Close mirror in all close paths (alongside `arena_sync`)
+- [ ] House Bot match account state machine (IDLE → entry → IN_POSITION → TP/SL → IDLE)
+- [ ] `core/arena/matches.py` — lifecycle (challenge → start → complete → ELO → archive)
+- [ ] Lock guards on 7 endpoints (edit, stop, close, trigger, reset, delete + HL close)
+- [ ] `GET /dojo/can-enter/{config_id}` — entry gate (active? no positions? not locked?)
+- [ ] Match lifecycle scheduler job (start, complete, expire pending, forfeit)
+- [ ] Forge: DojoTab, EnterMatchPanel, ActiveMatchCard, MatchHistoryList, MatchDetail
+- [ ] Forge: House Bot challenge UI (v1: House Bots only, no user-vs-user)
+- [ ] Forge: DojoLockBanner on Configure tab, lock states on ActivationBar/PositionsTable/BotManagementMenu
 
 ---
 
@@ -103,7 +108,7 @@ Phase 1 shipped (prompt-only). LLM now provides SL/TP on entry — verified work
 
 ## 🤖 **ACP Agent Intelligence** ($GG Graduation — Revenue Driver)
 
-**Status**: 🟡 IN PROGRESS — Market Conditions data source shipped, ACP integration next
+**Status**: 🟡 IN PROGRESS — Third-party agents discovered + tested, pending scheduler restart for end-to-end verification
 **Planning Doc**: [DOCS/todo/ACP_AGENT_INTELLIGENCE.md](DOCS/todo/ACP_AGENT_INTELLIGENCE.md)
 **Context**: [NOTE.md](NOTE.md) — Strategic context, $GG graduation, ACP overview
 
@@ -131,19 +136,23 @@ New MI category: "Agent Intelligence" — curated Virtuals ACP agents as data so
 
 ### ~~Workstream 1: ACP Buyer + Provider Code~~ ✅ (2026-03-24)
 - [x] `core/services/acp_client.py` — dual-client wrapper (buyer=ggbots.ai, provider=Sebastian)
-- [x] `market_intelligence/adapters/acp/acp_agent_adapter.py` — cache-first MI adapter
-- [x] Catalog YAML + `catalog_mapping.py` entries (ggbots_acp active, Otto/Wolfpack/BlackSwan commented)
+- [x] `market_intelligence/adapters/acp/acp_agent.py` — cache-first MI adapter (renamed from `acp_agent_adapter.py`)
+- [x] Catalog YAML + `catalog_mapping.py` entries
 - [x] `sebastian_virtuals.py` — PM2 background service (provider + buyer queue + monitor)
 - [x] `ecosystem.config.js` — sebastian-virtuals PM2 entry
-- [x] DB seed: `ggbots_acp` data point under `agentic_intelligence`
 
-### **Remaining: ACP Activation** (~1 day)
+### ~~Workstream 2: Third-Party Agent Discovery~~ ✅ (2026-04-01)
+- [x] Fixed ACPAgentAdapter import bug (`ACP` → `a_c_p_agent` snake_case, added special case)
+- [x] Discovered Otto AI, Wolfpack, BlackSwan via `browse_agents()`
+- [x] Test purchases verified: Otto ($0.01, crypto news + sentiment), BlackSwan ($0.01, risk flares)
+- [x] Wolfpack disabled (requires Base token address, not perp-compatible)
+- [x] DB seeded: 3 new data_points. Consolidated: removed `ggbots_acp` (self-consumption), kept `sebastian` (direct Redis)
+- [x] Added `_format_agentic_intelligence_data()` to `engine_v2.py` (was silently dropping ACP data from prompts)
+
+### **Remaining: ACP Activation**
 - [ ] Create separate EOA wallet for Sebastian provider (fixes `OnlyCounterParty` revert on evaluate)
 - [ ] Whitelist new EOA on Sebastian agent, update `.env` with separate provider key
-- [ ] Start `sebastian-virtuals` PM2 service, verify automated provider + buyer lifecycle
-- [ ] Discover third-party agent wallet addresses (`browse_agents` for Otto, Wolfpack, BlackSwan)
-- [ ] Uncomment third-party entries in `catalog_mapping.py`, run seed SQL
-- [ ] Enable ACP data points on test bots, verify end-to-end via bot cycle
+- [ ] Enable ACP data points on test bot, verify end-to-end via bot cycle (Otto + BlackSwan should work now after scheduler restart)
 - [ ] Submit for graduation review (7 working days)
 
 ---
@@ -157,25 +166,19 @@ AI trading arena on Virtuals Protocol. Every trade = on-chain ACP transaction = 
 
 ### ~~DGClaw Registration~~ ✅ (2026-03-25)
 ### ~~Phase 1: Arena Execution Layer~~ ✅ (2026-03-26)
+### ~~Phase 2: Backend + Pool + Trade Routing~~ ✅ (2026-03-30)
 
-Sev's live HL bot (`b9d9bf00...`) mirrors trades to DGClaw. `dgclaw_service.py` handles ACP lifecycle, orchestrator enqueues to `arena:trade_queue`, `sebastian-virtuals` processes. Balance $35.79 in DGClaw account.
+1-bot-1-agent model. 40 agents total: 28 available (tokenized, pool), 10 assigned (Denis SZN2, ~$15 each), 2 retired. `claw_api.py` for per-agent control, `arena_sync.py` for close mirroring, reconciler in orchestrator.
 
-### **Phase 1: Remaining**
-- [ ] Verify first automated arena trade end-to-end
-- [ ] Arena position monitoring/logging
-- [ ] Keep ACP wallet funded for $0.01/trade fees
+### ~~Arena Close Sync~~ ✅ (2026-04-01)
 
-### **Phase 2: Any User Can Enter** (major feature — VALIDATED)
+Hooks at paper TP/SL, HL fill detection, manual close. Reconciler as safety net. `arena_exit` activity type.
 
-Lite agent pool model — claw REST API control (no EOA needed). Full flow validated 2026-03-26: create → tokenize → fund → register → deposit → trade. See [trading/virtuals/README.md](trading/virtuals/README.md) for full scoping.
-
-- [ ] Agent pool creation script (batch lite API + tokenize + DGClaw join_leaderboard)
-- [ ] `arena_agents` table + assignment logic
-- [ ] Claw API adapter for per-user arena trades (POST /acp/jobs with user's apiKey)
-- [ ] `/virtuals-arena` frontend page (leaderboard, deposit address, bot selector, positions)
-- [ ] Deposit detection (poll claw API `/acp/wallet-balances`, trigger perp_deposit)
-- [ ] Per-user arena trading (orchestrator routes to claw API per assigned agent)
-- [ ] Withdrawal flow (perp_withdraw via claw API → USDC back to user)
+### **Phase 2: Remaining**
+- [ ] Frontend: `degen-arena-modal.tsx` polish + copy refinement (modal shell exists in ActivationBar)
+- [ ] End-to-end user test: join arena → deposit → bot trades → arena mirrors → TP/SL closes mirror
+- [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation in activity logger
+- [ ] Tokenize ggbot-003 (or keep retired)
 
 ---
 

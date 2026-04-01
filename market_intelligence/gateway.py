@@ -330,6 +330,8 @@ class MarketIntelligence:
         name_without_suffix = name_without_suffix.replace('WebSocket', 'Websocket')
         # Special case for CoinGecko to avoid coin_gecko
         name_without_suffix = name_without_suffix.replace('CoinGecko', 'Coingecko')
+        # Special case for ACP to avoid a_c_p_agent
+        name_without_suffix = name_without_suffix.replace('ACP', 'Acp')
         snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', name_without_suffix).lower()
 
         # Determine category from name patterns

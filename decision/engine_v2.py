@@ -394,7 +394,16 @@ class DecisionEngineV2:
         trading_symbol = symbol or self.config.selected_pair
         if not trading_symbol:
             return self._create_error_intent("No trading symbol specified")
-        
+
+        # Signal Mode: awareness_level='low' skips position management entirely.
+        # Used by House Bots in The Dojo — they only output entry signals, never manage positions.
+        awareness_level = (self.config.decision or {}).get('awareness_level', 'medium') if isinstance(self.config.decision, dict) else 'medium'
+        if awareness_level == 'low':
+            self._log_bind().info(
+                f"Signal Mode (awareness_level=low): opportunity analysis only for {trading_symbol}"
+            )
+            return await self._handle_opportunity_analysis(trading_symbol)
+
         # Check for active position to determine routing
         active_position = await self._get_active_position(trading_symbol, self.config_id)
         
@@ -1450,6 +1459,14 @@ Take Profit: {take_profit_text}
             if acct_section:
                 sections.append(acct_section)
 
+        # Format Agentic Intelligence (ACP agent data — Sebastian, Otto, Wolfpack, BlackSwan)
+        if 'agentic_intelligence' in self.market_intelligence:
+            agentic_section = self._format_agentic_intelligence_data(
+                self.market_intelligence['agentic_intelligence']
+            )
+            if agentic_section:
+                sections.append(agentic_section)
+
         return "\n\n".join(sections) if sections else None
 
     def _format_derivatives_data(self, derivatives: Dict[str, Any]) -> str:
@@ -1640,6 +1657,36 @@ Take Profit: {take_profit_text}
             lines.append("")
 
         return "\n".join(lines)
+
+    def _format_agentic_intelligence_data(self, agentic: Dict[str, Any]) -> str:
+        """Format agentic intelligence data (ACP agent deliverables) for LLM prompt."""
+        lines = ["## AGENTIC INTELLIGENCE", ""]
+
+        for agent_name, data in agentic.items():
+            if not data:
+                continue
+
+            # Agent data can be a dict (structured) or string (raw deliverable)
+            if isinstance(data, str):
+                lines.append(f"**{agent_name.replace('_', ' ').title()}**:")
+                lines.append(data)
+                lines.append("")
+            elif isinstance(data, dict):
+                label = data.get('agent_name', agent_name).replace('_', ' ').title()
+                lines.append(f"**{label}**:")
+                # Format known fields, fall back to dumping key-value pairs
+                summary = data.get('summary') or data.get('content') or data.get('deliverable')
+                if summary:
+                    lines.append(str(summary))
+                else:
+                    for key, value in data.items():
+                        if key in ('agent_name', 'fetched_at', 'metadata'):
+                            continue
+                        lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
+                lines.append("")
+
+        # Only return if we have actual content beyond the header
+        return "\n".join(lines) if len(lines) > 2 else ""
 
     async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> tuple[str, Dict[str, Any]]:
         """

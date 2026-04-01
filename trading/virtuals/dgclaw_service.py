@@ -466,12 +466,13 @@ class DGClawArenaService:
         action: str,
         summary: str,
         details: Dict[str, Any],
+        user_id: str = None,
     ):
         """Log arena trade as an activity."""
         try:
             log_activity_safe(
                 config_id=config_id,
-                user_id="system",
+                user_id=user_id,
                 activity_type=action,
                 activity_source="dgclaw_arena",
                 summary=summary,

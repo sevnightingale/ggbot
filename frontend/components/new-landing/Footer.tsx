@@ -51,12 +51,14 @@ export default function Footer() {
                 >
                   Blog
                 </Link>
-                <Link
-                  href="/arena"
+                <a
+                  href="https://degen.virtuals.io/#leaderboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-ivory/50 hover:text-ivory text-sm transition-colors"
                 >
-                  ggArena
-                </Link>
+                  Degen Arena
+                </a>
               </div>
             </div>
 

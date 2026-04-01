@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { BarChart2, Loader2, Circle, Zap, TrendingUp, TrendingDown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
+import { EloTierBadge } from '../shared/EloTierBadge'
 
 interface AccountData {
   config_id: string
@@ -428,7 +429,7 @@ function BotRow({
           )}
         </div>
 
-        {/* Metadata badges: model, pair, performance */}
+        {/* Metadata badges: model, pair, performance, ELO */}
         <div className="flex flex-wrap gap-1 mb-2">
           {logoPath && (
             <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">
@@ -464,6 +465,9 @@ function BotRow({
               }
               {performancePct >= 0 ? '+' : ''}{performancePct.toFixed(1)}%
             </span>
+          )}
+          {bot.trading_mode !== 'hyperliquid' && bot.elo_rating != null && (
+            <EloTierBadge elo={bot.elo_rating} size="sm" />
           )}
         </div>
 

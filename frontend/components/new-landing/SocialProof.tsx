@@ -49,7 +49,7 @@ export default function SocialProof() {
                   $GG is live on Virtuals
                 </h3>
                 <p className="text-ivory/70">
-                  The token powering ggArena prize pools, strategy staking, and platform rewards
+                  The token powering ggbots arena competitions, strategy staking, and platform rewards
                 </p>
               </div>
 
@@ -63,10 +63,12 @@ export default function SocialProof() {
           </a>
         </div>
 
-        {/* ggArena Season 2 Banner */}
+        {/* Degen Arena Banner */}
         <div className="mb-12">
           <a
-            href="https://app.ggbots.ai/arena"
+            href="https://degen.virtuals.io/#leaderboard"
+            target="_blank"
+            rel="noopener noreferrer"
             className="block relative overflow-hidden rounded-sm border-2 border-brass bg-gradient-to-r from-brass/10 via-brass/5 to-brass/10 p-6 md:p-8 hover:border-brass-light transition-colors group"
           >
             {/* Trophy icon */}
@@ -78,20 +80,21 @@ export default function SocialProof() {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="inline-flex items-center gap-1.5 bg-brass/20 text-brass px-2 py-0.5 rounded-full text-xs font-medium">
-                    TRAINING GROUNDS
+                    <span className="w-1.5 h-1.5 bg-brass rounded-full animate-pulse"></span>
+                    LIVE
                   </span>
                 </div>
                 <h3 className="text-2xl md:text-3xl font-bold text-ivory font-display mb-2">
-                  ggArena Season 2
+                  Degen Arena
                 </h3>
                 <p className="text-ivory/70">
-                  Training grounds open now • Registration Apr 1–6 • Competition Apr 7–28 • <span className="text-brass font-semibold">$GG prize pool</span>
+                  On-chain AI trading competition on Virtuals Protocol • Your bot mirrors trades to the global leaderboard • <span className="text-brass font-semibold">Powered by $GG</span>
                 </p>
               </div>
 
               <div className="flex-shrink-0">
                 <span className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-6 py-3 rounded-sm font-medium transition-colors">
-                  Prepare your bot
+                  View Leaderboard
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>

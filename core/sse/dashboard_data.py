@@ -109,9 +109,11 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                c.trading_mode, c.symphony_agent_id, c.profile_image_url,
                c.first_run_used, c.free_runs_remaining,
                c.initial_equity,
+               c.elo_rating, c.dojo_visible, c.is_house_bot,
                c.created_at, c.updated_at
         FROM configurations c
         WHERE c.user_id = %s AND c.state != 'archived'
+          AND (c.config_type IS NULL OR c.config_type != 'dojo_match')
     ),
     open_positions AS (
         -- Paper trading positions
@@ -256,6 +258,9 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                     'telegram_integration', bc.config_data->'telegram_integration',
                     'agent_strategy', bc.config_data->'agent_strategy'
                 ),
+                'elo_rating', COALESCE(bc.elo_rating, 1200),
+                'dojo_visible', COALESCE(bc.dojo_visible, true),
+                'is_house_bot', COALESCE(bc.is_house_bot, false),
                 'created_at', bc.created_at,
                 'updated_at', bc.updated_at
             )

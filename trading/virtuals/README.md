@@ -204,6 +204,24 @@ if config.arena_enabled:
 
 Latency doesn't matter — the bot cycle doesn't wait for it. Arena execution is fire-and-forget from the bot's perspective. The background service (`sebastian_virtuals.py`) handles the ACP job lifecycle async.
 
+### Arena Close Sync (`trading/virtuals/arena_sync.py`)
+
+Positions close through 4 paths — only decision-triggered closes went through the orchestrator's arena hook. TP/SL, manual, and monitor-detected closes bypassed it. Fixed with hybrid hooks + reconciler:
+
+```
+Close Path                  File                                      Arena Response
+──────────                  ──────                                    ──────────────
+Paper TP/SL/manual          supabase_service.py:close_position()      → mirror_close_to_arena()
+Live TP/SL (fill scan)      hyperliquid_adapter._detect_and_log_closes → mirror_close_to_arena()
+Live manual close           ggbot.py:close_hyperliquid_position()     → mirror_close_to_arena()
+Decision "exit"             orchestrator._execute_claw_arena_trade()  → direct close (existing)
+Safety net (per cycle)      orchestrator._reconcile_arena_position()  → closes stale positions
+```
+
+`mirror_close_to_arena(config_id, symbol, close_reason, user_id)` — idempotent. Checks DGClaw position exists before closing. Logs `arena_exit` activity with source `arena_sync`. Multiple callers can fire for same close — DGClaw position check prevents duplicate closes.
+
+Reconciler runs at start of each arena trade in orchestrator. Compares DGClaw positions vs primary (paper_trades + live_trades). Closes any arena position not held by primary. Source: `arena_reconciler`.
+
 ---
 
 ## Scoping: Two Phases
@@ -397,7 +415,7 @@ created_at        timestamptz
 
 ---
 
-## Current Status (2026-03-30)
+## Current Status (2026-04-01)
 
 ### Phase 1: Admin Bot — COMPLETE
 - [x] ggbots.ai registered on DGClaw, balance $73+, automated trades verified
@@ -406,26 +424,21 @@ created_at        timestamptz
 - [x] Arena-enabled via `ARENA_ENABLED_CONFIGS` env var (Sev's live BTC/USDT bot)
 - [x] Multiple BTC trades mirrored successfully
 
-### Phase 2: Any User Can Enter — IN PROGRESS
-- [x] Lite agent pool model validated (claw API control, no EOA needed)
-- [x] 30 ggbot agents created (ggbot-001 through ggbot-030), API keys vaulted
-- [x] 10 Denis agents onboarded (BB RSI Reversion, etc.), assigned to SZN2 configs
-- [x] Tokenization via claw API validated (`POST /acp/me/tokens` — dashboard is broken)
-- [x] ggbot-001 (GGBOT001), ggbot-002 (GGBOT002), ggbot-004 (GGBOT004) tokenized
-- [x] Denis's 10 agents: 6 funded on DGClaw ($15 each), 4 bridging
+### Phase 2: User Agents — BACKEND COMPLETE
+- [x] Lite agent pool: 40 total (28 available, 10 assigned, 2 retired). 39 tokenized
+- [x] Denis's 10 agents funded ~$15 each, actively trading on DGClaw
 - [x] `trading/virtuals/claw_api.py` — async HTTP client for claw REST API
-- [x] `api/virtuals_arena.py` — config-based API endpoints (join, status, check-deposit, withdraw, leaderboard)
+- [x] `api/virtuals_arena.py` — config-based endpoints (join, status, deposit, withdraw, leaderboard)
 - [x] `core/auth/vault_utils.py` — arena credential vault methods (by agent_id, by config_id)
 - [x] Orchestrator Phase 2 — direct claw API trade routing by `assigned_config_id`
 - [x] `scripts/create_arena_pool.py` — admin batch agent creation + auth flow
 - [x] DGClaw auto-registration on first deposit (join_leaderboard + RSA decrypt)
 - [x] `DegenArenaModal` — integrated into ActivationBar in Forge (1-bot-1-agent)
-- [x] `acp_client.py` memo error demoted to WARNING (was triggering false alerts)
-- [x] `dgclaw_service.py` 3s delay before first pay attempt (reduces memo race)
-- [ ] Tokenize remaining ggbot agents (005-030, minus 004) via `POST /acp/me/tokens`
-- [ ] Modal UI/UX polish and copy refinement
-- [ ] Verify Denis's 4 bridging agents land on DGClaw
-- [ ] End-to-end automated trade test (bot cycle → claw API → DGClaw position)
+- [x] Arena close sync: hooks at paper/live/manual close + reconciler safety net
+- [x] `trading/virtuals/arena_sync.py` — idempotent `mirror_close_to_arena()`
+- [ ] Frontend modal UI/UX polish
+- [ ] End-to-end user test (join → deposit → trade → TP/SL closes mirror)
+- [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation
 
 ---
 
@@ -434,6 +447,7 @@ created_at        timestamptz
 | File | Purpose |
 |---|---|
 | `trading/virtuals/README.md` | This file — full context |
+| `trading/virtuals/arena_sync.py` | Close mirroring — `mirror_close_to_arena()` + `_arena_to_pair()` |
 | `trading/virtuals/claw_api.py` | Async HTTP client for claw REST API (Phase 2 user agents) |
 | `trading/virtuals/dgclaw_service.py` | Phase 1 arena service (ACP SDK, admin bot) |
 | `api/virtuals_arena.py` | Phase 2 API endpoints (join, status, deposit, withdraw, leaderboard) |

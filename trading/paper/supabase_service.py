@@ -676,6 +676,19 @@ class SupabasePaperTradingService:
 
             logger.info(f"Paper position closed: {trade_id} - {reason} @ ${close_price:.2f} (P&L: ${net_pnl:.2f})")
 
+            # Mirror close to arena (fire-and-forget)
+            try:
+                import asyncio
+                from trading.virtuals.arena_sync import mirror_close_to_arena
+                asyncio.create_task(mirror_close_to_arena(
+                    config_id=str(trade['config_id']),
+                    symbol=trade['symbol'],
+                    close_reason=reason,
+                    user_id=str(trade['user_id']),
+                ))
+            except Exception:
+                pass
+
             # Publish exit notification to Telegram (skip for account_reset)
             if reason != 'account_reset':
                 try:

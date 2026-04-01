@@ -172,10 +172,15 @@ export function StrategyEditor({
   // Handle model selection
   const handleModelChange = (modelId: string) => {
     setLlmModel(modelId)
+    // Always reset provider to 'openrouter' on model change.
+    // All platform-key models route through OpenRouter. Users with their own
+    // native API keys (deepseek, openai, etc.) set provider via key management,
+    // not model selection.
     onUpdate?.({
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
-        model: modelId
+        model: modelId,
+        provider: 'openrouter'
       }
     })
   }

@@ -729,3 +729,30 @@ async def get_season_leaderboard(season_id: int) -> Dict[str, Any]:
         pass
 
     return result
+
+
+# ─── Dojo Public Endpoints ───────────────────────────────────────────────────
+
+
+@router.get("/dojo/bots")
+async def get_dojo_bots_endpoint() -> Dict[str, Any]:
+    """Public leaderboard: all active, visible paper bots with ELO and performance."""
+    from core.arena.dojo_public import get_dojo_bots
+    bots = get_dojo_bots()
+    return {"status": "success", "bots": bots, "count": len(bots)}
+
+
+@router.get("/dojo/stats")
+async def get_dojo_stats_endpoint() -> Dict[str, Any]:
+    """Aggregate Dojo statistics: total bots, average ELO, active matches."""
+    from core.arena.dojo_public import get_dojo_stats
+    stats = get_dojo_stats()
+    return {"status": "success", **stats}
+
+
+@router.get("/dojo/house-bots")
+async def get_house_bots_endpoint() -> Dict[str, Any]:
+    """House Bots available for Dojo challenges."""
+    from core.arena.dojo_public import get_house_bots
+    bots = get_house_bots()
+    return {"status": "success", "bots": bots, "count": len(bots)}

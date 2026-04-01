@@ -520,11 +520,103 @@ async def list_configs(
         for c in config_dicts:
             c['arena_registration'] = arena_map.get(c['config_id'])
 
+        # Enrich with dojo data (elo_rating, dojo_visible)
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT config_id, elo_rating, dojo_visible
+                        FROM configurations
+                        WHERE config_id = ANY(%s)
+                    """, (config_ids,))
+                    for row in cur.fetchall():
+                        cid = str(row[0])
+                        for c in config_dicts:
+                            if c['config_id'] == cid:
+                                c['elo_rating'] = row[1] or 1200
+                                c['dojo_visible'] = row[2] if row[2] is not None else True
+        except Exception:
+            pass  # Non-critical enrichment
+
     return {
         "status": "success",
         "configs": config_dicts,
         "count": len(config_dicts)
     }
+
+
+@app.put("/api/v2/config/{config_id}/dojo-visibility")
+async def toggle_dojo_visibility(
+    config_id: str,
+    body: Dict[str, Any],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Toggle dojo_visible flag for a bot configuration."""
+    visible = body.get("dojo_visible")
+    if visible is None:
+        raise HTTPException(status_code=400, detail="dojo_visible is required")
+
+    from core.common.db import get_db_connection
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE configurations
+                SET dojo_visible = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE config_id = %s AND user_id = %s
+                RETURNING config_id
+            """, (bool(visible), config_id, str(current_user.user_id)))
+            result = cur.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail="Configuration not found")
+            conn.commit()
+
+    return {"status": "success", "dojo_visible": bool(visible)}
+
+
+@app.get("/api/v2/dojo/elo-history/{config_id}")
+async def get_elo_history(
+    config_id: str,
+    limit: int = Query(default=20, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get ELO rating history for a bot."""
+    from core.common.db import get_db_connection
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Verify ownership
+            cur.execute(
+                "SELECT config_id FROM configurations WHERE config_id = %s AND user_id = %s",
+                (config_id, str(current_user.user_id))
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Configuration not found")
+
+            cur.execute("""
+                SELECT id, elo_before, elo_after, change, reason, match_id, details, created_at
+                FROM elo_history
+                WHERE config_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """, (config_id, limit, offset))
+
+            history = []
+            for row in cur.fetchall():
+                history.append({
+                    "id": str(row[0]),
+                    "elo_before": row[1],
+                    "elo_after": row[2],
+                    "change": row[3],
+                    "reason": row[4],
+                    "match_id": str(row[5]) if row[5] else None,
+                    "details": row[6],
+                    "created_at": row[7].isoformat() if row[7] else None,
+                })
+
+            cur.execute("SELECT COUNT(*) FROM elo_history WHERE config_id = %s", (config_id,))
+            total = cur.fetchone()[0]
+
+    return {"status": "success", "history": history, "total": total}
 
 
 @app.get("/api/v2/config/{config_id}")
@@ -1916,7 +2008,7 @@ async def close_hyperliquid_position(
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT lt.config_id, c.user_id
+                    SELECT lt.config_id, c.user_id, lt.symbol
                     FROM live_trades lt
                     JOIN configurations c ON lt.config_id = c.config_id
                     WHERE lt.batch_id = %s AND lt.provider = 'hyperliquid' AND lt.closed_at IS NULL
@@ -1926,7 +2018,7 @@ async def close_hyperliquid_position(
                 if not result:
                     raise HTTPException(status_code=404, detail="Position not found or already closed")
 
-                config_id, user_id = result
+                config_id, user_id, trade_symbol = result
                 if str(user_id) != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -1939,6 +2031,18 @@ async def close_hyperliquid_position(
                 status_code=500,
                 detail=close_result.get("reason", "Failed to close position")
             )
+
+        # Mirror close to arena (fire-and-forget)
+        try:
+            from trading.virtuals.arena_sync import mirror_close_to_arena
+            asyncio.create_task(mirror_close_to_arena(
+                config_id=str(config_id),
+                symbol=trade_symbol,
+                close_reason='manual',
+                user_id=current_user.user_id,
+            ))
+        except Exception:
+            pass
 
         return close_result
 
@@ -2633,6 +2737,16 @@ async def start_bot(
                     status_code=402,  # Payment Required
                     detail="Insufficient credits. Please add credits to activate your bot."
                 )
+        # =====================================================================
+
+        # =====================================================================
+        # CONFIG VALIDATION: Ensure bot has a trading pair configured
+        # =====================================================================
+        if not config.selected_pair:
+            raise HTTPException(
+                status_code=400,
+                detail="Configure a trading pair before starting this bot."
+            )
         # =====================================================================
 
         # =====================================================================

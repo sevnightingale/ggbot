@@ -1,10 +1,10 @@
 # Market Data System - Complete Architecture
 
 **Status**: ✅ Production Deployed
-**Version**: Phase 1 Complete (38 data points live, cost-optimized + ACP agents)
-**Last Updated**: 2026-03-24
+**Version**: Phase 1 Complete (39 data points live, cost-optimized + ACP agents)
+**Last Updated**: 2026-04-01
 
-The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **37 data points** across **8 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
+The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **39 data points** across **8 categories**, from technical indicators to real-time sentiment and third-party ACP agent intelligence, using a scalable catalog-driven architecture.
 
 ---
 
@@ -44,8 +44,8 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 **Intelligence Orchestrator** → Config-driven routing, parallel execution, permission system, agent support
 
 ### **Current Capabilities**
-- ✅ **38 data points** across 8 categories (all FREE tier)
-- ✅ **8 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB, Sebastian AI, ACP agents)
+- ✅ **39 data points** across 8 categories (all FREE tier)
+- ✅ **9 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB, Sebastian AI, ACP agents — Otto AI, BlackSwan)
 - ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
 - ✅ **Agent dynamic queries** (query without modifying config)
@@ -462,7 +462,7 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 
 ---
 
-## 📊 Data Sources (32 Total)
+## 📊 Data Sources (39 Total)
 
 ### **Complete Data Source Matrix**
 
@@ -493,12 +493,15 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | | Crypto News Headlines | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
 | **Account Performance** (1 source) |
 | | Trading History | AccountPerformance (DB) | FREE | 5 min | 🆓 |
-| **Market Conditions** (1 source) |
-| | Daily Market Brief | MarketConditions (DB) | FREE | Daily | 🆓 |
+| **Agentic Intelligence** (3 active sources) |
+| | Sebastian — Daily Market Brief | MarketConditions (Redis/DB) | FREE | Daily | 🆓 |
+| | Otto AI — Crypto News & Alpha | ACPAgent (ACP on-chain) | $0.01 | 1 hour | 🆓 |
+| | BlackSwan — Event Flares | ACPAgent (ACP on-chain) | $0.01 | 1 hour | 🆓 |
+| | ~~Wolfpack — Token Risk~~ | ~~ACPAgent~~ | ~~$0.02~~ | - | 🚫 Disabled (requires Base token address) |
 
-**Total**: 37 data points (all FREE tier)
+**Total**: 39 data points (all FREE tier, ACP agents cost $0.01-0.02/query cached 1hr)
 
-*Note: ggShot (Premium) disabled 2026-01-23 due to stale signals. Astrology data points (lunar_phase, mercury_status) added same date.*
+*Note: ggShot (Premium) disabled 2026-01-23 due to stale signals. Wolfpack disabled 2026-04-01 (requires Base chain token contract address, not compatible with perp trading).*
 
 ---
 
@@ -1125,7 +1128,10 @@ market_intelligence/
 │       ├── macro/
 │       │   └── coingecko_global.yaml  # USDT dominance (CoinGecko)
 │       ├── internal/
-│       │   └── account_performance.yaml  # Bot account performance
+│       │   ├── account_performance.yaml  # Bot account performance
+│       │   └── market_conditions.yaml    # Sebastian daily market brief
+│       ├── acp/
+│       │   └── acp_agent.yaml            # ACP agent intelligence (Otto, BlackSwan)
 │       └── market_data/
 │           └── ohlcv.yaml             # OHLCV candle data
 ├── adapters/                           # Data source adapters
@@ -1139,7 +1145,10 @@ market_intelligence/
 │   ├── signals/
 │   │   └── ggshot_adapter.py          # ggShot signal queries
 │   ├── internal/
-│   │   └── account_performance.py     # Bot trading history (internal DB)
+│   │   ├── account_performance.py     # Bot trading history (Redis cache, pre-computed)
+│   │   └── market_conditions.py       # Sebastian daily market brief (Redis/Supabase)
+│   ├── acp/
+│   │   └── acp_agent.py               # ACP agent adapter (Otto AI, BlackSwan — on-chain jobs)
 │   └── market_data/
 │       └── redis_websocket.py         # WebSocket price cache
 └── cache/

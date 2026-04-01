@@ -56,14 +56,13 @@ Agent (Claude SDK) → MCP Tools → Market Data / Trading / Observations
 
 **⚡ [Trading Agent](trading/)** - Precision Execution Engine
 - **Paper Trading Engine** - Professional-grade simulation with real market data
-- **Live Trading Engine** - Symphony.io integration for real-money execution (100 compatible symbols)
-- **AsterDEX Integration** - Decentralized futures trading with Web3 authentication (33 compatible symbols, up to 20x leverage)
+- **Hyperliquid Live Trading** - Non-custodial DEX execution via API wallets (228 perp markets, up to 50x leverage)
+- **Virtuals DGClaw Arena** - Competitive trading arena on Virtuals Protocol, trades mirrored via ACP (Agent Commerce Protocol)
 - **Dynamic Position Sizing** - Real-time account balance queries with config-based calculations
 - **Agent Override Support** - Autonomous agents can control position size and leverage independently
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
 - **Real-time monitoring** - 3-second price updates with automatic TP/SL execution
 - **Risk enforcement** with portfolio limits, exposure tracking, and emergency controls
-- **Multi-exchange support** with Symphony.io and AsterDEX integrations
 
 ---
 
@@ -78,9 +77,9 @@ The ggbot repository is organized into the following top-level directories:
 | **core/** | Core business logic (auth, config, domain, services) | ✅ Active | 16 subdirectories |
 | **decision/** | AI decision engine with V2 template system | ✅ Active | README.md, prompts/, engine_v2.py |
 | **extraction/** | Market data extraction with 21 preprocessors | ✅ Active | v2/ with README.md |
-| **trading/** | Paper & live trading execution engines | ✅ Active | README.md, paper/, live/ |
+| **trading/** | Paper & live trading execution engines | ✅ Active | README.md, paper/, live/, virtuals/ |
 | **frontend/** | Next.js Forge application | ✅ Active | README.md, app/forge/ |
-| **market_intelligence/** | Market data orchestrator (32 data points, 7 categories) | ✅ Active | README.md, orchestrator.py |
+| **market_intelligence/** | Market data orchestrator (39 data points, 8 categories) | ✅ Active | README.md, orchestrator.py |
 | **signals/** | Signal processing, Telegram publishing, ggShot parser | ✅ Active | listener_service.py, ggshot_parser.py |
 | **database/** | Schema, migrations, and database utilities | ✅ Active | README.md, migrations/ |
 | **tests/** | Integration and unit testing suite | ✅ Active | test_trading_flow_simple.py |
@@ -131,12 +130,12 @@ The ggbot repository is organized into the following top-level directories:
 - **Real-time WebSocket updates** with countdown timers and execution status
 
 **🎯 [Symbol Standardization](core/symbols/)** - Universal Trading Pair Management
-- **141 trading pairs** with comprehensive format support across all systems (100 Symphony-compatible for live trading)
-- **Multi-format conversion**: ggShot (`BTCUSDT`) ↔ CCXT (`BTC/USDT`) ↔ Symphony (`BTC`)
+- **228 trading pairs** with comprehensive format support (Hyperliquid perps)
+- **Multi-format conversion**: ggShot (`BTCUSDT`) ↔ CCXT (`BTC/USDT`) ↔ Hyperliquid (`BTC`)
 - **Validation and suggestions** for format errors and unsupported symbols
 
 **📊 Monitoring & Observability**
-- **Universal Account Monitor** - Unified monitoring service tracking paper, Symphony, and Aster accounts at 5-second intervals with historical snapshots
+- **Universal Account Monitor** - Unified monitoring service tracking paper and Hyperliquid accounts at 5-second intervals with historical snapshots
 - **Position tracking** via database queries with real-time P&L
 - **Performance analytics** with comprehensive trade lifecycle tracking
 - **Health checks** via API endpoints and WebSocket status broadcasts
@@ -203,7 +202,13 @@ The ggbot repository is organized into the following top-level directories:
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
 - **Automated risk management** - 3-second monitoring with auto TP/SL execution
 - **Complete audit trail** - Full trade lifecycle tracking and performance analytics
-- **Live trading** - Symphony.io integration for real-money execution (100 compatible symbols)
+- **Live trading** - Hyperliquid DEX integration for non-custodial live execution (228 perp markets)
+
+**🏟️ [Virtuals DGClaw Arena](trading/virtuals/)** (Production)
+- **Competitive trading arena** on Virtuals Protocol — every trade is an on-chain ACP transaction
+- **Arena mirroring** - Existing bots (paper or live) mirror trade intents to DGClaw automatically
+- **Lite agent pool** - Pre-created agents assigned 1-per-bot, controlled via claw REST API
+- **$GG token volume** - Arena trades generate ACP volume for token graduation
 
 **🛡️ [Risk Management](trading/)**
 - **Position sizing algorithms** based on AI confidence scoring
@@ -268,7 +273,7 @@ The ggbot repository is organized into the following top-level directories:
 ### AI/LLM Providers
 | Provider | Integration | Models |
 |----------|-------------|--------|
-| **Anthropic** | 0.49.0 | Claude Haiku 4.5, Sonnet 4.5, Opus 4 |
+| **Anthropic** | 0.49.0 | Claude Haiku 4.5, Sonnet 4.6, Opus 4.6 |
 | **OpenAI** | 1.70.0 | GPT-4, GPT-5 (Responses API) |
 | **XAI** | 1.3.1 | Grok 4 (Agentic API for market intelligence) |
 | **Google** | 2.1.2 | Gemini models |
@@ -277,7 +282,8 @@ The ggbot repository is organized into the following top-level directories:
 ### Trading & Data
 | Service | Purpose | Status |
 |---------|---------|--------|
-| **Symphony.io** | Live trading execution | ✅ 100 symbols supported |
+| **Hyperliquid** | Live DEX trading (perps) | ✅ 228 markets, API wallet model |
+| **Virtuals/DGClaw** | Competitive trading arena | ✅ ACP protocol, lite agent pool |
 | **Binance** | Real-time WebSocket prices | ✅ market-data-ws service |
 | **CCXT** | Multi-exchange library | ✅ 4.4.80 |
 | **Stripe** | Subscription payments | ✅ 11.1.0 |
@@ -285,7 +291,7 @@ The ggbot repository is organized into the following top-level directories:
 ### Infrastructure
 | Service | Purpose | Access |
 |---------|---------|--------|
-| **PM2** | Process management | 5 services (ggbot, market-data-ws, signal-listener, x-bot, error-alerts) |
+| **PM2** | Process management | 8 services (ggbot, ggbot-scheduler, market-data-ws, error-alerts, account-monitor, sebastian-bot, sebastian-telegram, sebastian-virtuals) |
 | **Supabase** | PostgreSQL + Auth | Remote managed service |
 | **Redis** | Cache + Queues | Local (port 6379) |
 | **Vercel** | Frontend hosting | Production deployment |
@@ -298,11 +304,12 @@ The ggbot repository includes comprehensive module documentation:
 
 | Module | Lines | Contents |
 |--------|-------|----------|
-| **[agent/README.md](agent/README.md)** | 750+ | 12 MCP tools, 2 modes (strategy/autonomous), Symphony integration roadmap |
+| **[agent/README.md](agent/README.md)** | 750+ | 12 MCP tools, 2 modes (strategy/autonomous) |
 | **[extraction/v2/README.md](extraction/v2/README.md)** | 845 | 21 preprocessors, 12x performance, API docs |
-| **[market_intelligence/README.md](market_intelligence/README.md)** | 1154 | 32 data points, 7 categories, orchestrator architecture |
+| **[market_intelligence/README.md](market_intelligence/README.md)** | 1154 | 39 data points, 8 categories, orchestrator architecture, ACP agent adapters |
 | **[decision/README.md](decision/README.md)** | 525 | V2 template system, 3 modes, webhook integration |
-| **[trading/README.md](trading/README.md)** | 723 | Paper & live trading, Symphony integration |
+| **[trading/README.md](trading/README.md)** | 723 | Paper & live trading, Hyperliquid integration |
+| **[trading/virtuals/README.md](trading/virtuals/README.md)** | 460+ | DGClaw arena, ACP protocol, lite agent pool, claw API |
 | **[billing/README.md](billing/README.md)** | 400+ | Metered billing, Stripe + crypto payments, credit grants, usage tracking |
 | **[frontend/README.md](frontend/README.md)** | 488 | Forge architecture, subscription system |
 | **[frontend/SEO.md](frontend/SEO.md)** | 350+ | SEO infrastructure, blog system, OG images, content strategy |

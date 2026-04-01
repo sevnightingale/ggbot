@@ -6,6 +6,64 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-01 - ACP Agent Intelligence + Error Alerting + Frontend Fixes
+
+**ACP Agent Adapter Fix** (`market_intelligence/gateway.py`, `adapters/acp/`):
+- `ACPAgentAdapter` import broken since deployment — `ACP` → snake_case → `a_c_p_agent` (wrong). Added `ACP` → `Acp` special case in gateway `_adapter_name_to_module()`
+- Renamed `acp_agent_adapter.py` → `acp_agent.py` to match gateway naming convention
+- Added `_format_agentic_intelligence_data()` to `decision/engine_v2.py` — ACP agent deliverables were fetched but silently dropped at prompt formatting
+
+**Third-Party ACP Agents** (`catalog_mapping.py`, DB seed):
+- Discovered via `browse_agents()`: Otto AI (`0xe5B38F...`), Wolfpack (`0xbaC206...`), BlackSwan (`0x0aFE3b...`)
+- Test purchases verified: Otto delivers markdown crypto news + bull/bear score ($0.01, ~19s). BlackSwan delivers risk flare status with 5K+ datapoints ($0.01, ~19s)
+- Wolfpack disabled — requires Base token contract address, not compatible with perp trading
+- Consolidated: removed `ggbots_acp` data point (self-consumption). Sebastian direct Redis read is sole ggbots source
+- DB: 3 new data_points seeded under `agentic_intelligence` (39 total active data points, 8 categories)
+
+**Frontend Model Selection Bug** (`frontend/app/forge/components/configure/StrategyEditor.tsx`):
+- `handleModelChange()` only updated `model` field, left `provider` stale from previous selection
+- User config had `provider: 'deepseek'` + `model: 'qwen'` → "Model Not Exist" error from DeepSeek API
+- Fix: always reset `provider: 'openrouter'` on model change (all platform-key models route through OpenRouter)
+
+**Bot Activation Validation** (`ggbot.py`):
+- Added `selected_pair` check in `start_bot` endpoint — prevents bots from being activated without trading pair
+- Matches existing frontend guard in `ActivationBar.tsx:186` (`hasStrategy` check)
+
+**Transient Error Threshold** (`core/monitoring/error_alert_service.py`):
+- SSL/connection errors now accumulate in 5-minute sliding window. Alert only after 3+ occurrences (real outage vs one-off blip)
+- Format: `[3x in 5min] SSL connection has been closed unexpectedly`
+
+**Arena/Landing Page Updates** (frontend):
+- `/arena` page: replaced Season 2 competition UI with "Season 2 Postponed" + DGClaw directions
+- Landing: Season 2 banner → "Degen Arena — LIVE" banner linking to DGClaw leaderboard
+- Features CTA → "Build your bot in Forge". Footer → "Degen Arena" external link
+- Forge: removed Season 2 announcement banner
+
+**Documentation**: README.md updated (Hyperliquid/DGClaw, removed Symphony/Aster refs, PM2 services, LLM models). CLAUDE.md doc reference table updated. MI README updated (39 data points, ACP agents, directory structure). OK.md SOP rewritten (index-driven review).
+
+---
+
+## 2026-04-01 - Arena Pool Tokenization + Close Mirroring
+
+**Pool Tokenization** (26 agents):
+- Dispersed $1 USDC to each agent wallet via EOA (`0xFF0ab...`) on Base, then tokenized via `POST /acp/me/tokens` on claw API
+- ggbot-005 through ggbot-030 now tokenized (GGBOT005-GGBOT030), ggbot-003 retired (tokenization conflict)
+- Pool: 28 available, 10 assigned (Denis SZN2), 2 retired. All Denis agents funded ~$15 each on DGClaw
+
+**Arena Close Mirroring** (`trading/virtuals/arena_sync.py` — NEW):
+- Root cause: arena only mirrored opens + decision closes. Paper TP/SL, live TP/SL, manual closes bypassed arena
+- `mirror_close_to_arena()` — idempotent function checks DGClaw position exists before closing. Safe for duplicate calls
+- Hook 1: `trading/paper/supabase_service.py:close_position()` — covers paper TP/SL/liquidation/manual
+- Hook 2: `core/monitoring/adapters/hyperliquid_adapter.py:_detect_and_log_closes()` — covers live TP/SL fills
+- Hook 3: `ggbot.py:close_hyperliquid_position()` — covers live manual close
+- Fix: orchestrator close path now logs `arena_exit` activity (was returning before activity logging)
+
+**Arena Reconciler** (`core/orchestrator/orchestrator.py:_reconcile_arena_position()`):
+- Safety net: before each arena trade, compares DGClaw positions vs primary (paper/live). Closes stale arena positions
+- Activity types: `arena_exit` with sources `arena_sync`, `claw_arena`, `arena_reconciler`
+
+---
+
 ## 2026-03-28 - Production Fixes: Candle Cache, ACP Adapter, Prompt Consistency
 
 **Error log audit** covering 16h of production logs. Five issues identified, all fixed.

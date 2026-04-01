@@ -1046,6 +1046,9 @@ class GGBotOrchestrator:
             client = ClawAPIClient(arena_agent['claw_api_key'])
             wallet = arena_agent['wallet_address']
 
+            # Reconcile: close stale arena positions that primary no longer holds
+            await self._reconcile_arena_position(client, arena_agent, config)
+
             # Determine side
             if action in ('long', 'enter_long', 'enter'):
                 side = 'long'
@@ -1057,7 +1060,26 @@ class GGBotOrchestrator:
                 pair = self._arena_to_pair(symbol)
                 if pair:
                     result = await client.close_trade(pair)
-                    self._log.info(f"Arena close {pair}: {result.get('status')}")
+                    status = result.get('status', 'unknown')
+                    self._log.info(f"Arena close {pair}: {status}")
+                    try:
+                        from core.common.activity_logger import log_activity_safe
+                        log_activity_safe(
+                            config_id=config.config_id,
+                            user_id=config.user_id,
+                            activity_type='arena_exit',
+                            activity_source='claw_arena',
+                            summary=f"Arena: Closed {pair} (decision)",
+                            details={
+                                'pair': pair,
+                                'agent': arena_agent['agent_name'],
+                                'job_id': result.get('job_id'),
+                                'status': status,
+                            },
+                            importance=6,
+                        )
+                    except Exception:
+                        pass
                 return
             else:
                 return
@@ -1160,6 +1182,64 @@ class GGBotOrchestrator:
             if symbol.upper().endswith(suffix) and len(symbol) > len(suffix):
                 symbol = symbol[:-len(suffix)]
         return symbol.upper() if symbol.isalpha() and len(symbol) <= 10 else None
+
+    async def _reconcile_arena_position(self, client, arena_agent: Dict[str, Any], config: BotConfigV2):
+        """Close arena positions that the primary bot no longer holds."""
+        try:
+            from core.common.db import db_fetch_all
+
+            positions = await client.get_dgclaw_positions(arena_agent['wallet_address'])
+            if not positions:
+                return
+
+            # Check what the primary bot currently holds
+            primary_pairs = set()
+
+            paper_rows = await db_fetch_all(
+                "SELECT symbol FROM paper_trades WHERE config_id = %s AND status = 'open'",
+                (config.config_id,)
+            )
+            for r in paper_rows:
+                pair = self._arena_to_pair(r[0])
+                if pair:
+                    primary_pairs.add(pair)
+
+            live_rows = await db_fetch_all(
+                "SELECT symbol FROM live_trades WHERE config_id = %s AND closed_at IS NULL",
+                (config.config_id,)
+            )
+            for r in live_rows:
+                pair = self._arena_to_pair(r[0])
+                if pair:
+                    primary_pairs.add(pair)
+
+            # Close any arena position not in primary
+            for pos in positions:
+                pair = pos.get('pair', '')
+                if pair and pair not in primary_pairs:
+                    self._log.info(f"Reconciler: closing stale {pair} on {arena_agent['agent_name']}")
+                    result = await client.close_trade(pair)
+                    try:
+                        from core.common.activity_logger import log_activity_safe
+                        log_activity_safe(
+                            config_id=config.config_id,
+                            user_id=config.user_id,
+                            activity_type='arena_exit',
+                            activity_source='arena_reconciler',
+                            summary=f"Arena: Reconciled stale {pair}",
+                            details={
+                                'pair': pair,
+                                'agent': arena_agent['agent_name'],
+                                'job_id': result.get('job_id'),
+                                'status': result.get('status'),
+                            },
+                            importance=5,
+                        )
+                    except Exception:
+                        pass
+
+        except Exception as e:
+            self._log.warning(f"Arena reconcile failed: {e}")
 
     async def _run_trading_v2(
         self,

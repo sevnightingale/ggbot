@@ -183,62 +183,47 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     # triggers its own ACP job, even for global data.
     # ========================================================================
 
-    # ggbots.ai — Our own market brief via ACP (self-consumption for volume)
-    ('agentic_intelligence', 'ggbots_acp'): {
+    # ggbots_acp removed — consolidated into 'sebastian' (direct Redis read).
+    # ACP self-consumption can be re-added when $GG graduation pipeline is active.
+
+    # Third-party ACP agents — discovered + tested 2026-04-01
+    # Otto AI: crypto news with bull/bear sentiment. $0.01/call, ~19s latency.
+    # Deliverable: markdown market brief with key stories + sentiment score.
+    ('agentic_intelligence', 'otto_ai_news'): {
         'data_type': 'acp_agent',
         'params_template': {
-            'agent_name': 'ggbots',
-            'agent_address': '0xREDACTED_AGENT_WALLET',
-            'offering_name': 'marketBrief',
+            'agent_name': 'otto_ai',
+            'agent_address': '0xe5B38F112b92Ce8F2103eDAbA7E9a9842f12d5f6',
+            'offering_name': 'crypto_news',
             'service_requirement': {
-                'focus': 'all',
-                'bot_id': '{config_id}',
+                'initiate_AI_crypto_news_report_job': True,
             }
         },
-        'cache_ttl': 3600,  # 1 hour
+        'cache_ttl': 3600,
+        'global': True,  # News is not symbol-specific
     },
-
-    # Otto AI — Crypto News (per-symbol)
-    # ('agentic_intelligence', 'otto_ai_news'): {
-    #     'data_type': 'acp_agent',
-    #     'params_template': {
-    #         'agent_name': 'otto_ai',
-    #         'agent_address': '',  # TODO: discover via browse_agents()
-    #         'offering_name': 'Crypto News',
-    #         'service_requirement': {
-    #             'symbol': '{symbol}',
-    #             'request_type': 'crypto_news',
-    #         }
-    #     },
-    #     'cache_ttl': 3600,
-    # },
-
-    # Wolfpack Intelligence — Composite Risk Score (per-symbol)
+    # BlackSwan: market risk flare detection. $0.01/call, ~19s latency.
+    # Deliverable: {status, severity, assessment, signals[], datapointsAnalysed}
+    ('agentic_intelligence', 'blackswan_predictions'): {
+        'data_type': 'acp_agent',
+        'params_template': {
+            'agent_name': 'blackswan',
+            'agent_address': '0x0aFE3b8497De824A230986Ddab7f66EE4C80CBd8',
+            'offering_name': 'flare',
+            'service_requirement': {}
+        },
+        'cache_ttl': 3600,
+        'global': True,
+    },
+    # Wolfpack: requires Base token contract address — not suitable for perp trading.
+    # Revisit if they add a symbol-based offering.
     # ('agentic_intelligence', 'wolfpack_risk'): {
     #     'data_type': 'acp_agent',
     #     'params_template': {
     #         'agent_name': 'wolfpack',
-    #         'agent_address': '',  # TODO: discover via browse_agents()
-    #         'offering_name': 'Composite Risk Score',
-    #         'service_requirement': {
-    #             'symbol': '{symbol}',
-    #             'request_type': 'risk_score',
-    #         }
-    #     },
-    #     'cache_ttl': 3600,
-    # },
-
-    # BlackSwan — Prediction Market Monitor (global, per-bot for volume)
-    # ('agentic_intelligence', 'blackswan_predictions'): {
-    #     'data_type': 'acp_agent',
-    #     'params_template': {
-    #         'agent_name': 'blackswan',
-    #         'agent_address': '',  # TODO: discover via browse_agents()
-    #         'offering_name': 'Prediction Market Monitor',
-    #         'service_requirement': {
-    #             'request_type': 'prediction_monitor',
-    #             'bot_id': '{config_id}',
-    #         }
+    #         'agent_address': '0xbaC206A51E126DD97DC8046CB9a17fF4F4D9d7f2',
+    #         'offering_name': 'token_risk_analysis',
+    #         'service_requirement': {'token_address': '0x...'},
     #     },
     #     'cache_ttl': 3600,
     # },

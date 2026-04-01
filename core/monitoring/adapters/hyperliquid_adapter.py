@@ -11,6 +11,7 @@ Key differences from Symphony/Aster:
 - Positions are account-wide (shared across all bots for same wallet)
 """
 
+import asyncio
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, Set, Dict, List
@@ -463,6 +464,18 @@ class HyperliquidAccountAdapter(AccountAdapter):
                     related_symbol=platform_symbol,
                     importance=9
                 )
+
+                # Mirror close to arena (fire-and-forget)
+                try:
+                    from trading.virtuals.arena_sync import mirror_close_to_arena
+                    asyncio.create_task(mirror_close_to_arena(
+                        config_id=config_id,
+                        symbol=platform_symbol,
+                        close_reason=inferred_close_reason,
+                        user_id=user_id,
+                    ))
+                except Exception:
+                    pass
 
                 for h in agg['hashes']:
                     self._logged_closes.add(h)
