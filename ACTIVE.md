@@ -186,8 +186,15 @@
 - `GET /api/v2/public/dojo/bots` - Dojo leaderboard (active visible paper bots + Elo)
 - `GET /api/v2/public/dojo/stats` - Aggregate Dojo statistics
 - `GET /api/v2/public/dojo/house-bots` - House Bots available for challenges
+- `GET /api/v2/public/dojo/match/{match_id}` - Shareable match detail (public)
 - `PUT /api/v2/config/{id}/dojo-visibility` - Toggle dojo_visible flag
 - `GET /api/v2/dojo/elo-history/{config_id}` - Paginated Elo rating history
+- `GET /api/v2/dojo/can-enter/{config_id}` - Entry gate check (eligible for match?)
+- `POST /api/v2/dojo/challenge` - Issue challenge (House Bot auto-starts)
+- `POST /api/v2/dojo/match/{id}/forfeit` - Forfeit active match
+- `GET /api/v2/dojo/matches/{config_id}` - Paginated match history
+- `GET /api/v2/dojo/stats/{config_id}` - Aggregate W/L/D stats
+- `GET /api/v2/dojo/active/{config_id}` - Active/pending matches
 
 **Arena Betting** (USX staking on bots, public — wallet = identity)
 - `POST /api/v2/arena/pledge` - Record USX bet after on-chain tx (no auth, validates wallet + tx_hash format)
@@ -615,6 +622,15 @@ created_at timestamptz, updated_at timestamptz, state text=inactive, symphony_ag
 trading_mode varchar(20)=paper' varying, is_public_performance bool?, profile_image_url text?, description text?
 first_run_used bool?, free_runs_remaining int?=3, arena_registered_at timestamptz?, initial_equity numeric?
 arena_enabled bool?, dojo_visible bool?=true, elo_rating int?=1200, is_house_bot bool?=false
+
+### dojo_matches (26 cols) | PK: id | FK: challenger/opponent_config_id→configurations, challenger/opponent_instance_id→configurations
+Idx: idx_dojo_matches_status(status) WHERE status IN ('pending','active'), idx_dojo_matches_challenger(challenger_config_id), idx_dojo_matches_opponent(opponent_config_id), idx_dojo_matches_active_lock(status) WHERE status='active'
+id uuid, format text, status text, challenger_config_id uuid, opponent_config_id uuid, challenger_user_id uuid, opponent_user_id uuid
+challenger_instance_id uuid?, opponent_instance_id uuid?, challenger_config_snapshot jsonb?, opponent_config_snapshot jsonb?
+challenge_expires_at timestamptz?, accepted_at timestamptz?, starts_at timestamptz?, ends_at timestamptz?
+challenger_end_equity numeric?, opponent_end_equity numeric?, challenger_composite_score numeric?, opponent_composite_score numeric?
+winner_config_id uuid?, challenger_elo_before int?, challenger_elo_after int?, opponent_elo_before int?, opponent_elo_after int?
+result_details jsonb?, completed_at timestamptz?, created_at timestamptz
 
 ### elo_history (9 cols) | PK: id | FK: config_id→configurations
 Idx: idx_elo_history_config(config_id, created_at DESC)

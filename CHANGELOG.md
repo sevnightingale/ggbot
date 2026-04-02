@@ -6,6 +6,55 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-02 - The Dojo: Phase 4 (1v1 Matches)
+
+**Match System** (`core/arena/matches.py` — NEW, ~500 lines):
+- `dojo_matches` table: 26 columns, 5 indexes (partial on active status). Dual-reference: original config IDs for Elo, instance config IDs for paper accounts
+- `create_challenge()` — House Bot auto-accept + auto-start. User-vs-user path built with 24h expiry (ready for future)
+- `start_match()` — creates `config_type='dojo_match'` instance configs + $10k paper accounts, snapshots strategy, records Elo baselines
+- `complete_match()` — composite scoring on match instances, Elo update on originals, archive instances
+- `forfeit_match()` — opponent wins, Elo adjusts (score 0 vs 1), archive
+- `process_dojo_matches()` — scheduler job (5min): complete expired, start accepted, expire stale challenges
+- Match instance config_data copies source bot's trading/decision settings for correct mirror trade execution
+
+**Mirror Service** (`core/arena/dojo_mirror.py` — NEW, ~230 lines):
+- `mirror_trade_to_dojo()` — copy-trade user bot entries to match instance paper accounts via `SupabasePaperTradingService`
+- `mirror_close_to_dojo()` — idempotent close on match instances, queries by original config_id (no cascade risk)
+- `dispatch_house_bot_signal()` — broadcasts House Bot entry signals to IDLE match accounts (derived from open position count)
+- Orchestrator hooks at both autonomous + signal-driven paths (alongside DGClaw mirror)
+- Close path hooks in 3 files: `supabase_service.py` (paper TP/SL), `ggbot.py` (HL manual), `hyperliquid_adapter.py` (HL fill detection)
+
+**Lock System** (`ggbot.py`, `api/paper_trading.py`):
+- `_check_dojo_lock()` helper — 7 endpoints guarded: config edit, stop, run now, reset, delete, HL close, paper close
+- SSE enrichment: `dojo_locked` via EXISTS subquery on `idx_dojo_matches_active_lock` partial index
+- Config list enrichment: `dojo_locked` + `dojo_matches_active` array with opponent name, format, ends_at
+
+**Scheduler** (`ggbot_scheduler.py`):
+- `dojo_match_lifecycle` — IntervalTrigger(5min), processes match state transitions
+- `weekly_rolling_elo` — CronTrigger(Sun midnight UTC), Swiss-system Elo update
+
+**API Endpoints** (`ggbot.py`, `api/public.py`):
+- `GET /dojo/can-enter/{config_id}` — entry gate (active? paper? no positions? not locked?)
+- `POST /dojo/challenge` — issue challenge (body: config_id, opponent_config_id, format)
+- `POST /dojo/match/{id}/forfeit` — forfeit active match
+- `GET /dojo/matches/{config_id}` — paginated match history
+- `GET /dojo/stats/{config_id}` — aggregate W/L/D stats
+- `GET /dojo/active/{config_id}` — active/pending matches
+- `GET /public/dojo/match/{id}` — shareable match detail
+
+**Frontend** (`DojoTab.tsx` rewrite, `DojoLockBanner.tsx` — NEW, 5 components modified):
+- DojoTab: challenge UI with inline format picker (Blitz/Rapid/Standard), active match cards with forfeit confirmation, match history with expandable composite breakdown, W/L/D record in header
+- DojoLockBanner: brass-accent banner on Configure tab showing opponent, format, time remaining
+- Lock states: ActivationBar (disable stop/run), PositionsTable (disable close), BotManagementMenu (disable delete/reset)
+- Elo badge moved from BotRail → ActivationBar (next to bot name, paper bots only)
+
+**Bugfixes** (caught in audit):
+- `close_position` kwargs: mirror was passing `(config_id, user_id, close_reason)` — actual signature is `(trade_id, reason)`. Fixed
+- Match instance config_data: was empty shell, `execute_trade` needs `trading.leverage` etc. Now copies source bot's trading/decision settings
+- House Bot Elo: reset from 1500 → 1200 (inflated starting Elo is misleading)
+
+---
+
 ## 2026-04-01 - The Dojo: Phases 1-3 (Foundation, Elo Engine, House Bots)
 
 **Phase 1: Foundation** (`core/arena/dojo_public.py`, `core/sse/dashboard_data.py`, `ggbot.py`, frontend):
@@ -13,7 +62,7 @@ Complete history of features, fixes, and improvements. For current status see AC
 - Forward guards: `config_type != 'dojo_match'` filter added to `config_service.list_configs()` and `dashboard_data.py` CTE
 - Public endpoints: `GET /api/v2/public/dojo/bots`, `GET /api/v2/public/dojo/stats`
 - Visibility toggle: `PUT /api/v2/config/{id}/dojo-visibility`
-- Frontend: `EloTierBadge` shared component (6 tiers: Novice→Grandmaster), Elo badges on BotRail, `'dojo'` tab in TabNavigation + MobileNav (paper bots only), `DojoTab` shell with visibility toggle
+- Frontend: `EloTierBadge` shared component (6 tiers: Novice→Grandmaster), Elo badge on ActivationBar (paper bots), `'dojo'` tab in TabNavigation + MobileNav (paper bots only), `DojoTab` shell with visibility toggle
 
 **Phase 2: Elo Engine** (`core/arena/elo.py`, `ggbot.py`):
 - `elo_history` table + index. Stores all rating changes with reason, match reference, details JSONB
@@ -27,7 +76,7 @@ Complete history of features, fixes, and improvements. For current status see AC
 **Phase 3: House Bots** (`decision/engine_v2.py`, `core/services/config_service.py`):
 - `awareness_level` routing in `_handle_autonomous_trading()` — `low` = Signal Mode (opportunity analysis only, no position management). Used by House Bots. `medium` = default behavior (unchanged)
 - `is_house_bot` added to `BotConfigV2` model, `get_config()`, `list_configs()` queries + dict construction
-- 3 House Bot configs created: The Arbiter (Standard/4h), The Arbiter: Rapid (1h), The Arbiter: Blitz (15m). All BTC/USDT, `awareness_level: 'low'`, Elo 1500, inactive until tuned
+- 3 House Bot configs created: The Arbiter (Standard/4h), The Arbiter: Rapid (1h), The Arbiter: Blitz (15m). All BTC/USDT, `awareness_level: 'low'`, Elo 1200, inactive until tuned
 - `GET /api/v2/public/dojo/house-bots` endpoint
 - Frontend: DojoTab House Bots section with format labels, Elo badges, disabled Challenge buttons
 

@@ -4,37 +4,25 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 ---
 
-## 🥋 **The Dojo** (ACTIVE — Primary Focus)
+## 🥋 **The Dojo** (Phases 1-4 COMPLETE)
 
-**Status**: 🟡 IN PROGRESS — Phases 1-3 complete, Phase 4 next
+**Status**: 🟢 COMPLETE — All 4 phases deployed
 **Planning Doc**: [DOCS/todo/DOJO.md](DOCS/todo/DOJO.md)
 
-Chess.com-inspired competitive environment. Elo on bots directly (no archetype entity). Dojo = third tab in Forge (paper bots only) + public leaderboard at `/dojo`. Copy-trade model: matches mirror bot decisions to isolated $10k accounts (zero LLM cost). House Bots: decision oracle mode (opportunity-only, no positions, signal dispatch to match accounts with TP/SL-only exits — zero marginal cost per match). Full lock during match (forfeit to unlock). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
+Chess.com-inspired competitive environment. Elo on bots directly. Dojo = third tab in Forge (paper bots only). Copy-trade model: matches mirror bot decisions to isolated $10k accounts (zero LLM cost). House Bots: decision oracle mode (opportunity-only, signal dispatch). Full lock during match (forfeit to unlock). Composite score: PnL 40%, Sortino 25%, Drawdown 20%, Win Rate 15%.
 
 ### ~~Phase 1: Dojo Foundation~~ ✅ (2026-04-01)
-
-DB columns (`dojo_visible`, `elo_rating`, `is_house_bot`), public endpoints, `EloTierBadge` component, Dojo tab in Forge, visibility toggle. Forward guards on `config_service` and `dashboard_data` for `config_type != 'dojo_match'`.
-
 ### ~~Phase 2: Elo Engine~~ ✅ (2026-04-01)
-
-`elo_history` table, `core/arena/elo.py` (Sortino, composite score, Elo update, weekly rolling), Elo history API + frontend section.
-
 ### ~~Phase 3: House Bots~~ ✅ (2026-04-01)
+### ~~Phase 4: 1v1 Matches~~ ✅ (2026-04-02)
 
-3 Arbiter variants created (Standard/Rapid/Blitz), `awareness_level` routing in decision engine, `is_house_bot` on BotConfigV2 model, House Bot public endpoint + DojoTab display.
+`dojo_matches` table, `core/arena/matches.py` (lifecycle), `core/arena/dojo_mirror.py` (copy-trade + signal dispatch), orchestrator + close path hooks, lock guards on 7 endpoints, scheduler jobs (5min lifecycle + weekly Elo), 7 API endpoints, full frontend (challenge UI, active match cards, match history, lock banner + states).
 
-### **Phase 4: 1v1 Matches**
-- [ ] `dojo_matches` table (config snapshots + instance refs)
-- [ ] `core/arena/dojo_mirror.py` — copy-trade mirror + House Bot signal dispatch (same hook as DGClaw in orchestrator)
-- [ ] Close mirror in all close paths (alongside `arena_sync`)
-- [ ] House Bot match account state machine (IDLE → entry → IN_POSITION → TP/SL → IDLE)
-- [ ] `core/arena/matches.py` — lifecycle (challenge → start → complete → Elo → archive)
-- [ ] Lock guards on 7 endpoints (edit, stop, close, trigger, reset, delete + HL close)
-- [ ] `GET /dojo/can-enter/{config_id}` — entry gate (active? no positions? not locked?)
-- [ ] Match lifecycle scheduler job (start, complete, expire pending, forfeit)
-- [ ] Forge: DojoTab, EnterMatchPanel, ActiveMatchCard, MatchHistoryList, MatchDetail
-- [ ] Forge: House Bot challenge UI (v1: House Bots only, no user-vs-user)
-- [ ] Forge: DojoLockBanner on Configure tab, lock states on ActivationBar/PositionsTable/BotManagementMenu
+### **Remaining / Future**
+- [ ] Activate House Bots (currently inactive — needs strategy tuning)
+- [ ] Public `/dojo` leaderboard page (separate from Forge tab)
+- [ ] User-vs-user challenges (accept/reject flow — backend ready, frontend not built)
+- [ ] Match instance config retention policy (accumulate over time in `configurations` table)
 
 ---
 
