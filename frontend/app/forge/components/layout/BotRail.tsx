@@ -5,7 +5,6 @@ import Image from 'next/image'
 import { BarChart2, Loader2, Circle, Zap, TrendingUp, TrendingDown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
-import { EloTierBadge } from '../shared/EloTierBadge'
 
 interface AccountData {
   config_id: string
@@ -465,9 +464,6 @@ function BotRow({
               }
               {performancePct >= 0 ? '+' : ''}{performancePct.toFixed(1)}%
             </span>
-          )}
-          {bot.trading_mode !== 'hyperliquid' && bot.elo_rating != null && (
-            <EloTierBadge elo={bot.elo_rating} size="sm" />
           )}
         </div>
 

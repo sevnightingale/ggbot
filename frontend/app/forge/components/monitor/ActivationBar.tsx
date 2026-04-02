@@ -11,6 +11,7 @@ import { BotImageUpload } from '@/components/BotImageUpload'
 import { ArenaRegistrationModal } from '@/components/arena-registration-modal'
 import { DegenArenaModal } from '@/components/degen-arena-modal'
 import { estimateDailyCost } from '@/lib/cost-estimation'
+import { EloTierBadge } from '../shared/EloTierBadge'
 
 interface AccountMetrics {
   totalEquity: number
@@ -242,6 +243,9 @@ export function ActivationBar({
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                 {selectedBot.config_name || 'Untitled Bot'}
               </h2>
+              {isPaperTrading && selectedBot.elo_rating != null && (
+                <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
+              )}
             </div>
             {/* Status Message - Dynamic when active, static "last activity" when inactive */}
             {latestActivity && (
