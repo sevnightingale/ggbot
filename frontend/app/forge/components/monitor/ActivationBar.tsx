@@ -363,7 +363,8 @@ export function ActivationBar({
           </div>
         </div>
 
-        {/* Row 2: KPI Metrics */}
+        {/* Row 2: KPI Metrics — min-h prevents layout shift on first SSE payload */}
+        <div className="min-h-[108px]">
         {metrics && (
           <>
             {usePnlOnlyKPIs ? (
@@ -416,6 +417,7 @@ export function ActivationBar({
             )}
           </>
         )}
+        </div>
       </div>
 
       {/* Upgrade Modal */}
@@ -482,7 +484,7 @@ function KPICard({ label, value, positive }: KPICardProps) {
       <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
         {label}
       </div>
-      <div className={`text-lg sm:text-xl leading-snug ${
+      <div className={`text-lg sm:text-xl leading-snug font-mono ${
         positive !== undefined
           ? positive
             ? 'text-green-500'
@@ -701,15 +703,15 @@ function StatusMessage({ latestActivity, isActive }: StatusMessageProps) {
   }, [spinnerChars.length])
 
   return (
-    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] h-[20px] max-w-[400px]">
       {isActive ? (
-        <span className="font-mono text-[var(--agent-extraction)]">
+        <span className="font-mono text-[var(--agent-extraction)] flex-shrink-0">
           {spinnerChars[spinnerIndex]}
         </span>
       ) : (
-        <span className="text-[var(--text-muted)]">○</span>
+        <span className="text-[var(--text-muted)] flex-shrink-0">○</span>
       )}
-      <span>{displayMessage}</span>
+      <span className="truncate">{displayMessage}</span>
     </div>
   )
 }
