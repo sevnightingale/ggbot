@@ -482,10 +482,10 @@ function ActionButtons({
     <div className="flex items-center gap-2">
       <button
         onClick={onDegenArena}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
       >
         <Trophy className="h-4 w-4" />
-        <span className="hidden sm:inline">Degen Arena</span>
+        <span className="hidden sm:inline">Enter Degen Arena</span>
       </button>
 
       {/* Enter Arena — hidden until S2 registration API ready */}
@@ -510,7 +510,7 @@ function ActionButtons({
       <button
         onClick={onManualTrigger}
         disabled={isManualTriggering || isStarting || isStopping || !canRunOnce || dojoLocked}
-        className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed ${
+        className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors disabled:cursor-not-allowed ${
           !canRunOnce || dojoLocked ? 'opacity-50' : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
         }`}
         title={dojoLocked ? 'Locked for Dojo match' : !canRunOnce ? 'No free test runs remaining.' : undefined}
