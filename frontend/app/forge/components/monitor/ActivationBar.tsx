@@ -99,6 +99,9 @@ export function ActivationBar({
     total_usage_usd: number
   } | null>(null)
 
+  // Arena status: 'none' | 'joined' | 'funded'
+  const [arenaState, setArenaState] = useState<'none' | 'joined' | 'funded'>('none')
+
   useEffect(() => {
     // Skip optimistic placeholder bots (temp IDs from duplication)
     if (selectedBot.config_id.startsWith('temp-')) return
@@ -117,9 +120,23 @@ export function ActivationBar({
       }
     }
 
+    const fetchArenaStatus = async () => {
+      try {
+        const data = await apiClient.getArenaStatus(selectedBot.config_id)
+        if (data.status === 'joined') {
+          setArenaState((data.dgclaw_balance || 0) > 0 ? 'funded' : 'joined')
+        } else {
+          setArenaState('none')
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+
     fetchConfigUsage()
+    fetchArenaStatus()
     // Refresh every 5 minutes while component is mounted
-    const interval = setInterval(fetchConfigUsage, 5 * 60 * 1000)
+    const interval = setInterval(() => { fetchConfigUsage(); fetchArenaStatus() }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [selectedBot.config_id])
 
@@ -207,7 +224,7 @@ export function ActivationBar({
 
   return (
     <>
-      <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+      <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 overflow-hidden">
         {/* Credit Exhaustion Warning Banner */}
         {isPausedForCredits && (
           <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-500">
@@ -229,52 +246,31 @@ export function ActivationBar({
 
         {/*
           Desktop (lg+): 2 rows
-            Row A: [avatar + name + elo]  ———  [countdown + cost + buttons]
-            Row B: [status text, 3-line height]
+            Row A: [avatar + name + elo]  ———  [buttons]
+            Row B: [status text]  ———  [countdown + cost]
 
-          Mobile (<lg): 4 rows stacked
+          Mobile (<lg): stacked
             1. Identity: avatar + name + elo
-            2. Buttons: degen arena, run once, activate/deactivate
-            3. Status: rotating text, 3-line height
-            4. Metadata: countdown, cost
+            2. Buttons: centered
+            3. Status + metadata: text left, countdown/cost right
         */}
 
-        {/* Desktop: single row with identity left, controls right */}
+        {/* Desktop: identity left, buttons right */}
         <div className="hidden lg:flex items-center justify-between gap-3 mb-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <BotImageUpload
               configId={selectedBot.config_id}
               currentImageUrl={selectedBot.profile_image_url || null}
               onUploadComplete={(url) => { console.log('Image uploaded:', url) }}
             />
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] truncate">
               {selectedBot.config_name || 'Untitled Bot'}
             </h2>
             {isPaperTrading && selectedBot.elo_rating != null && (
               <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
             )}
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-              {countdown && !isSignalDriven && (
-                <div className="flex items-center gap-1 whitespace-nowrap">
-                  <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span>{countdown}</span>
-                </div>
-              )}
-              {configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0 && (
-                <div className="flex items-center gap-1 whitespace-nowrap" title="Total LLM cost for this bot (all-time)">
-                  <Coins className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span>${configUsage.total_usage_usd.toFixed(2)}</span>
-                </div>
-              )}
-              {getDailyCostDisplay() && (
-                <div className="flex items-center gap-1 whitespace-nowrap" title={getDailyCostDisplay()!.title}>
-                  <Coins className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span>{getDailyCostDisplay()!.text}</span>
-                </div>
-              )}
-            </div>
+          <div className="flex-shrink-0">
             <ActionButtons
               isActive={isActive}
               isStarting={isStarting}
@@ -286,6 +282,7 @@ export function ActivationBar({
               freeRunsRemaining={freeRunsRemaining}
               isPaperTrading={isPaperTrading}
               isRegisteredForArena={isRegisteredForArena}
+              arenaState={arenaState}
               onManualTrigger={handleManualTrigger}
               onToggleActive={isActive ? onStop : handleActivate}
               onDegenArena={() => setDegenArenaOpen(true)}
@@ -323,6 +320,7 @@ export function ActivationBar({
               freeRunsRemaining={freeRunsRemaining}
               isPaperTrading={isPaperTrading}
               isRegisteredForArena={isRegisteredForArena}
+              arenaState={arenaState}
               onManualTrigger={handleManualTrigger}
               onToggleActive={isActive ? onStop : handleActivate}
               onDegenArena={() => setDegenArenaOpen(true)}
@@ -331,14 +329,12 @@ export function ActivationBar({
           </div>
         </div>
 
-        {/* Status row — always rendered, fixed height for up to 3 lines */}
-        <div className="h-[3rem] mb-3">
-          <StatusMessage latestActivity={latestActivity ?? null} isActive={isActive} />
-        </div>
-
-        {/* Mobile Row 4: Metadata (countdown + cost) — hidden on desktop (shown inline above) */}
-        {(countdown || (configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0) || getDailyCostDisplay()) && (
-          <div className="lg:hidden flex items-center gap-3 text-xs text-[var(--text-muted)] mb-3">
+        {/* Status + metadata row — fixed height, status left, metadata right */}
+        <div className="flex items-start justify-between gap-4 h-[3rem] mb-3">
+          <div className="min-w-0">
+            <StatusMessage latestActivity={latestActivity ?? null} isActive={isActive} />
+          </div>
+          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] flex-shrink-0">
             {countdown && !isSignalDriven && (
               <div className="flex items-center gap-1 whitespace-nowrap">
                 <Clock className="h-3.5 w-3.5 flex-shrink-0" />
@@ -348,7 +344,7 @@ export function ActivationBar({
             {configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0 && (
               <div className="flex items-center gap-1 whitespace-nowrap" title="Total LLM cost for this bot (all-time)">
                 <Coins className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>${configUsage.total_usage_usd.toFixed(2)} total</span>
+                <span>${configUsage.total_usage_usd.toFixed(2)}</span>
               </div>
             )}
             {getDailyCostDisplay() && (
@@ -358,7 +354,7 @@ export function ActivationBar({
               </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* Row 2: KPI Metrics — always render grid, show placeholder dashes pre-SSE */}
         {usePnlOnlyKPIs ? (
@@ -450,7 +446,15 @@ export function ActivationBar({
       {/* Degen Arena (DGClaw) Modal */}
       <DegenArenaModal
         isOpen={degenArenaOpen}
-        onClose={() => setDegenArenaOpen(false)}
+        onClose={() => {
+          setDegenArenaOpen(false)
+          // Refresh arena state so button updates after deposit/join
+          apiClient.getArenaStatus(selectedBot.config_id).then(data => {
+            if (data.status === 'joined') {
+              setArenaState((data.dgclaw_balance || 0) > 0 ? 'funded' : 'joined')
+            }
+          }).catch(() => {})
+        }}
         configId={selectedBot.config_id}
         configName={selectedBot.config_name || 'Untitled Bot'}
         isBotActive={isActive}
@@ -470,22 +474,34 @@ interface KPICardProps {
 function ActionButtons({
   isActive, isStarting, isStopping, isManualTriggering,
   canRunOnce, dojoLocked, canAccess, freeRunsRemaining,
-  isPaperTrading, isRegisteredForArena,
+  isPaperTrading, isRegisteredForArena, arenaState,
   onManualTrigger, onToggleActive, onDegenArena, onArena,
 }: {
   isActive: boolean; isStarting: boolean; isStopping: boolean; isManualTriggering: boolean
   canRunOnce: boolean; dojoLocked: boolean; canAccess: (feature: string) => boolean; freeRunsRemaining: number
-  isPaperTrading: boolean; isRegisteredForArena: boolean
+  isPaperTrading: boolean; isRegisteredForArena: boolean; arenaState: 'none' | 'joined' | 'funded'
   onManualTrigger: () => void; onToggleActive: () => void; onDegenArena: () => void; onArena: () => void
 }) {
   return (
     <div className="flex items-center gap-2">
       <button
         onClick={onDegenArena}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors ${
+          arenaState === 'funded'
+            ? 'border-[#8B7CF2]/30 bg-[#8B7CF2]/10 text-[#8B7CF2]'
+            : arenaState === 'joined'
+              ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+              : 'border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+        }`}
       >
-        <Trophy className="h-4 w-4" />
-        <span className="hidden sm:inline">Enter Degen Arena</span>
+        {arenaState === 'funded' ? (
+          <CheckCircle className="h-4 w-4" />
+        ) : (
+          <Trophy className="h-4 w-4" />
+        )}
+        <span className="hidden sm:inline">
+          {arenaState === 'funded' ? 'In Arena' : arenaState === 'joined' ? 'Fund Arena' : 'Degen Arena'}
+        </span>
       </button>
 
       {/* Enter Arena — hidden until S2 registration API ready */}
