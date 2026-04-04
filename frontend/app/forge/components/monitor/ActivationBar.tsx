@@ -227,51 +227,52 @@ export function ActivationBar({
           </div>
         )}
 
-        {/* Row 1: Bot Name + Status + Controls */}
+        {/* Row 1: Bot Name + Status + Controls — fixed height to prevent CLS */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
-          {/* Left: Profile Image + Bot Name + Status */}
-          <div className="flex flex-col items-center lg:items-start gap-2">
+          {/* Left: Profile Image + Bot Name + Status — min-h locks layout, lg for desktop */}
+          <div className="flex flex-col items-center lg:items-start min-h-[52px] lg:min-h-[52px] justify-center">
             <div className="flex items-center gap-3">
               <BotImageUpload
                 configId={selectedBot.config_id}
                 currentImageUrl={selectedBot.profile_image_url || null}
                 onUploadComplete={(url) => {
-                  // Update parent state if needed - currently handled by SSE refresh
                   console.log('Image uploaded:', url)
                 }}
               />
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] truncate max-w-[200px] lg:max-w-[300px]">
                 {selectedBot.config_name || 'Untitled Bot'}
               </h2>
               {isPaperTrading && selectedBot.elo_rating != null && (
                 <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
               )}
             </div>
-            {/* Status Message - Dynamic when active, static "last activity" when inactive */}
-            {latestActivity && (
-              <StatusMessage latestActivity={latestActivity} isActive={isActive} />
-            )}
+            {/* Status Message — always rendered at fixed height, empty when no data */}
+            <div className="h-[20px]">
+              {latestActivity && (
+                <StatusMessage latestActivity={latestActivity} isActive={isActive} />
+              )}
+            </div>
           </div>
 
           {/* Right: Controls */}
-          <div className="flex items-center justify-center lg:justify-end gap-3 flex-wrap">
-            {/* Countdown & Cost */}
-            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+          <div className="flex items-center justify-center lg:justify-end gap-3">
+            {/* Countdown & Cost — min-w prevents button shift when badges appear */}
+            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] min-w-[120px] justify-end">
               {countdown && !isSignalDriven && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <Clock className="h-4 w-4 flex-shrink-0" />
                   <span>{countdown}</span>
                 </div>
               )}
               {configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0 && (
-                <div className="flex items-center gap-1" title="Total LLM cost for this bot (all-time)">
-                  <Coins className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1 whitespace-nowrap" title="Total LLM cost for this bot (all-time)">
+                  <Coins className="h-3.5 w-3.5 flex-shrink-0" />
                   <span>${configUsage.total_usage_usd.toFixed(2)} total</span>
                 </div>
               )}
               {getDailyCostDisplay() && (
-                <div className="flex items-center gap-1" title={getDailyCostDisplay()!.title}>
-                  <Coins className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1 whitespace-nowrap" title={getDailyCostDisplay()!.title}>
+                  <Coins className="h-3.5 w-3.5 flex-shrink-0" />
                   <span>{getDailyCostDisplay()!.text}</span>
                 </div>
               )}
@@ -364,7 +365,7 @@ export function ActivationBar({
         </div>
 
         {/* Row 2: KPI Metrics — min-h prevents layout shift on first SSE payload */}
-        <div className="min-h-[108px]">
+        <div className="min-h-[120px] sm:min-h-[108px]">
         {metrics && (
           <>
             {usePnlOnlyKPIs ? (
@@ -480,11 +481,11 @@ interface KPICardProps {
 
 function KPICard({ label, value, positive }: KPICardProps) {
   return (
-    <div className="border rounded-lg px-3 py-2 border-[var(--border)]">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+    <div className="border rounded-lg px-3 py-2 border-[var(--border)] overflow-hidden">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)] truncate">
         {label}
       </div>
-      <div className={`text-lg sm:text-xl leading-snug font-mono ${
+      <div className={`text-lg sm:text-xl leading-snug font-mono tabular-nums truncate ${
         positive !== undefined
           ? positive
             ? 'text-green-500'
