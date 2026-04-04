@@ -6,6 +6,30 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-04 - DGClaw Arena: Audit + Bug Fixes + Modal UX
+
+**Vault Bug** (`core/auth/vault_utils.py`):
+- `store_arena_credential` crashed on DGClaw registration — `vault.create_secret()` tried re-creating existing claw key, unique constraint violation silently dropped dgclaw_api_key. Fix: skip claw secret if already stored, only create dgclaw secret.
+
+**Arena Close Sync** (`trading/virtuals/arena_sync.py`):
+- Phase 1 admin bot (ARENA_ENABLED_CONFIGS env var) had no `arena_agents` row → `mirror_close_to_arena()` silently skipped all closes. Added Phase 1 fallback: enqueue close to `arena:trade_queue` via Redis for `sebastian-virtuals`. Both Phase 1 + Phase 2 close paths now covered.
+
+**Check-Deposit Flow** (`api/virtuals_arena.py`):
+- Registration (30-120s) now fire-and-forget via `asyncio.create_task`, returns `{"status": "registering"}` immediately. No HTTP timeout.
+- Min deposit $5→$6 (matches DGClaw actual minimum). Smart reserve: $0.10 for tight balances ($6-$8), $1.00 for $8+.
+- Status endpoint returns `is_registered` boolean.
+
+**Frontend Modal** (`degen-arena-modal.tsx`, `ActivationBar.tsx`, `api.ts`):
+- "+$X pending" → "+$X in wallet" (funds not in transit, just sitting).
+- Smart button labels: "Register & Deposit" / "Deposit to Arena" / "Deposit More" / "Check Balance" based on state.
+- Registration spinner shown when `is_registered=false` + wallet has funds.
+- Fee messaging: "$10+ recommended, $6 minimum", "~$1 bridge fee" (was "$20 minimum", "~$2 fee").
+- ActivationBar stateful: "Enter Degen Arena" → "Arena: Needs Funds" → "Manage Arena Agent" (green success tint).
+
+**Audit findings**: ACP SDK (`virtuals-acp==0.3.23`) confirmed working — EIP-7702 error on Apr 2 was transient RPC issue, not SDK breakage. Denis SZN2 bots correctly waiting (ADX ~10, no trend on ETH). Closed orphaned admin DGClaw BTC short ($67,121→$67,019).
+
+---
+
 ## 2026-04-02 - The Dojo: Phase 4 (1v1 Matches)
 
 **Match System** (`core/arena/matches.py` — NEW, ~500 lines):

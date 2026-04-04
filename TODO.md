@@ -139,7 +139,7 @@ New MI category: "Agent Intelligence" — curated Virtuals ACP agents as data so
 
 ## 🏟️ **Virtuals DGClaw Arena** ($GG Graduation — Volume Driver)
 
-**Status**: 🟡 IN PROGRESS — Phase 1 deployed, awaiting first automated trade
+**Status**: 🟡 IN PROGRESS — Phase 2 user flow tested, bugs fixed (2026-04-04)
 **Architecture Doc**: [trading/virtuals/README.md](trading/virtuals/README.md)
 
 AI trading arena on Virtuals Protocol. Every trade = on-chain ACP transaction = $GG volume. Arena is a parallel execution layer — bot runs normally (paper/live), arena mirrors trade intents to DGClaw via ACP.
@@ -148,17 +148,24 @@ AI trading arena on Virtuals Protocol. Every trade = on-chain ACP transaction = 
 ### ~~Phase 1: Arena Execution Layer~~ ✅ (2026-03-26)
 ### ~~Phase 2: Backend + Pool + Trade Routing~~ ✅ (2026-03-30)
 
-1-bot-1-agent model. 40 agents total: 28 available (tokenized, pool), 10 assigned (Denis SZN2, ~$15 each), 2 retired. `claw_api.py` for per-agent control, `arena_sync.py` for close mirroring, reconciler in orchestrator.
+1-bot-1-agent model. 40 agents total: 27 available (tokenized, pool), 11 assigned (10 Denis SZN2 + 1 user), 2 retired. `claw_api.py` for per-agent control, `arena_sync.py` for close mirroring, reconciler in orchestrator.
 
-### ~~Arena Close Sync~~ ✅ (2026-04-01)
+### ~~Arena Close Sync~~ ✅ (2026-04-01, Phase 1 fallback added 2026-04-04)
 
-Hooks at paper TP/SL, HL fill detection, manual close. Reconciler as safety net. `arena_exit` activity type.
+Hooks at paper TP/SL, HL fill detection, manual close. Reconciler as safety net. Phase 1 (env var) + Phase 2 (arena_agents) both covered.
 
-### **Phase 2: Remaining**
-- [ ] Frontend: `degen-arena-modal.tsx` polish + copy refinement (modal shell exists in ActivationBar)
-- [ ] End-to-end user test: join arena → deposit → bot trades → arena mirrors → TP/SL closes mirror
+### ~~Phase 2: Modal UX + Bug Fixes~~ ✅ (2026-04-04)
+
+- [x] Frontend: modal UX polish — async registration, smart button labels, correct fee messaging
+- [x] ActivationBar stateful button: Enter Degen Arena → Arena: Needs Funds → Manage Arena Agent
+- [x] Vault bug: `store_arena_credential` duplicate key crash on DGClaw registration
+- [x] Close sync Phase 1 fallback: admin bot closes now enqueue via Redis
+- [x] End-to-end user test: join → assign agent → deposit $6 → DGClaw funded ($4.99 after bridge)
+
+### **Remaining**
 - [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation in activity logger
 - [ ] Tokenize ggbot-003 (or keep retired)
+- [ ] End-to-end: wait for bot entry signal → verify arena mirror fires + close sync works
 
 ---
 

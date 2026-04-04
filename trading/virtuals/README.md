@@ -415,30 +415,30 @@ created_at        timestamptz
 
 ---
 
-## Current Status (2026-04-01)
+## Current Status (2026-04-04)
 
 ### Phase 1: Admin Bot — COMPLETE
-- [x] ggbots.ai registered on DGClaw, balance $73+, automated trades verified
+- [x] ggbots.ai registered on DGClaw, balance $70+, automated trades verified
 - [x] `dgclaw_service.py` — arena execution service (ACP SDK, Railway backend for balance)
 - [x] Orchestrator arena hook → `arena:trade_queue` → `sebastian-virtuals` section D
 - [x] Arena-enabled via `ARENA_ENABLED_CONFIGS` env var (Sev's live BTC/USDT bot)
-- [x] Multiple BTC trades mirrored successfully
+- [x] Close sync Phase 1 fallback: `arena_sync.py` enqueues close via Redis when no `arena_agents` row
 
-### Phase 2: User Agents — BACKEND COMPLETE
-- [x] Lite agent pool: 40 total (28 available, 10 assigned, 2 retired). 39 tokenized
-- [x] Denis's 10 agents funded ~$15 each, actively trading on DGClaw
-- [x] `trading/virtuals/claw_api.py` — async HTTP client for claw REST API
-- [x] `api/virtuals_arena.py` — config-based endpoints (join, status, deposit, withdraw, leaderboard)
-- [x] `core/auth/vault_utils.py` — arena credential vault methods (by agent_id, by config_id)
+### Phase 2: User Agents — COMPLETE (2026-04-04)
+- [x] Lite agent pool: 40 total (27 available, 11 assigned, 2 retired). 39 tokenized
+- [x] Denis's 10 agents funded ~$15 each, DGClaw registered
+- [x] First user test: The Technician → ggbot-004 assigned → $6 deposited → $4.99 on DGClaw
+- [x] `trading/virtuals/claw_api.py` — async HTTP client for claw REST API (timeout 180s)
+- [x] `api/virtuals_arena.py` — config-based endpoints (join, status, check-deposit, withdraw)
+- [x] `core/auth/vault_utils.py` — arena credential vault (skip-if-exists for claw key on re-registration)
 - [x] Orchestrator Phase 2 — direct claw API trade routing by `assigned_config_id`
 - [x] `scripts/create_arena_pool.py` — admin batch agent creation + auth flow
-- [x] DGClaw auto-registration on first deposit (join_leaderboard + RSA decrypt)
-- [x] `DegenArenaModal` — integrated into ActivationBar in Forge (1-bot-1-agent)
-- [x] Arena close sync: hooks at paper/live/manual close + reconciler safety net
-- [x] `trading/virtuals/arena_sync.py` — idempotent `mirror_close_to_arena()`
-- [ ] Frontend modal UI/UX polish
-- [ ] End-to-end user test (join → deposit → trade → TP/SL closes mirror)
+- [x] DGClaw auto-registration: async fire-and-forget on first check-deposit, returns `"registering"` immediately
+- [x] `DegenArenaModal` — smart button labels, registration progress, correct fee messaging
+- [x] `ActivationBar` — stateful button: Enter Degen Arena → Arena: Needs Funds → Manage Arena Agent
+- [x] Arena close sync: Phase 1 (Redis queue) + Phase 2 (claw API) + reconciler safety net
 - [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation
+- [ ] End-to-end: wait for bot entry signal → verify arena mirror + close sync
 
 ---
 
