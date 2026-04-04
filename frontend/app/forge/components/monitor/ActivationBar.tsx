@@ -227,15 +227,25 @@ export function ActivationBar({
           </div>
         )}
 
-        {/* Row 1: Identity + Actions */}
-        <div className="flex items-center justify-between gap-3 mb-2">
+        {/*
+          Desktop (lg+): 2 rows
+            Row A: [avatar + name + elo]  ———  [countdown + cost + buttons]
+            Row B: [status text, 3-line height]
+
+          Mobile (<lg): 4 rows stacked
+            1. Identity: avatar + name + elo
+            2. Buttons: degen arena, run once, activate/deactivate
+            3. Status: rotating text, 3-line height
+            4. Metadata: countdown, cost
+        */}
+
+        {/* Desktop: single row with identity left, controls right */}
+        <div className="hidden lg:flex items-center justify-between gap-3 mb-2">
           <div className="flex items-center gap-3">
             <BotImageUpload
               configId={selectedBot.config_id}
               currentImageUrl={selectedBot.profile_image_url || null}
-              onUploadComplete={(url) => {
-                console.log('Image uploaded:', url)
-              }}
+              onUploadComplete={(url) => { console.log('Image uploaded:', url) }}
             />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               {selectedBot.config_name || 'Untitled Bot'}
@@ -244,95 +254,91 @@ export function ActivationBar({
               <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
             )}
           </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => setDegenArenaOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] transition-colors"
-            >
-              <Trophy className="h-4 w-4" />
-              <span className="hidden sm:inline">Degen Arena</span>
-            </button>
-
-            {/* Enter Arena — hidden until S2 registration API ready */}
-            {false && isPaperTrading && (
-              isRegisteredForArena ? (
-                <div className="inline-flex items-center gap-1.5 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm text-green-500">
-                  <CheckCircle className="h-4 w-4" />
-                  <span>In Arena</span>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+              {countdown && !isSignalDriven && (
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>{countdown}</span>
                 </div>
-              ) : (
-                <button
-                  onClick={() => setArenaModalOpen(true)}
-                  disabled={!isActive}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Trophy className="h-4 w-4" />
-                  <span>Enter Arena</span>
-                </button>
-              )
-            )}
-
-            <button
-              onClick={handleManualTrigger}
-              disabled={isManualTriggering || isStarting || isStopping || !canRunOnce || dojoLocked}
-              className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed ${
-                !canRunOnce || dojoLocked
-                  ? 'opacity-50'
-                  : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
-              }`}
-              title={dojoLocked ? 'Locked for Dojo match' : !canRunOnce ? 'No free test runs remaining. Subscribe to run your bot.' : undefined}
-            >
-              {!canAccess('bot_activation') && freeRunsRemaining === 0 ? (
-                <Crown className="h-4 w-4" />
-              ) : (
-                <Zap className="h-4 w-4" />
               )}
-              <span className="hidden sm:inline">
-                {isManualTriggering ? 'Triggering...' : (
-                  <>
-                    Run once
-                    {!canAccess('bot_activation') && freeRunsRemaining > 0 && (
-                      <span className="text-xs text-[var(--text-muted)]"> ({freeRunsRemaining} free)</span>
-                    )}
-                  </>
-                )}
-              </span>
-            </button>
-
-            <button
-              onClick={isActive ? onStop : handleActivate}
-              disabled={isStarting || isStopping || (isActive && dojoLocked)}
-              title={isActive && dojoLocked ? 'Locked for Dojo match — forfeit to unlock' : undefined}
-              className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
-                isActive
-                  ? 'bg-rose-600/90 hover:bg-rose-700 ring-rose-500 text-white'
-                  : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] ring-[var(--accent)] text-[#edebe7] dark:text-[#1a1816]'
-              } disabled:opacity-50`}
-            >
-              {isActive ? (
-                <>
-                  <PauseCircle className="h-4 w-4" />
-                  {isStopping ? 'Deactivating...' : 'Deactivate'}
-                </>
-              ) : (
-                <>
-                  {!canAccess('bot_activation') ? (
-                    <Crown className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                  {isStarting ? 'Activating...' : 'Activate'}
-                </>
+              {configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0 && (
+                <div className="flex items-center gap-1 whitespace-nowrap" title="Total LLM cost for this bot (all-time)">
+                  <Coins className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>${configUsage.total_usage_usd.toFixed(2)}</span>
+                </div>
               )}
-            </button>
+              {getDailyCostDisplay() && (
+                <div className="flex items-center gap-1 whitespace-nowrap" title={getDailyCostDisplay()!.title}>
+                  <Coins className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>{getDailyCostDisplay()!.text}</span>
+                </div>
+              )}
+            </div>
+            <ActionButtons
+              isActive={isActive}
+              isStarting={isStarting}
+              isStopping={isStopping}
+              isManualTriggering={isManualTriggering}
+              canRunOnce={canRunOnce}
+              dojoLocked={dojoLocked}
+              canAccess={canAccess}
+              freeRunsRemaining={freeRunsRemaining}
+              isPaperTrading={isPaperTrading}
+              isRegisteredForArena={isRegisteredForArena}
+              onManualTrigger={handleManualTrigger}
+              onToggleActive={isActive ? onStop : handleActivate}
+              onDegenArena={() => setDegenArenaOpen(true)}
+              onArena={() => setArenaModalOpen(true)}
+            />
           </div>
         </div>
 
-        {/* Row 2: Status + live metadata — fixed 3-line height, text flows naturally */}
-        <div className="flex items-start justify-between gap-4 mb-3 h-[3.75rem]">
+        {/* Mobile: 4 stacked rows */}
+        <div className="lg:hidden space-y-2 mb-2">
+          {/* Mobile Row 1: Identity */}
+          <div className="flex items-center gap-3">
+            <BotImageUpload
+              configId={selectedBot.config_id}
+              currentImageUrl={selectedBot.profile_image_url || null}
+              onUploadComplete={(url) => { console.log('Image uploaded:', url) }}
+            />
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              {selectedBot.config_name || 'Untitled Bot'}
+            </h2>
+            {isPaperTrading && selectedBot.elo_rating != null && (
+              <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
+            )}
+          </div>
+          {/* Mobile Row 2: Buttons */}
+          <div className="flex items-center justify-center gap-2">
+            <ActionButtons
+              isActive={isActive}
+              isStarting={isStarting}
+              isStopping={isStopping}
+              isManualTriggering={isManualTriggering}
+              canRunOnce={canRunOnce}
+              dojoLocked={dojoLocked}
+              canAccess={canAccess}
+              freeRunsRemaining={freeRunsRemaining}
+              isPaperTrading={isPaperTrading}
+              isRegisteredForArena={isRegisteredForArena}
+              onManualTrigger={handleManualTrigger}
+              onToggleActive={isActive ? onStop : handleActivate}
+              onDegenArena={() => setDegenArenaOpen(true)}
+              onArena={() => setArenaModalOpen(true)}
+            />
+          </div>
+        </div>
+
+        {/* Status row — always rendered, fixed height for up to 3 lines */}
+        <div className="h-[3rem] mb-3">
           <StatusMessage latestActivity={latestActivity ?? null} isActive={isActive} />
-          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] flex-shrink-0">
+        </div>
+
+        {/* Mobile Row 4: Metadata (countdown + cost) — hidden on desktop (shown inline above) */}
+        {(countdown || (configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0) || getDailyCostDisplay()) && (
+          <div className="lg:hidden flex items-center gap-3 text-xs text-[var(--text-muted)] mb-3">
             {countdown && !isSignalDriven && (
               <div className="flex items-center gap-1 whitespace-nowrap">
                 <Clock className="h-3.5 w-3.5 flex-shrink-0" />
@@ -342,7 +348,7 @@ export function ActivationBar({
             {configUsage?.total_usage_usd != null && configUsage.total_usage_usd > 0 && (
               <div className="flex items-center gap-1 whitespace-nowrap" title="Total LLM cost for this bot (all-time)">
                 <Coins className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>${configUsage.total_usage_usd.toFixed(2)}</span>
+                <span>${configUsage.total_usage_usd.toFixed(2)} total</span>
               </div>
             )}
             {getDailyCostDisplay() && (
@@ -352,7 +358,7 @@ export function ActivationBar({
               </div>
             )}
           </div>
-        </div>
+        )}
 
         {/* Row 2: KPI Metrics — always render grid, show placeholder dashes pre-SSE */}
         {usePnlOnlyKPIs ? (
@@ -459,6 +465,95 @@ interface KPICardProps {
   label: string
   value: string
   positive?: boolean
+}
+
+function ActionButtons({
+  isActive, isStarting, isStopping, isManualTriggering,
+  canRunOnce, dojoLocked, canAccess, freeRunsRemaining,
+  isPaperTrading, isRegisteredForArena,
+  onManualTrigger, onToggleActive, onDegenArena, onArena,
+}: {
+  isActive: boolean; isStarting: boolean; isStopping: boolean; isManualTriggering: boolean
+  canRunOnce: boolean; dojoLocked: boolean; canAccess: (feature: string) => boolean; freeRunsRemaining: number
+  isPaperTrading: boolean; isRegisteredForArena: boolean
+  onManualTrigger: () => void; onToggleActive: () => void; onDegenArena: () => void; onArena: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={onDegenArena}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] transition-colors"
+      >
+        <Trophy className="h-4 w-4" />
+        <span className="hidden sm:inline">Degen Arena</span>
+      </button>
+
+      {/* Enter Arena — hidden until S2 registration API ready */}
+      {false && isPaperTrading && (
+        isRegisteredForArena ? (
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm text-green-500">
+            <CheckCircle className="h-4 w-4" />
+            <span>In Arena</span>
+          </div>
+        ) : (
+          <button
+            onClick={onArena}
+            disabled={!isActive}
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trophy className="h-4 w-4" />
+            <span>Enter Arena</span>
+          </button>
+        )
+      )}
+
+      <button
+        onClick={onManualTrigger}
+        disabled={isManualTriggering || isStarting || isStopping || !canRunOnce || dojoLocked}
+        className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed ${
+          !canRunOnce || dojoLocked ? 'opacity-50' : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
+        }`}
+        title={dojoLocked ? 'Locked for Dojo match' : !canRunOnce ? 'No free test runs remaining.' : undefined}
+      >
+        {!canAccess('bot_activation') && freeRunsRemaining === 0 ? (
+          <Crown className="h-4 w-4" />
+        ) : (
+          <Zap className="h-4 w-4" />
+        )}
+        {isManualTriggering ? 'Triggering...' : (
+          <>
+            Run once
+            {!canAccess('bot_activation') && freeRunsRemaining > 0 && (
+              <span className="text-xs text-[var(--text-muted)]">({freeRunsRemaining} free)</span>
+            )}
+          </>
+        )}
+      </button>
+
+      <button
+        onClick={onToggleActive}
+        disabled={isStarting || isStopping || (isActive && dojoLocked)}
+        title={isActive && dojoLocked ? 'Locked for Dojo match — forfeit to unlock' : undefined}
+        className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
+          isActive
+            ? 'bg-rose-600/90 hover:bg-rose-700 ring-rose-500 text-white'
+            : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] ring-[var(--accent)] text-[#edebe7] dark:text-[#1a1816]'
+        } disabled:opacity-50`}
+      >
+        {isActive ? (
+          <>
+            <PauseCircle className="h-4 w-4" />
+            {isStopping ? 'Deactivating...' : 'Deactivate'}
+          </>
+        ) : (
+          <>
+            {!canAccess('bot_activation') ? <Crown className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isStarting ? 'Activating...' : 'Activate'}
+          </>
+        )}
+      </button>
+    </div>
+  )
 }
 
 function KPICard({ label, value, positive }: KPICardProps) {
