@@ -227,10 +227,10 @@ export function ActivationBar({
           </div>
         )}
 
-        {/* Row 1: Bot Name + Status + Controls — fixed height to prevent CLS */}
+        {/* Row 1: Bot Name + Status + Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
-          {/* Left: Profile Image + Bot Name + Status — min-h locks layout, lg for desktop */}
-          <div className="flex flex-col items-center lg:items-start min-h-[52px] lg:min-h-[52px] justify-center">
+          {/* Left: Profile Image + Bot Name + Status */}
+          <div className="flex flex-col items-center lg:items-start gap-1">
             <div className="flex items-center gap-3">
               <BotImageUpload
                 configId={selectedBot.config_id}
@@ -239,25 +239,21 @@ export function ActivationBar({
                   console.log('Image uploaded:', url)
                 }}
               />
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] truncate max-w-[200px] lg:max-w-[300px]">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                 {selectedBot.config_name || 'Untitled Bot'}
               </h2>
               {isPaperTrading && selectedBot.elo_rating != null && (
                 <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
               )}
             </div>
-            {/* Status Message — always rendered at fixed height, empty when no data */}
-            <div className="h-[20px]">
-              {latestActivity && (
-                <StatusMessage latestActivity={latestActivity} isActive={isActive} />
-              )}
-            </div>
+            {/* Status — always rendered so it never adds/removes height */}
+            <StatusMessage latestActivity={latestActivity ?? null} isActive={isActive} />
           </div>
 
           {/* Right: Controls */}
           <div className="flex items-center justify-center lg:justify-end gap-3">
-            {/* Countdown & Cost — min-w prevents button shift when badges appear */}
-            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] min-w-[120px] justify-end">
+            {/* Countdown & Cost */}
+            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
               {countdown && !isSignalDriven && (
                 <div className="flex items-center gap-1 whitespace-nowrap">
                   <Clock className="h-4 w-4 flex-shrink-0" />
@@ -364,61 +360,53 @@ export function ActivationBar({
           </div>
         </div>
 
-        {/* Row 2: KPI Metrics — min-h prevents layout shift on first SSE payload */}
-        <div className="min-h-[120px] sm:min-h-[108px]">
-        {metrics && (
+        {/* Row 2: KPI Metrics — always render grid, show placeholder dashes pre-SSE */}
+        {usePnlOnlyKPIs ? (
           <>
-            {usePnlOnlyKPIs ? (
-              <>
-                {/* Legacy live modes (Symphony/Aster): Cumulative P&L focused */}
-                <div className="grid grid-cols-3 gap-3 mb-2">
-                  <KPICard
-                    label="Cumulative P&L"
-                    value={`${metrics.totalEquity >= 0 ? '+' : ''}$${Math.round(metrics.totalEquity).toLocaleString()}`}
-                    positive={metrics.totalEquity >= 0}
-                  />
-                  <KPICard
-                    label="Unrealized"
-                    value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
-                    positive={metrics.pnl >= 0}
-                  />
-                  <KPICard label="Trades" value={String(metrics.trades)} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
-                  <KPICard
-                    label="Perf"
-                    value={`${metrics.performance.toFixed(2)}%`}
-                    positive={metrics.performance >= 0}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Paper Trading: Full equity view */}
-                <div className="grid grid-cols-3 gap-3 mb-2">
-                  <KPICard label="Total Equity" value={`$${Math.round(metrics.totalEquity).toLocaleString()}`} />
-                  <KPICard label="Available" value={`$${Math.round(metrics.availableBalance).toLocaleString()}`} />
-                  <KPICard
-                    label="Unrealized"
-                    value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
-                    positive={metrics.pnl >= 0}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <KPICard label="Trades" value={String(metrics.trades)} />
-                  <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
-                  <KPICard
-                    label="Perf"
-                    value={`${metrics.performance.toFixed(2)}%`}
-                    positive={metrics.performance >= 0}
-                  />
-                </div>
-              </>
-            )}
+            <div className="grid grid-cols-3 gap-3 mb-2">
+              <KPICard
+                label="Cumulative P&L"
+                value={metrics ? `${metrics.totalEquity >= 0 ? '+' : ''}$${Math.round(metrics.totalEquity).toLocaleString()}` : '—'}
+                positive={metrics ? metrics.totalEquity >= 0 : undefined}
+              />
+              <KPICard
+                label="Unrealized"
+                value={metrics ? `${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}` : '—'}
+                positive={metrics ? metrics.pnl >= 0 : undefined}
+              />
+              <KPICard label="Trades" value={metrics ? String(metrics.trades) : '—'} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <KPICard label="Win Rate" value={metrics ? `${Math.round(metrics.winRate)}%` : '—'} />
+              <KPICard
+                label="Perf"
+                value={metrics ? `${metrics.performance.toFixed(2)}%` : '—'}
+                positive={metrics ? metrics.performance >= 0 : undefined}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3 mb-2">
+              <KPICard label="Total Equity" value={metrics ? `$${Math.round(metrics.totalEquity).toLocaleString()}` : '—'} />
+              <KPICard label="Available" value={metrics ? `$${Math.round(metrics.availableBalance).toLocaleString()}` : '—'} />
+              <KPICard
+                label="Unrealized"
+                value={metrics ? `${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}` : '—'}
+                positive={metrics ? metrics.pnl >= 0 : undefined}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <KPICard label="Trades" value={metrics ? String(metrics.trades) : '—'} />
+              <KPICard label="Win Rate" value={metrics ? `${Math.round(metrics.winRate)}%` : '—'} />
+              <KPICard
+                label="Perf"
+                value={metrics ? `${metrics.performance.toFixed(2)}%` : '—'}
+                positive={metrics ? metrics.performance >= 0 : undefined}
+              />
+            </div>
           </>
         )}
-        </div>
       </div>
 
       {/* Upgrade Modal */}
@@ -500,7 +488,7 @@ function KPICard({ label, value, positive }: KPICardProps) {
 
 
 interface StatusMessageProps {
-  latestActivity: Activity
+  latestActivity: Activity | null
   isActive: boolean
 }
 
@@ -530,6 +518,10 @@ function StatusMessage({ latestActivity, isActive }: StatusMessageProps) {
 
   // Generate activity-based status messages with variants
   React.useEffect(() => {
+    if (!latestActivity) {
+      setDisplayMessage(isActive ? 'Waiting for first activity...' : 'No activity yet')
+      return
+    }
 
     const generateMessage = () => {
       const activity = latestActivity
@@ -704,7 +696,7 @@ function StatusMessage({ latestActivity, isActive }: StatusMessageProps) {
   }, [spinnerChars.length])
 
   return (
-    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] h-[20px] max-w-[400px]">
+    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
       {isActive ? (
         <span className="font-mono text-[var(--agent-extraction)] flex-shrink-0">
           {spinnerChars[spinnerIndex]}
@@ -712,7 +704,7 @@ function StatusMessage({ latestActivity, isActive }: StatusMessageProps) {
       ) : (
         <span className="text-[var(--text-muted)] flex-shrink-0">○</span>
       )}
-      <span className="truncate">{displayMessage}</span>
+      <span className="line-clamp-1">{displayMessage}</span>
     </div>
   )
 }
