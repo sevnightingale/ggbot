@@ -296,6 +296,9 @@ async def get_arena_status(
 
     dgclaw_balance = dgclaw_account.get('balance', 0) if dgclaw_account else 0
 
+    # Check registration status (dgclaw_api_key_vault_id set = registered)
+    is_registered = await _is_registered_on_dgclaw(agent['agent_id'])
+
     return {
         "status": "joined",
         "agent_name": agent['agent_name'],
@@ -304,6 +307,7 @@ async def get_arena_status(
         "user_wallet_address": agent.get('user_wallet_address'),
         "wallet_balance_usdc": wallet_balance,
         "dgclaw_balance": dgclaw_balance,
+        "is_registered": is_registered,
         "positions": positions,
     }
 
@@ -347,51 +351,55 @@ async def check_deposit(
 
     # Register on DGClaw if not yet registered (first deposit triggers this)
     if not await _is_registered_on_dgclaw(agent['agent_id']):
-        _log.info(f"Agent {agent['agent_id']} not registered on DGClaw, registering...")
-        registered = await _register_on_dgclaw(
+        _log.info(f"Agent {agent['agent_id']} not registered on DGClaw, starting background registration...")
+        # Fire-and-forget: registration takes 30-120s, don't block the HTTP response
+        asyncio.create_task(_register_on_dgclaw(
             agent['agent_id'], agent['wallet_address'], agent['claw_api_key']
-        )
-        if not registered:
-            return {
-                "status": "error",
-                "balance": balance,
-                "reason": "Failed to register on DGClaw. Please try again.",
-            }
-        # Re-check balance (registration costs $0.01)
-        balance = await client.get_wallet_balance()
+        ))
+        return {
+            "status": "registering",
+            "balance": balance,
+            "message": "Registering your agent on Degen Claw. This takes about 30 seconds — we'll update automatically.",
+        }
 
-    # Keep $1 for ACP fees, deposit the rest
-    reserve = 1.0
-    min_deposit = 5.0
+    # DGClaw minimum is $6 — need at least $6 in wallet
+    min_deposit = 6.0
 
     if balance < min_deposit:
         return {
             "status": "insufficient",
             "balance": balance,
-            "message": f"Balance ${balance:.2f} is below the $5 minimum deposit.",
+            "message": f"Balance ${balance:.2f} is below the ${min_deposit:.0f} minimum deposit. Send at least ${min_deposit:.0f} USDC.",
         }
 
-    deposit_amount = balance - reserve
-    if deposit_amount < 4:
-        deposit_amount = balance - 0.5  # Smaller reserve if tight
+    # Reserve for ACP trade fees ($0.01 per trade)
+    # For tight balances ($6-$7), use smaller reserve to maximize deposit
+    if balance < 8:
+        reserve = 0.10  # Minimal reserve — user can top up later
+    else:
+        reserve = 1.0  # Standard reserve (~100 trades)
 
-    _log.info(f"Triggering perp_deposit: ${deposit_amount:.2f} (wallet: ${balance:.2f})")
+    deposit_amount = balance - reserve
+
+    _log.info(f"Triggering perp_deposit: ${deposit_amount:.2f} (wallet: ${balance:.2f}, reserve: ${reserve:.2f})")
 
     result = await client.deposit_to_dgclaw(deposit_amount)
 
     if result.get('status') == 'success':
+        receipt = result.get('receipt', {})
+        bridged = float(receipt.get('bridgedAmount', deposit_amount - 1))
         return {
             "status": "deposited",
             "amount_sent": deposit_amount,
-            "effective_amount": round(deposit_amount - 1, 2),
-            "message": f"Deposited ${deposit_amount:.0f} USDC. After bridge fee (~$1), expect ~${max(deposit_amount - 1, 0):.0f} in DGClaw.",
+            "effective_amount": round(bridged, 2),
+            "message": f"Deposited ${deposit_amount:.0f} USDC. After bridge fee, ${bridged:.2f} arrived in DGClaw.",
         }
     else:
         _log.error(f"Deposit failed: {result}")
         return {
             "status": "error",
             "balance": balance,
-            "reason": result.get('reason', 'Deposit failed'),
+            "reason": result.get('reason', 'Deposit failed. DGClaw may be temporarily unavailable — try again in a few minutes.'),
         }
 
 

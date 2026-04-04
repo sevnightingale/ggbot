@@ -26,7 +26,7 @@ class ClawAPIClient:
     DGCLAW_BACKEND = "https://dgclaw-app-production.up.railway.app"
 
     # ACP job polling
-    MAX_POLL_TIME = 90   # seconds
+    MAX_POLL_TIME = 180  # seconds (DGClaw can be slow, especially deposits/bridges)
     POLL_INTERVAL = 5    # seconds
 
     def __init__(self, api_key: str):

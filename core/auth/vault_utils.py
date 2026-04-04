@@ -767,13 +767,22 @@ class VaultManager:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Store claw API key in vault
-                    vault_name_claw = f"arena_claw_{agent_id}"
+                    # Check if claw key already stored (avoid duplicate vault secret)
                     cur.execute(
-                        "SELECT vault.create_secret(%s, %s) as secret_id;",
-                        (claw_api_key, vault_name_claw)
+                        "SELECT claw_api_key_vault_id FROM arena_agents WHERE id = %s",
+                        (agent_id,)
                     )
-                    claw_vault_id = cur.fetchone()[0]
+                    existing = cur.fetchone()
+                    claw_vault_id = existing[0] if existing and existing[0] else None
+
+                    if not claw_vault_id:
+                        # Store claw API key in vault (first time only)
+                        vault_name_claw = f"arena_claw_{agent_id}"
+                        cur.execute(
+                            "SELECT vault.create_secret(%s, %s) as secret_id;",
+                            (claw_api_key, vault_name_claw)
+                        )
+                        claw_vault_id = cur.fetchone()[0]
 
                     # Store DGClaw API key if provided
                     dgclaw_vault_id = None
@@ -786,12 +795,18 @@ class VaultManager:
                         dgclaw_vault_id = cur.fetchone()[0]
 
                     # Update arena_agents with vault references
-                    cur.execute("""
+                    update_parts = ["claw_api_key_vault_id = %s"]
+                    update_params = [claw_vault_id]
+                    if dgclaw_vault_id:
+                        update_parts.append("dgclaw_api_key_vault_id = %s")
+                        update_params.append(dgclaw_vault_id)
+                    update_params.append(agent_id)
+
+                    cur.execute(f"""
                         UPDATE arena_agents
-                        SET claw_api_key_vault_id = %s,
-                            dgclaw_api_key_vault_id = %s
+                        SET {', '.join(update_parts)}
                         WHERE id = %s
-                    """, (claw_vault_id, dgclaw_vault_id, agent_id))
+                    """, tuple(update_params))
 
                     conn.commit()
                     logger.info(f"Stored arena credentials for agent {agent_id}")

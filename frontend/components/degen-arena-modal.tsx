@@ -38,6 +38,7 @@ interface ArenaStatus {
   user_wallet_address?: string
   wallet_balance_usdc?: number
   dgclaw_balance?: number
+  is_registered?: boolean
   positions?: Position[]
 }
 
@@ -168,12 +169,16 @@ export function DegenArenaModal({
       const data = await res.json()
 
       if (data.status === 'deposited') {
-        setDepositStatus('Funds deposited successfully!')
+        setDepositStatus(data.message || 'Funds deposited successfully!')
         await fetchStatus(false)
-        setTimeout(() => setDepositStatus(null), 5000)
+        setTimeout(() => setDepositStatus(null), 8000)
+      } else if (data.status === 'registering') {
+        setDepositStatus(data.message || 'Registering on Degen Claw (~30s)...')
+        // Registration is async — poll will pick up completion
+        setTimeout(() => setDepositStatus(null), 10000)
       } else if (data.status === 'no_funds') {
         setDepositStatus(null)
-        setError('No USDC detected yet. Transfers can take a few minutes to confirm — try again shortly.')
+        setError('No USDC detected yet. Transfers can take a few minutes — try again shortly.')
       } else if (data.status === 'insufficient') {
         setDepositStatus(null)
         setError(data.message)
@@ -313,7 +318,7 @@ export function DegenArenaModal({
               <div className="space-y-2">
                 <div className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-medium flex items-center justify-center">1</span>
-                  <p className="text-sm text-[var(--text-secondary)]">Fund your arena agent with USDC on Base chain ($20 minimum)</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Fund your arena agent with USDC on Base ($10+ recommended, $6 minimum)</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-medium flex items-center justify-center">2</span>
@@ -334,7 +339,7 @@ export function DegenArenaModal({
             {/* Fees */}
             <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
               <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-              <span>~$2 fee per deposit (bridge + registration). $0.01 per trade. For a $20 deposit, ~$18 becomes your trading balance.</span>
+              <span>~$1 bridge fee per deposit. $0.01 per trade. For a $10 deposit, ~$9 becomes your trading balance.</span>
             </div>
 
             {/* Wallet input */}
@@ -385,7 +390,18 @@ export function DegenArenaModal({
   const balance = arenaStatus.dgclaw_balance || 0
   const walletBalance = arenaStatus.wallet_balance_usdc || 0
   const positions = arenaStatus.positions || []
-  const needsFunding = balance === 0 && walletBalance < 5
+  const isRegistered = arenaStatus.is_registered !== false
+  const hasFundsInWallet = walletBalance >= 0.1
+  const needsFunding = balance === 0 && !hasFundsInWallet
+
+  // Determine the primary action button label and behavior
+  const getDepositButtonLabel = () => {
+    if (checking) return depositStatus || 'Processing...'
+    if (!isRegistered && hasFundsInWallet) return 'Register & Deposit'
+    if (hasFundsInWallet && balance === 0) return 'Deposit to Arena'
+    if (hasFundsInWallet) return 'Deposit More'
+    return "I've Sent USDC — Check Balance"
+  }
 
   return (
     <Modal open={isOpen} onOpenChange={onClose} size="sm">
@@ -406,9 +422,9 @@ export function DegenArenaModal({
           <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Arena Balance</p>
-              {walletBalance > 0.1 && (
-                <span className="text-xs text-[var(--text-muted)]">
-                  +${walletBalance.toFixed(2)} pending
+              {hasFundsInWallet && (
+                <span className="text-xs text-[var(--accent)]">
+                  +${walletBalance.toFixed(2)} in wallet
                 </span>
               )}
             </div>
@@ -422,12 +438,23 @@ export function DegenArenaModal({
             )}
           </div>
 
+          {/* Registration in progress */}
+          {!isRegistered && hasFundsInWallet && (
+            <div className="rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/20 p-3 flex items-center gap-3">
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)] flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Registering on Degen Claw...</p>
+                <p className="text-xs text-[var(--text-muted)]">This takes about 30 seconds. We&apos;ll deposit your funds automatically once complete.</p>
+              </div>
+            </div>
+          )}
+
           {/* Needs funding prompt */}
           {needsFunding && (
             <div className="rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/20 p-3 space-y-2">
               <p className="text-sm font-medium text-[var(--text-primary)]">Fund your arena agent</p>
               <p className="text-sm text-[var(--text-secondary)]">
-                Send <strong>$20+ USDC</strong> on Base chain to:
+                Send <strong>USDC</strong> on Base chain to:
               </p>
               <div className="flex items-center gap-2 bg-[var(--bg-primary)] rounded-lg px-3 py-2">
                 <span className="text-xs font-mono text-[var(--text-muted)] truncate flex-1">
@@ -441,7 +468,7 @@ export function DegenArenaModal({
                 </button>
               </div>
               <p className="text-xs text-[var(--text-muted)]">
-                ~$2 in fees (bridge + registration). ~$18 effective trading balance.
+                $10+ recommended (minimum $6). ~$1 bridge fee deducted on deposit.
               </p>
             </div>
           )}
@@ -462,7 +489,7 @@ export function DegenArenaModal({
             </div>
           )}
 
-          {/* Check / Deposit button */}
+          {/* Action button */}
           <button
             onClick={handleCheckDeposit}
             disabled={checking}
@@ -471,12 +498,12 @@ export function DegenArenaModal({
             {checking ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {depositStatus || 'Checking...'}
+                {depositStatus || 'Processing...'}
               </>
             ) : (
               <>
                 <RefreshCw className="h-4 w-4" />
-                {needsFunding ? "I've Sent USDC" : 'Deposit More'}
+                {getDepositButtonLabel()}
               </>
             )}
           </button>

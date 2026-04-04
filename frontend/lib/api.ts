@@ -927,6 +927,18 @@ export class ApiClient {
     return await response.json()
   }
 
+  // Arena status (DGClaw)
+  async getArenaStatus(configId: string): Promise<{
+    status: 'not_joined' | 'joined'
+    dgclaw_balance?: number
+    wallet_balance_usdc?: number
+    is_registered?: boolean
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/virtuals-arena/status?config_id=${configId}`)
+    if (!response.ok) return { status: 'not_joined' }
+    return await response.json()
+  }
+
   // Purchase Credits via Stripe
   async purchaseCredits(amountCents: number): Promise<{ checkout_url: string }> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/credits/purchase`, {

@@ -488,10 +488,8 @@ function ActionButtons({
         onClick={onDegenArena}
         className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors ${
           arenaState === 'funded'
-            ? 'border-[#8B7CF2]/30 bg-[#8B7CF2]/10 text-[#8B7CF2]'
-            : arenaState === 'joined'
-              ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
-              : 'border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+            ? 'border-green-500/30 bg-green-500/10 text-green-500'
+            : 'border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
         }`}
       >
         {arenaState === 'funded' ? (
@@ -500,7 +498,7 @@ function ActionButtons({
           <Trophy className="h-4 w-4" />
         )}
         <span className="hidden sm:inline">
-          {arenaState === 'funded' ? 'In Arena' : arenaState === 'joined' ? 'Fund Arena' : 'Degen Arena'}
+          {arenaState === 'funded' ? 'Manage Arena Agent' : arenaState === 'joined' ? 'Arena: Needs Funds' : 'Enter Degen Arena'}
         </span>
       </button>
 
