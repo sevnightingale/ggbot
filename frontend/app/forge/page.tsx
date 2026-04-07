@@ -1262,6 +1262,7 @@ function ForgeApp() {
                             configId={selectedConfigId}
                             title={selectedBot.config_name}
                             variant="embedded"
+                            isOwner
                           />
                         </div>
                       )}

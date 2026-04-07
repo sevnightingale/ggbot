@@ -950,7 +950,7 @@ Dual-mode equity chart using TradingView Lightweight Charts v4.2.0. Users can to
 **Mode Toggle UI**: Brass-colored toggle buttons in header with conditional timeframe selector (performance mode only)
 
 **Component Variants**:
-- **Standalone**: `aster.ggbots.ai` → `/view/{config_id}` (full viewport, 100vh - 280px)
+- **Standalone**: `/view/{config_id}` on the main app (full viewport, 100vh - 280px) — public shareable timeline
 - **Embedded**: `/forge` Monitor tab (fixed 600px height, full width)
 
 **Integration** (2025-11-08): Timeline replaced DecisionFeed + PerformanceChart in Forge Monitor tab, consolidating KPIs, equity chart, and activity history into single comprehensive view.

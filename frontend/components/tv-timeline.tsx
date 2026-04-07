@@ -5,7 +5,9 @@ import { createChart, ColorType, LineStyle } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, LineData, Time, SeriesMarker } from 'lightweight-charts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Session } from '@supabase/supabase-js';
+import { Download } from 'lucide-react';
 import ActivityModal from './activity-modal';
+import { ActivityExportModal } from './ActivityExportModal';
 import ReactMarkdown from 'react-markdown';
 import { useTheme } from '@/lib/theme';
 
@@ -76,6 +78,8 @@ interface TimelineProps {
   configId: string;
   title?: string;
   variant?: 'standalone' | 'embedded';
+  /** When true, show the activity export download button. Owner-only (Forge embed). */
+  isOwner?: boolean;
 }
 
 type ChartMode = 'activity' | 'performance';
@@ -143,7 +147,7 @@ function aggregateToTimeframe(dataPoints: BalancePoint[], timeframe: Timeframe):
   return aggregated;
 }
 
-export default function TVTimeline({ configId, title, variant = 'standalone' }: TimelineProps) {
+export default function TVTimeline({ configId, title, variant = 'standalone', isOwner = false }: TimelineProps) {
   const { theme } = useTheme();
   const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -165,6 +169,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   const [chartMode, setChartMode] = useState<ChartMode>('activity');
   const [timeframe, setTimeframe] = useState<Timeframe>('5m');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('dollar');
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
@@ -1025,6 +1030,23 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       <section className="max-w-7xl mx-auto">
         <div className="rounded-xl border p-4 relative flex flex-col" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: variant === 'embedded' ? '600px' : 'calc(100vh - 280px)', minHeight: '400px' }}>
 
+          {/* Export button — top-right corner, owner-only */}
+          {isOwner && (
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              title="Export activity log"
+              aria-label="Export activity log"
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-md border transition-colors hover:brightness-125"
+              style={{
+                backgroundColor: VIBE.obsidian,
+                borderColor: VIBE.hair,
+                color: VIBE.ivory,
+              }}
+            >
+              <Download size={14} />
+            </button>
+          )}
+
           {/* Chart Mode and Timeframe Controls - Centered above chart */}
           <div className="flex justify-center gap-2 mb-3 flex-shrink-0">
             {/* Mode Toggle */}
@@ -1249,6 +1271,16 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         onClose={() => setDetailActivities([])}
         onNavigate={(index) => setCurrentActivityIndex(index)}
       />
+
+      {/* Activity Export Modal — owner-only */}
+      {isOwner && (
+        <ActivityExportModal
+          open={isExportModalOpen}
+          onOpenChange={setIsExportModalOpen}
+          configId={configId}
+          botName={metadata?.botName || title || 'Bot'}
+        />
+      )}
     </div>
   );
 }

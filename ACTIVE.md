@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-04-01 07:53:17 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-04-07 10:38:48 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,64 +12,62 @@
 - **Users with Bots**: 345 (96.4%)
 
 ### Bot Statistics
-- **Total Bots**: 566
-- **Active Bots**: 43 (7.6%)
-  - Paper: 40
+- **Total Bots**: 561
+- **Active Bots**: 37 (6.6%)
+  - Paper: 34
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 3
-- **Inactive Bots**: 523
+- **Inactive Bots**: 524
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 7,833
-  - Wins: 2,644
-  - Losses: 5,189
-  - Platform Win Rate: 33.75%
-  - Total P&L: $127,603.58
+- **Total Trades (All Time)**: 8,095
+  - Wins: 2,724
+  - Losses: 5,371
+  - Platform Win Rate: 33.65%
+  - Total P&L: $117,877.06
 - **Recent Activity**:
-  - Last 24 hours: 57 trades
-  - Last 7 days: 257 trades
-  - Last 30 days: 563 trades
+  - Last 24 hours: 52 trades
+  - Last 7 days: 348 trades
+  - Last 30 days: 740 trades
 
 ### Open Positions
 - **Open Positions**: 15
 - **Unique Symbols**: 3
-- **Total Exposure**: $301,769.90
+- **Total Exposure**: $230,597.82
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,206.96
+- **Average Balance**: $10,192.37
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **ETH/USDT**: 29 bots
-- **BTC/USDT**: 12 bots
-- ****: 1 bots
+- **ETH/USDT**: 22 bots
+- **BTC/USDT**: 14 bots
 - **SOL/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 1223 decisions (avg confidence: 38.4%)
-- **enter**: 58 decisions (avg confidence: 83.3%)
-- **exit**: 24 decisions (avg confidence: 72.9%)
-- **close**: 2 decisions (avg confidence: 68.5%)
-- **long**: 2 decisions (avg confidence: 65.0%)
-- **short**: 1 decisions (avg confidence: 65.0%)
+- **wait**: 1488 decisions (avg confidence: 35.8%)
+- **enter**: 56 decisions (avg confidence: 80.5%)
+- **exit**: 31 decisions (avg confidence: 71.8%)
+- **close**: 2 decisions (avg confidence: 67.5%)
+- **short**: 1 decisions (avg confidence: 55.0%)
 
 ### System Health
-- **Decisions (last hour)**: 56
+- **Decisions (last hour)**: 65
 - **Status**: 🟢 HEALTHY
 
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $665.19 (margin: $273.90, 41.2%)
-- **Last 30d Revenue**: $106.72 from 39 users
-- **Month-to-Date**: $2.15 (projected: ~$64.50)
-- **Avg LTV (paid)**: $20.28
+- **All-Time Revenue**: $680.72 (margin: $280.29, 41.2%)
+- **Last 30d Revenue**: $99.07 from 34 users
+- **Month-to-Date**: $31.58 (projected: ~$135.34)
+- **Avg LTV (paid)**: $20.83
 
 ### Conversion Funnel
 - **Signup → Created Bot**: 95.8%
@@ -78,14 +76,14 @@
 - **Post-Monetization (Jan+)**: 20.4% (19/93)
 
 ### Engagement
-- **DAU/WAU/MAU**: 11/17/39
-- **DAU/WAU Stickiness**: 64.7%
-- **Power Users (4+/8wk)**: 12
+- **DAU/WAU/MAU**: 10/12/34
+- **DAU/WAU Stickiness**: 83.3%
+- **Power Users (4+/8wk)**: 11
 
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 5
 - **Active Bots**: 3
-- **Total Volume**: $41,506.71
+- **Total Volume**: $54,133.83
 
 ## 🖥️ System Resources
 
@@ -93,24 +91,24 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 12MB | 5d 14h | 10 |
-| ggbot | 🟢 online | 3% | 251MB | 2d 13h | 15 |
-| account-monitor | 🟢 online | 0.8% | 28MB | 5d 14h | 10 |
-| sebastian-bot | 🟢 online | 0.1% | 30MB | 5d 14h | 10 |
-| market-data-ws | 🟢 online | 1.1% | 84MB | 3d 9h | 11 |
-| sebastian-telegram | 🟢 online | 0% | 28MB | 4h 29m | 11 |
-| ggbot-scheduler | 🟢 online | 0% | 305MB | 2d 13h | 14 |
-| sebastian-virtuals | 🟢 online | 0.1% | 26MB | 5d 14h | 4 |
+| error-alerts | 🟢 online | 0% | 30MB | 1h 46m | 15 |
+| ggbot | 🟢 online | 2.8% | 254MB | 1h 46m | 22 |
+| account-monitor | 🟢 online | 0.7% | 145MB | 1h 46m | 15 |
+| sebastian-bot | 🟢 online | 0.1% | 78MB | 1h 46m | 16 |
+| market-data-ws | 🟢 online | 0.9% | 192MB | 1h 46m | 16 |
+| sebastian-telegram | 🟢 online | 0% | 29MB | 1h 46m | 16 |
+| ggbot-scheduler | 🟢 online | 0% | 345MB | 1h 46m | 21 |
+| sebastian-virtuals | 🟢 online | 0.1% | 83MB | 1h 46m | 9 |
 
 ### VM Resources
 
-- **Disk**: 61G / 78G (78%)
+- **Disk**: 61G / 78G (79%)
 - **Memory**: 1.9Gi / 3.8Gi
-- **CPU Load**: 0.26 / 2.24 / 1.98 (1m/5m/15m)
+- **CPU Load**: 0.56 / 0.16 / 0.09 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 44.41M)
+- **Redis**: 🟢 connected (Memory: 25.95M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -122,7 +120,7 @@
 |---------|-----|--------|---------|
 | **V2 Orchestrator** | `https://ggbots-api.nightingale.business` | ✅ | Main backend API |
 | **Frontend** | `https://ggbot-app.vercel.app` | ✅ | Next.js application |
-| **Timeline Viewer** | `aster.ggbots.ai` | ✅ | AI consciousness timeline - chart shows bot's subjective awareness moments |
+| **Timeline Viewer** | `https://ggbot-app.vercel.app/view/{config_id}` | ✅ | Public activity timeline (TVTimeline standalone variant) |
 
 ### Core API Endpoints
 
@@ -565,7 +563,7 @@ df -h
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-04-01 07:53:18 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-04-07 10:38:49 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -592,12 +590,12 @@ stripe_reported_at timestamptz?, account_balance numeric?, account_pnl numeric?,
 Idx: idx_agent_sessions_last_active(last_active_at), idx_agent_sessions_session_id(session_id)
 config_id uuid, session_id varchar(255), last_active_at timestamp?, created_at timestamp?, updated_at timestamp?
 
-### arena_agents (14 cols) | PK: id | UQ: wallet_address
-Idx: arena_agents_wallet_address_key(wallet_address), idx_arena_agents_config(assigned_config_id), idx_arena_agents_status(status), idx_arena_agents_user(assigned_user_id)
+### arena_agents (15 cols) | PK: id | UQ: wallet_address
+Idx: arena_agents_wallet_address_key(wallet_address), idx_arena_agents_config(assigned_config_id), idx_arena_agents_hl_subaccount(hl_subaccount_address), idx_arena_agents_status(status), idx_arena_...
 id int, virtuals_id int, agent_name varchar, wallet_address varchar, claw_api_key_vault_id uuid?
 dgclaw_api_key_vault_id uuid?, token_address varchar?, token_symbol varchar?, assigned_user_id uuid?
 assigned_at timestamptz?, status varchar?=available' varying, created_at timestamptz?, user_wallet_address varchar?
-assigned_config_id uuid?
+assigned_config_id uuid?, hl_subaccount_address varchar(42)?
 
 ### arena_pledges (12 cols) | PK: id | FK: config_id→configurations | UQ: tx_hash
 Idx: arena_pledges_tx_hash_key(tx_hash), idx_arena_pledges_config(config_id), idx_arena_pledges_pledged_at(pledged_at), idx_arena_pledges_user(user_id), idx_arena_pledges_wallet(wallet_address)
@@ -621,21 +619,7 @@ config_id uuid, user_id uuid, config_type varchar(50), config_name varchar(100)?
 created_at timestamptz, updated_at timestamptz, state text=inactive, symphony_agent_id varchar(255)?
 trading_mode varchar(20)=paper' varying, is_public_performance bool?, profile_image_url text?, description text?
 first_run_used bool?, free_runs_remaining int?=3, arena_registered_at timestamptz?, initial_equity numeric?
-arena_enabled bool?, dojo_visible bool?=true, elo_rating int?=1200, is_house_bot bool?=false
-
-### dojo_matches (26 cols) | PK: id | FK: challenger/opponent_config_id→configurations, challenger/opponent_instance_id→configurations
-Idx: idx_dojo_matches_status(status) WHERE status IN ('pending','active'), idx_dojo_matches_challenger(challenger_config_id), idx_dojo_matches_opponent(opponent_config_id), idx_dojo_matches_active_lock(status) WHERE status='active'
-id uuid, format text, status text, challenger_config_id uuid, opponent_config_id uuid, challenger_user_id uuid, opponent_user_id uuid
-challenger_instance_id uuid?, opponent_instance_id uuid?, challenger_config_snapshot jsonb?, opponent_config_snapshot jsonb?
-challenge_expires_at timestamptz?, accepted_at timestamptz?, starts_at timestamptz?, ends_at timestamptz?
-challenger_end_equity numeric?, opponent_end_equity numeric?, challenger_composite_score numeric?, opponent_composite_score numeric?
-winner_config_id uuid?, challenger_elo_before int?, challenger_elo_after int?, opponent_elo_before int?, opponent_elo_after int?
-result_details jsonb?, completed_at timestamptz?, created_at timestamptz
-
-### elo_history (9 cols) | PK: id | FK: config_id→configurations
-Idx: idx_elo_history_config(config_id, created_at DESC)
-id uuid, config_id uuid, elo_before int, elo_after int, change int, reason text
-match_id uuid?, details jsonb?, created_at timestamptz
+arena_enabled bool?, dojo_visible bool?=true, elo_rating int?, is_house_bot bool?
 
 ### data_points (11 cols) | PK: data_point_id | FK: source_id→data_sources | UQ: source_id,name
 Idx: data_points_source_id_name_key(source_id, name), idx_data_points_name(name), idx_data_points_premium(requires_premium, enabled), idx_data_points_source(source_id, enabled, sort_order)
@@ -652,6 +636,21 @@ Idx: idx_decisions_action_status(action, status), idx_decisions_config_created(c
 decision_id uuid, user_id uuid, config_id uuid?, symbol varchar(20), action varchar(20), status varchar(20)?
 confidence numeric, reasoning text?, prompt text?, decision_data jsonb?, parent_decision_id uuid?
 created_at timestamptz, created_by text?=decision_engine_v2
+
+### dojo_matches (27 cols) | PK: id | FK: challenger_config_id→configurations, challenger_instance_id→configurations, opponent_config_id→configurations, opponent_instance_id→configurations
+Idx: idx_dojo_matches_active_lock(status), idx_dojo_matches_challenger(challenger_config_id), idx_dojo_matches_opponent(opponent_config_id), idx_dojo_matches_status(status)
+id uuid, format text, status text=pending, challenger_config_id uuid, opponent_config_id uuid, challenger_user_id uuid
+opponent_user_id uuid, challenger_instance_id uuid?, opponent_instance_id uuid?, challenger_config_snapshot jsonb?
+opponent_config_snapshot jsonb?, challenge_expires_at timestamptz?, accepted_at timestamptz?, starts_at timestamptz?
+ends_at timestamptz?, challenger_end_equity numeric?, opponent_end_equity numeric?, challenger_composite_score numeric?
+opponent_composite_score numeric?, winner_config_id uuid?, challenger_elo_before int?, challenger_elo_after int?
+opponent_elo_before int?, opponent_elo_after int?, result_details jsonb?, completed_at timestamptz?
+created_at timestamptz?
+
+### elo_history (9 cols) | PK: id | FK: config_id→configurations
+Idx: idx_elo_history_config(config_id, created_at)
+id uuid, config_id uuid, elo_before int, elo_after int, change int, reason text, match_id uuid?, details jsonb?
+created_at timestamptz?
 
 ### live_trades (15 cols) | PK: batch_id | FK: config_id→configurations, decision_id→decisions | UQ: decision_id
 Idx: idx_live_trades_config(config_id), idx_live_trades_open(config_id, closed_at), idx_live_trades_provider(config_id, provider), idx_live_trades_provider_open(config_id, closed_at, provider), idx...
@@ -787,7 +786,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-04-01 07:53:18 UTC
+Source: `core/config/models.py` | Auto-generated 2026-04-07 10:38:49 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

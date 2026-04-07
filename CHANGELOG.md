@@ -6,6 +6,32 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-07 - Activity Log Export (Forge → Download)
+
+**Feature**: Users can download gzipped JSON of bot's activity log for offline review/analysis. Fills gap — existing `GET /activities/{config_id}` hard-caps at 1000 rows, unusable for bots past p90 (2,363 activities).
+
+**Backend** (`api/activities.py:exports_activities`):
+- New endpoint `GET /api/v2/activities/{config_id}/export?start_time=...&end_time=...`
+- Owner-only (403 if `config.user_id != current_user.user_id`), 90-day max range, 50k row cap
+- Uses existing `idx_activities_config_billing(config_id, created_at)` — ASC ordered
+- Excludes 10 billing/token cols (`provider`, `model`, `*_tokens`, `*_cost_usd`, `stripe_reported*`, `thinking_mode`, `user_id`). Keeps 15 incl full `details` JSONB (LLM thoughts, action, confidence, SL/TP)
+- `gzip.compress()` in-memory → `Response` with `Content-Encoding: gzip` + `Content-Disposition` filename `{slug}_activities_{start}_to_{end}.json.gz`
+- Verified against `b523154c-...` (GiGi Chefin): 2,962 rows → 6.8 MB JSON → 398 KB gzipped (17x ratio)
+
+**Frontend** (`ActivityExportModal.tsx` new, `tv-timeline.tsx`, `forge/page.tsx`):
+- New `ActivityExportModal` using existing `components/ui/modal.tsx` primitives (sm size)
+- 4 quick presets (24h/7d/30d/90d) + two `<input type="datetime-local">` with UTC normalization on send
+- Validation: end > start, ≤ now, ≤ 90 days. Inline error messages + disabled Download button
+- `TVTimeline` gets new `isOwner?: boolean` prop — download icon button absolute top-right of chart container (z-10) when true
+- Forge Monitor caller passes `isOwner`, public `/view/{config_id}` (uses `TVTimelineStandalone`) untouched
+- Download handler: `fetch` with `Authorization: Bearer`, blob → `URL.createObjectURL` → invisible anchor click → revoke
+
+**Test suite verified 7 scenarios** (owner 200 / not-owner 403 / no-auth 401 / >90d 400 / end<start 400 / 404 / invalid timestamp 400)
+
+**Unrelated doc fix**: `ACTIVE.md` + `frontend/README.md` — stale `aster.ggbots.ai` Timeline Viewer URL → `ggbot-app.vercel.app/view/{config_id}` (was polluting fresh Claude onboarding context)
+
+---
+
 ## 2026-04-07 - DGClaw Arena: Backfill Exits from HL Fills
 
 **Gap**: DGClaw server-side TP/SL closes execute directly on Hyperliquid without producing an ACP job. None of the 4 `mirror_close_to_arena` paths fire → no `arena_exit` activity. Evidence on ggbot-004: 4 HL round-trips, only 3 matching activities. Apr 5 22:02 BTC close at $67,651 (oid=371386016564) was invisible to users.

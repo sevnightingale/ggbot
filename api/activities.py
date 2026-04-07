@@ -5,9 +5,12 @@ Provides activity data for the Canvas-based Activity Timeline viewer.
 Endpoints return activities, balance series, and metadata for a specific bot config.
 """
 
-from fastapi import APIRouter, Query, Depends, HTTPException
+import gzip
+import json
+import re
+from fastapi import APIRouter, Query, Depends, HTTPException, Response
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2
 from core.common.db import get_db_connection
@@ -17,6 +20,36 @@ from trading.live.symphony_service import SymphonyLiveTradingService
 
 
 router = APIRouter(prefix="/api/v2/activities", tags=["activities"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Activity Export Constants
+# ─────────────────────────────────────────────────────────────────────────────
+EXPORT_MAX_RANGE_DAYS = 90
+EXPORT_MAX_ROWS = 50_000  # Safety cap against runaway memory
+
+# Columns kept in the export — billing/token fields are intentionally excluded
+# so users don't debate costs/usage. `user_id` is also excluded (internal only).
+EXPORT_COLUMNS_SQL = """
+    activity_id, config_id, activity_type, activity_source,
+    summary, details, trade_id, trade_type, decision_id,
+    related_symbol, importance, created_at,
+    account_balance, account_pnl, total_equity
+"""
+
+
+def _slugify_bot_name(name: Optional[str], config_id: str) -> str:
+    """
+    Convert a bot name to a filesystem-safe slug for the export filename.
+
+    Rules: lowercase, alphanumeric + hyphens, collapse repeats, max 40 chars.
+    Fallback to `bot_{short_id}` if name is empty or produces an empty slug.
+    """
+    if not name:
+        return f"bot_{config_id[:8]}"
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    slug = re.sub(r"-+", "-", slug)[:40]
+    return slug or f"bot_{config_id[:8]}"
 
 
 @router.get("/{config_id}")
@@ -521,3 +554,241 @@ async def get_timeline_metadata(
     except Exception as e:
         logger.error(f"Failed to get timeline metadata for config {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve metadata: {str(e)}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Activity Log Export
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{config_id}/export")
+async def export_activities(
+    config_id: str,
+    start_time: str = Query(..., description="ISO timestamp — inclusive start of export range"),
+    end_time: str = Query(..., description="ISO timestamp — inclusive end of export range"),
+    current_user: AuthenticatedUser = Depends(get_current_user_v2),
+):
+    """
+    Export a bot's activity log as a gzipped JSON file.
+
+    Owner-only. Returns every activity row for the specified config within the
+    given time range (up to 90 days max, 50k rows max), including full LLM
+    prompts in `details`. Billing/token columns are intentionally excluded.
+
+    Query parameters:
+        start_time: ISO-8601 timestamp (required) — range start
+        end_time:   ISO-8601 timestamp (required) — range end (must be > start, ≤ now)
+
+    Returns:
+        200: gzipped JSON file (application/json + Content-Encoding: gzip)
+             Content-Disposition forces a download with filename
+             `{slug}_activities_{start}_to_{end}.json.gz`
+        400: invalid time params, range > 90 days, end before start, end in future,
+             or result set exceeds row cap
+        403: authenticated user does not own the config
+        404: config not found
+        500: query or serialization failure
+
+    Response body (after gunzip):
+    {
+      "export_metadata": {
+        "config_id": "...",
+        "bot_name": "...",
+        "exported_at": "2026-04-07T10:45:00Z",
+        "start_time": "...",
+        "end_time": "...",
+        "row_count": 2363
+      },
+      "activities": [
+        {
+          "activity_id": "...", "config_id": "...", "activity_type": "...",
+          "activity_source": "...", "summary": "...", "details": {...},
+          "trade_id": "...", "trade_type": "...", "decision_id": "...",
+          "related_symbol": "...", "importance": 7, "created_at": "...",
+          "account_balance": ..., "account_pnl": ..., "total_equity": ...
+        }
+      ]
+    }
+
+    Note on `details`: this JSONB column passes through untransformed. If any
+    future activity type starts storing token counts or costs inside `details`,
+    those will leak through — the filter only strips top-level billing columns.
+    """
+    # ── 1. Parse and validate time range ──────────────────────────────────
+    try:
+        start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid start_time or end_time — must be ISO-8601 timestamps",
+        )
+
+    # Normalize to UTC if naive
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=timezone.utc)
+    if end_dt.tzinfo is None:
+        end_dt = end_dt.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+
+    if end_dt <= start_dt:
+        raise HTTPException(
+            status_code=400, detail="end_time must be after start_time"
+        )
+    if end_dt > now + timedelta(minutes=5):  # 5min tolerance for clock skew
+        raise HTTPException(
+            status_code=400, detail="end_time cannot be in the future"
+        )
+    if (end_dt - start_dt) > timedelta(days=EXPORT_MAX_RANGE_DAYS):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Time range exceeds {EXPORT_MAX_RANGE_DAYS}-day maximum",
+        )
+
+    # ── 2. Ownership check + fetch bot name ──────────────────────────────
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT user_id, config_name
+                    FROM configurations
+                    WHERE config_id = %s
+                    """,
+                    (config_id,),
+                )
+                config_row = cur.fetchone()
+
+                if not config_row:
+                    raise HTTPException(
+                        status_code=404, detail="Configuration not found"
+                    )
+
+                owner_id, bot_name = config_row
+
+                if str(owner_id) != str(current_user.user_id):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You do not own this bot configuration",
+                    )
+
+                # ── 3. Count rows first (cheap with index) ────────────────
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM activities
+                    WHERE config_id = %s
+                      AND created_at >= %s
+                      AND created_at <= %s
+                    """,
+                    (config_id, start_dt, end_dt),
+                )
+                row_count = cur.fetchone()[0]
+
+                if row_count > EXPORT_MAX_ROWS:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Export contains {row_count:,} rows, exceeds "
+                            f"{EXPORT_MAX_ROWS:,} limit. Narrow the time range."
+                        ),
+                    )
+
+                # ── 4. Fetch activities ──────────────────────────────────
+                cur.execute(
+                    f"""
+                    SELECT {EXPORT_COLUMNS_SQL}
+                    FROM activities
+                    WHERE config_id = %s
+                      AND created_at >= %s
+                      AND created_at <= %s
+                    ORDER BY created_at ASC
+                    """,
+                    (config_id, start_dt, end_dt),
+                )
+                rows = cur.fetchall()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Activity export query failed for config {config_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to query activities: {str(e)}"
+        )
+
+    # ── 5. Transform rows to dicts ───────────────────────────────────────
+    activities = []
+    for row in rows:
+        try:
+            activities.append(
+                {
+                    "activity_id": str(row[0]) if row[0] else None,
+                    "config_id": str(row[1]) if row[1] else None,
+                    "activity_type": row[2],
+                    "activity_source": row[3],
+                    "summary": row[4],
+                    "details": row[5],  # JSONB → dict (full prompts included)
+                    "trade_id": str(row[6]) if row[6] else None,
+                    "trade_type": row[7],
+                    "decision_id": str(row[8]) if row[8] else None,
+                    "related_symbol": row[9],
+                    "importance": row[10],
+                    "created_at": row[11].isoformat() if row[11] else None,
+                    "account_balance": float(row[12]) if row[12] is not None else None,
+                    "account_pnl": float(row[13]) if row[13] is not None else None,
+                    "total_equity": float(row[14]) if row[14] is not None else None,
+                }
+            )
+        except Exception as e:
+            # Don't let one bad row kill the whole export
+            logger.warning(
+                f"Activity export: skipping malformed row {row[0]} in {config_id}: {e}"
+            )
+            continue
+
+    # ── 6. Build response payload ────────────────────────────────────────
+    payload = {
+        "export_metadata": {
+            "config_id": config_id,
+            "bot_name": bot_name,
+            "exported_at": now.isoformat(),
+            "start_time": start_dt.isoformat(),
+            "end_time": end_dt.isoformat(),
+            "row_count": len(activities),
+        },
+        "activities": activities,
+    }
+
+    try:
+        body = json.dumps(payload, default=str).encode("utf-8")
+        gzipped = gzip.compress(body)
+    except Exception as e:
+        logger.error(
+            f"Activity export serialization failed for config {config_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to serialize export: {str(e)}"
+        )
+
+    # ── 7. Build filename and return ─────────────────────────────────────
+    slug = _slugify_bot_name(bot_name, config_id)
+    start_date = start_dt.strftime("%Y-%m-%d")
+    end_date = end_dt.strftime("%Y-%m-%d")
+    filename = f"{slug}_activities_{start_date}_to_{end_date}.json.gz"
+
+    logger.info(
+        f"Activity export: {len(activities)} rows, "
+        f"{len(body):,} bytes → {len(gzipped):,} bytes gzipped, "
+        f"config={config_id[:8]}, user={str(current_user.user_id)[:8]}"
+    )
+
+    return Response(
+        content=gzipped,
+        media_type="application/json",
+        headers={
+            "Content-Encoding": "gzip",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
