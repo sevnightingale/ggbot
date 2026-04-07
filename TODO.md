@@ -139,7 +139,7 @@ New MI category: "Agent Intelligence" — curated Virtuals ACP agents as data so
 
 ## 🏟️ **Virtuals DGClaw Arena** ($GG Graduation — Volume Driver)
 
-**Status**: 🟡 IN PROGRESS — Phase 2 user flow tested, bugs fixed (2026-04-04)
+**Status**: 🟡 IN PROGRESS — Phase 2 user flow verified, close backfill shipped (2026-04-07)
 **Architecture Doc**: [trading/virtuals/README.md](trading/virtuals/README.md)
 
 AI trading arena on Virtuals Protocol. Every trade = on-chain ACP transaction = $GG volume. Arena is a parallel execution layer — bot runs normally (paper/live), arena mirrors trade intents to DGClaw via ACP.
@@ -150,9 +150,9 @@ AI trading arena on Virtuals Protocol. Every trade = on-chain ACP transaction = 
 
 1-bot-1-agent model. 40 agents total: 27 available (tokenized, pool), 11 assigned (10 Denis SZN2 + 1 user), 2 retired. `claw_api.py` for per-agent control, `arena_sync.py` for close mirroring, reconciler in orchestrator.
 
-### ~~Arena Close Sync~~ ✅ (2026-04-01, Phase 1 fallback added 2026-04-04)
+### ~~Arena Close Sync~~ ✅ (2026-04-01, Phase 1 fallback 2026-04-04, HL backfill 2026-04-07)
 
-Hooks at paper TP/SL, HL fill detection, manual close. Reconciler as safety net. Phase 1 (env var) + Phase 2 (arena_agents) both covered.
+Four real-time hooks (paper TP/SL, HL fill detection, manual close, reconciler) + `sync_closes_from_hl()` backfill for the 5th path (DGClaw server-side TP/SL, which never produces an ACP job). Opportunistic `hl_subaccount_address` capture on `/status`, Redis 60s throttle, dual dedup by oid + (pair,±60s). No frontend changes — rides existing 10s modal/timeline polling.
 
 ### ~~Phase 2: Modal UX + Bug Fixes~~ ✅ (2026-04-04)
 
@@ -165,7 +165,7 @@ Hooks at paper TP/SL, HL fill detection, manual close. Reconciler as safety net.
 ### **Remaining**
 - [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation in activity logger
 - [ ] Tokenize ggbot-003 (or keep retired)
-- [ ] End-to-end: wait for bot entry signal → verify arena mirror fires + close sync works
+- [ ] End-to-end: wait for bot entry signal → verify arena mirror fires (close sync now fully covered)
 
 ---
 

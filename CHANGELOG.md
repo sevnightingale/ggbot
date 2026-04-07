@@ -6,6 +6,28 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-07 - DGClaw Arena: Backfill Exits from HL Fills
+
+**Gap**: DGClaw server-side TP/SL closes execute directly on Hyperliquid without producing an ACP job. None of the 4 `mirror_close_to_arena` paths fire → no `arena_exit` activity. Evidence on ggbot-004: 4 HL round-trips, only 3 matching activities. Apr 5 22:02 BTC close at $67,651 (oid=371386016564) was invisible to users.
+
+**Schema** (`database/migrations/add_hl_subaccount_to_arena_agents.sql`):
+- New column `arena_agents.hl_subaccount_address VARCHAR(42)` + partial index. Captured opportunistically in `/status` when Railway exposes `hlSubaccountAddress` (only during active positions). Self-heals — every agent populated on next active trade. ggbot-004 seeded directly via SQL.
+
+**Sync Function** (`trading/virtuals/arena_sync.py:sync_closes_from_hl`):
+- Queries `Info.user_fills_by_time(subaccount, 7d)`, filters to Close fills, groups partial fills by `(coin, 5s_bucket, dir)`, size-weighted avg price, sum pnl, liquidation flag if any fill liquidated.
+- Dual dedup — primary by `details->>'hl_order_id'`, secondary by `(pair, created_at ± 60s)` to catch existing rows from live close paths (arena_sync/claw_arena/arena_reconciler) that don't carry the HL oid.
+- Direct `db_execute` with historical `created_at = fill_time` — rows slot into TVTimeline at correct position, not "now". `activity_source='hl_sync'`, `close_reason='dgclaw_server_side'` or `'liquidation'`.
+- Redis 60s throttle (`arena:sync_closes_last_run:{agent_id}`) — hot /status poll path short-circuits <1ms. HL query fires at most once per minute per modal session.
+
+**Wiring** (`api/virtuals_arena.py:get_arena_status`):
+- Opportunistic hl_subaccount capture on every `/status` call (`UPDATE ... WHERE hl_subaccount_address IS NULL`).
+- Invokes `sync_closes_from_hl` awaited (not fire-and-forget) so next modal tick sees fresh data without racing. Wrapped in try/except.
+- **Zero frontend changes** — rides existing 10s poll loops on `degen-arena-modal.tsx:21` and `tv-timeline.tsx:806`. No new endpoint, no button, no event listeners.
+
+**Verified end-to-end against production**: first run inserted exactly 1 row (Apr 5 22:02:55 BTC close, oid=371386016564, historical created_at). 3 subsequent runs returned 0 (dedup + throttle). Throttle key TTL confirmed 60s. arena_exit breakdown by source for Technician: arena_sync=3, claw_arena=1, arena_reconciler=1, hl_sync=1.
+
+---
+
 ## 2026-04-04 - DGClaw Arena: Audit + Bug Fixes + Modal UX
 
 **Vault Bug** (`core/auth/vault_utils.py`):

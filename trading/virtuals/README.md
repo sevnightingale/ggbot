@@ -206,7 +206,7 @@ Latency doesn't matter — the bot cycle doesn't wait for it. Arena execution is
 
 ### Arena Close Sync (`trading/virtuals/arena_sync.py`)
 
-Positions close through 4 paths — only decision-triggered closes went through the orchestrator's arena hook. TP/SL, manual, and monitor-detected closes bypassed it. Fixed with hybrid hooks + reconciler:
+Positions close through **5 paths**. Four are logged in real time. The fifth (DGClaw server-side TP/SL) is backfilled after-the-fact by `sync_closes_from_hl`.
 
 ```
 Close Path                  File                                      Arena Response
@@ -216,11 +216,53 @@ Live TP/SL (fill scan)      hyperliquid_adapter._detect_and_log_closes → mirro
 Live manual close           ggbot.py:close_hyperliquid_position()     → mirror_close_to_arena()
 Decision "exit"             orchestrator._execute_claw_arena_trade()  → direct close (existing)
 Safety net (per cycle)      orchestrator._reconcile_arena_position()  → closes stale positions
+DGClaw server-side TP/SL    NONE (no ACP job produced)                → sync_closes_from_hl() backfill
 ```
 
 `mirror_close_to_arena(config_id, symbol, close_reason, user_id)` — idempotent. Checks DGClaw position exists before closing. Logs `arena_exit` activity with source `arena_sync`. Multiple callers can fire for same close — DGClaw position check prevents duplicate closes.
 
 Reconciler runs at start of each arena trade in orchestrator. Compares DGClaw positions vs primary (paper_trades + live_trades). Closes any arena position not held by primary. Source: `arena_reconciler`.
+
+### Close Backfill from HL Fills (`sync_closes_from_hl`)
+
+DGClaw monitors user-set TP/SL levels itself and executes directly on Hyperliquid without going through an ACP job. None of the `mirror_close_to_arena` paths fire for these — the position simply disappears from Railway. `sync_closes_from_hl` plugs this gap by querying Hyperliquid Info API and backfilling `arena_exit` activities.
+
+**Data source: HL Info API, not DGClaw Railway.** Railway returns `hlSubaccountAddress: None` when idle — can't query it when we most need to. HL subaccount address is persistent per agent once captured.
+
+**Capture flow (self-healing)**:
+1. `/api/v2/virtuals-arena/status` endpoint polls `claw_api.get_dgclaw_account()` (already fetches `hl_subaccount` when populated)
+2. On every call, if Railway returns non-null `hl_subaccount` AND `arena_agents.hl_subaccount_address IS NULL`, persist it via `UPDATE ... WHERE IS NULL`
+3. Every agent gets its address captured automatically on its next active DGClaw position. No backfill script needed
+
+**Sync flow** (invoked from same `/status` endpoint, awaited):
+1. Load agent with `hl_subaccount_address` (skip if NULL — waits for self-heal)
+2. Redis throttle check: `arena:sync_closes_last_run:{agent_id}` with 60s TTL. If present, return 0 (<1ms short-circuit)
+3. `Info.user_fills_by_time(hl_sub, 7_days_ago_ms)` via `asyncio.to_thread` (SDK is sync)
+4. Filter to fills where `dir` starts with `"Close"`
+5. Load existing dedup keys for this config: both `hl_order_id` (primary) and `(pair, created_at)` pairs (secondary, for legacy rows that pre-date this feature)
+6. Group partial fills by `(coin, time_ms // 5000, dir)` — 5s bucket. Sum sz, sum closedPnl, size-weighted avg px, earliest oid as dedup key. Liquidation flag if any fill in bucket is liquidation
+7. For each group, skip if oid in `existing_oids` OR if a matching `arena_exit` exists within ±60s of fill time for the same pair
+8. Insert surviving groups via direct `db_execute` with `created_at = datetime.fromtimestamp(fill_time_ms / 1000, tz=UTC)` — rows slot into TVTimeline at the correct historical position. `activity_source='hl_sync'`, `close_reason='dgclaw_server_side'` or `'liquidation'`
+
+**Why this is pure backend plumbing**:
+- Modal polls `/status` every 10s (`degen-arena-modal.tsx:21`). Sync rides that poll
+- TVTimeline polls `/activities/{configId}` every 10s (`tv-timeline.tsx:806`). New rows appear automatically
+- No new endpoint, no button, no custom events, no frontend changes
+
+**Dedup strategy — two parallel checks**:
+
+| Source | Carries `hl_order_id` | Dedup check |
+|---|---|---|
+| `hl_sync` (this function) | ✅ always | primary: `details->>'hl_order_id'` |
+| `arena_sync` (live TP/SL path) | ❌ no | secondary: `(pair, created_at ± 60s)` |
+| `claw_arena` (decision close) | ❌ no | secondary: `(pair, created_at ± 60s)` |
+| `arena_reconciler` (safety net) | ❌ no | secondary: `(pair, created_at ± 60s)` |
+
+The ±60s window is safe because back-to-back closes on the same pair within one minute are effectively impossible on bot cycles of 3-5 minutes. When live close paths eventually start carrying `hl_order_id`, the secondary check becomes a no-op.
+
+**Partial fill aggregation**: `market_close()` can produce multiple fills at the same instant on different liquidity levels. Grouping by 5s bucket collapses them into one activity row regardless of how they filled, matching the same pattern used by `hyperliquid_adapter._detect_and_log_closes`.
+
+**Redis throttle**: `arena:sync_closes_last_run:{agent_id}` with 60s TTL. If Redis is unavailable, function falls through (sync is self-dedupping via the DB query — throttle is a cost optimization, not a correctness requirement). Namespace shared with `arena:trade_queue`, no new Redis infrastructure.
 
 ---
 
@@ -415,7 +457,7 @@ created_at        timestamptz
 
 ---
 
-## Current Status (2026-04-04)
+## Current Status (2026-04-07)
 
 ### Phase 1: Admin Bot — COMPLETE
 - [x] ggbots.ai registered on DGClaw, balance $70+, automated trades verified
@@ -437,6 +479,7 @@ created_at        timestamptz
 - [x] `DegenArenaModal` — smart button labels, registration progress, correct fee messaging
 - [x] `ActivationBar` — stateful button: Enter Degen Arena → Arena: Needs Funds → Manage Arena Agent
 - [x] Arena close sync: Phase 1 (Redis queue) + Phase 2 (claw API) + reconciler safety net
+- [x] **HL fill backfill** (2026-04-07): `sync_closes_from_hl()` catches DGClaw server-side TP/SL closes that never produce an ACP job. `arena_agents.hl_subaccount_address` column + opportunistic capture in /status. Verified on ggbot-004's Apr 5 22:02 close (oid=371386016564)
 - [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation
 - [ ] End-to-end: wait for bot entry signal → verify arena mirror + close sync
 
@@ -447,7 +490,8 @@ created_at        timestamptz
 | File | Purpose |
 |---|---|
 | `trading/virtuals/README.md` | This file — full context |
-| `trading/virtuals/arena_sync.py` | Close mirroring — `mirror_close_to_arena()` + `_arena_to_pair()` |
+| `trading/virtuals/arena_sync.py` | Close mirroring (`mirror_close_to_arena`) + close backfill (`sync_closes_from_hl`) + `_arena_to_pair()` |
+| `database/migrations/add_hl_subaccount_to_arena_agents.sql` | Migration: `arena_agents.hl_subaccount_address` column + partial index |
 | `trading/virtuals/claw_api.py` | Async HTTP client for claw REST API (Phase 2 user agents) |
 | `trading/virtuals/dgclaw_service.py` | Phase 1 arena service (ACP SDK, admin bot) |
 | `api/virtuals_arena.py` | Phase 2 API endpoints (join, status, deposit, withdraw, leaderboard) |
