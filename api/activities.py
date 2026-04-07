@@ -5,7 +5,6 @@ Provides activity data for the Canvas-based Activity Timeline viewer.
 Endpoints return activities, balance series, and metadata for a specific bot config.
 """
 
-import gzip
 import json
 import re
 from fastapi import APIRouter, Query, Depends, HTTPException, Response
@@ -572,16 +571,16 @@ async def export_activities(
 
     Owner-only. Returns every activity row for the specified config within the
     given time range (up to 90 days max, 50k rows max), including full LLM
-    prompts in `details`. Billing/token columns are intentionally excluded.
+    thought details. Billing/token columns are intentionally excluded.
 
     Query parameters:
         start_time: ISO-8601 timestamp (required) — range start
         end_time:   ISO-8601 timestamp (required) — range end (must be > start, ≤ now)
 
     Returns:
-        200: gzipped JSON file (application/json + Content-Encoding: gzip)
+        200: plain JSON file (application/json)
              Content-Disposition forces a download with filename
-             `{slug}_activities_{start}_to_{end}.json.gz`
+             `{slug}_activities_{start}_to_{end}.json`
         400: invalid time params, range > 90 days, end before start, end in future,
              or result set exceeds row cap
         403: authenticated user does not own the config
@@ -762,8 +761,7 @@ async def export_activities(
     }
 
     try:
-        body = json.dumps(payload, default=str).encode("utf-8")
-        gzipped = gzip.compress(body)
+        body = json.dumps(payload, default=str, indent=2).encode("utf-8")
     except Exception as e:
         logger.error(
             f"Activity export serialization failed for config {config_id}: {e}"
@@ -776,19 +774,17 @@ async def export_activities(
     slug = _slugify_bot_name(bot_name, config_id)
     start_date = start_dt.strftime("%Y-%m-%d")
     end_date = end_dt.strftime("%Y-%m-%d")
-    filename = f"{slug}_activities_{start_date}_to_{end_date}.json.gz"
+    filename = f"{slug}_activities_{start_date}_to_{end_date}.json"
 
     logger.info(
-        f"Activity export: {len(activities)} rows, "
-        f"{len(body):,} bytes → {len(gzipped):,} bytes gzipped, "
+        f"Activity export: {len(activities)} rows, {len(body):,} bytes, "
         f"config={config_id[:8]}, user={str(current_user.user_id)[:8]}"
     )
 
     return Response(
-        content=gzipped,
+        content=body,
         media_type="application/json",
         headers={
-            "Content-Encoding": "gzip",
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )

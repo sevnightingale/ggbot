@@ -284,7 +284,7 @@ export function ActivityExportModal({
         )}
 
         <p className="text-xs text-[var(--text-muted)] italic">
-          Downloads as <code className="px-1 bg-[var(--bg-tertiary)] rounded">.json.gz</code> — decompress to open as JSON. Billing and cost data are not included.
+          Downloads as a <code className="px-1 bg-[var(--bg-tertiary)] rounded">.json</code> file. Billing and cost data are not included.
         </p>
       </ModalBody>
 

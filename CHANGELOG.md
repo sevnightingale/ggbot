@@ -8,15 +8,15 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ## 2026-04-07 - Activity Log Export (Forge → Download)
 
-**Feature**: Users can download gzipped JSON of bot's activity log for offline review/analysis. Fills gap — existing `GET /activities/{config_id}` hard-caps at 1000 rows, unusable for bots past p90 (2,363 activities).
+**Feature**: Users can download bot's activity log as a plain JSON file for offline review/analysis. Fills gap — existing `GET /activities/{config_id}` hard-caps at 1000 rows, unusable for bots past p90 (2,363 activities).
 
-**Backend** (`api/activities.py:exports_activities`):
+**Backend** (`api/activities.py:export_activities`):
 - New endpoint `GET /api/v2/activities/{config_id}/export?start_time=...&end_time=...`
 - Owner-only (403 if `config.user_id != current_user.user_id`), 90-day max range, 50k row cap
 - Uses existing `idx_activities_config_billing(config_id, created_at)` — ASC ordered
 - Excludes 10 billing/token cols (`provider`, `model`, `*_tokens`, `*_cost_usd`, `stripe_reported*`, `thinking_mode`, `user_id`). Keeps 15 incl full `details` JSONB (LLM thoughts, action, confidence, SL/TP)
-- `gzip.compress()` in-memory → `Response` with `Content-Encoding: gzip` + `Content-Disposition` filename `{slug}_activities_{start}_to_{end}.json.gz`
-- Verified against `b523154c-...` (GiGi Chefin): 2,962 rows → 6.8 MB JSON → 398 KB gzipped (17x ratio)
+- Returns plain JSON via `Response(content=json.dumps(..., indent=2))` — `application/json` + `Content-Disposition: attachment; filename="{slug}_activities_{start}_to_{end}.json"`. No gzip (`.gz` is unfriendly UX, especially Windows)
+- Verified against `b523154c-...` (GiGi Chefin): 576 rows / 24h → 1.5 MB pretty-printed JSON
 
 **Frontend** (`ActivityExportModal.tsx` new, `tv-timeline.tsx`, `forge/page.tsx`):
 - New `ActivityExportModal` using existing `components/ui/modal.tsx` primitives (sm size)
