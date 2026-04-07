@@ -296,6 +296,38 @@ async def get_arena_status(
 
     dgclaw_balance = dgclaw_account.get('balance', 0) if dgclaw_account else 0
 
+    # Opportunistic HL subaccount capture. Railway only exposes
+    # hlSubaccountAddress while a position is active, so we grab it whenever
+    # we see it and never overwrite. Once captured, sync_closes_from_hl can
+    # backfill arena_exit activities for DGClaw server-side TP/SL closes.
+    if dgclaw_account:
+        hl_sub = dgclaw_account.get('hl_subaccount')
+        if hl_sub and not agent.get('hl_subaccount_address'):
+            try:
+                await db_execute(
+                    "UPDATE arena_agents SET hl_subaccount_address = %s "
+                    "WHERE id = %s AND hl_subaccount_address IS NULL",
+                    (hl_sub, agent['agent_id']),
+                )
+                agent['hl_subaccount_address'] = hl_sub
+                _log.info(
+                    f"Captured HL subaccount {hl_sub[:10]}... for "
+                    f"{agent.get('agent_name', '?')} (agent_id={agent['agent_id']})"
+                )
+            except Exception as e:
+                _log.error(f"Failed to persist hl_subaccount for agent {agent['agent_id']}: {e}")
+
+    # Backfill any arena_exit activities from DGClaw server-side closes.
+    # Redis-throttled to 60s per agent, so the hot /status poll path stays
+    # cheap. Wrapped in try/except so any failure never breaks the response.
+    try:
+        from trading.virtuals.arena_sync import sync_closes_from_hl
+        synced = await sync_closes_from_hl(config_id, agent)
+        if synced > 0:
+            _log.info(f"Arena sync closes for config {config_id[:8]}: {synced} new exits")
+    except Exception as e:
+        _log.error(f"sync_closes_from_hl failed for config {config_id[:8]}: {e}")
+
     # Check registration status (dgclaw_api_key_vault_id set = registered)
     is_registered = await _is_registered_on_dgclaw(agent['agent_id'])
 

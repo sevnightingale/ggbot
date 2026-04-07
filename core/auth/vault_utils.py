@@ -943,7 +943,7 @@ class VaultManager:
                     cur.execute("""
                         SELECT aa.id, aa.claw_api_key_vault_id, aa.wallet_address,
                                aa.agent_name, aa.token_symbol, aa.user_wallet_address,
-                               aa.assigned_user_id
+                               aa.assigned_user_id, aa.hl_subaccount_address
                         FROM arena_agents aa
                         WHERE aa.assigned_config_id = %s AND aa.status = 'assigned'
                     """, (config_id,))
@@ -952,7 +952,8 @@ class VaultManager:
                     if not result or not result[1]:
                         return None
 
-                    agent_id, claw_vault_id, wallet_address, agent_name, token_symbol, user_wallet, user_id = result
+                    (agent_id, claw_vault_id, wallet_address, agent_name,
+                     token_symbol, user_wallet, user_id, hl_subaccount) = result
 
                     cur.execute("""
                         SELECT decrypted_secret
@@ -972,6 +973,7 @@ class VaultManager:
                         'token_symbol': token_symbol,
                         'user_wallet_address': user_wallet,
                         'user_id': user_id,
+                        'hl_subaccount_address': hl_subaccount,
                     }
 
         except Exception as e:
