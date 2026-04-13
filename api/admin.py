@@ -24,7 +24,7 @@ from core.common.logger import logger
 router = APIRouter(prefix="/api/v2/admin", tags=["admin"])
 
 # Admin user ID from environment
-ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "00000000-0000-0000-0000-000000000000")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
 
 
 # =============================================================================

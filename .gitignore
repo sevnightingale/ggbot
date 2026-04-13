@@ -56,6 +56,10 @@ hummingbot_postgres_data/
 **/conf/strategies/
 **/conf/connectors/
 
+# Browser session cookies
+**/cookies.json
+**/temp_cookies.json
+
 # Bot instance data
 ggshot-*-*-*/
 

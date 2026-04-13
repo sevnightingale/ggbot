@@ -163,7 +163,7 @@ def check_recent_invoices(customer_id: str, limit: int = 3):
 
 
 def main():
-    email = "redacted@example.com"
+    email = os.getenv("TEST_EMAIL", "test@example.com")
 
     print("=" * 60)
     print("🧪 Stripe Credit Grants Test")

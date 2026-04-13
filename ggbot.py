@@ -74,9 +74,9 @@ async def get_service_user(request: Request):
 async def get_mock_user_for_dev():
     """Mock user for development."""
     return AuthenticatedUser(
-        user_id="00000000-0000-0000-0000-000000000000",
+        user_id=os.getenv("ADMIN_USER_ID", "dev-mock-user-id"),
         email="user@example.com",
-        claims={"sub": "00000000-0000-0000-0000-000000000000", "email": "user@example.com"}
+        claims={"sub": os.getenv("ADMIN_USER_ID", "dev-mock-user-id"), "email": "user@example.com"}
     )
 
 # local — services
