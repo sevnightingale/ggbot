@@ -623,7 +623,7 @@ class UsageMonitor:
 
                     self.redis.setex(
                         f"usage:summary:{user_id}",
-                        300,
+                        600,
                         json.dumps(summary)
                     )
 
@@ -661,7 +661,7 @@ class UsageMonitor:
 
                     self.redis.setex(
                         f"usage:summary:{user_id}",
-                        300,
+                        600,
                         json.dumps(summary)
                     )
                     cached_count += 1
