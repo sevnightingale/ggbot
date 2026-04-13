@@ -360,7 +360,7 @@ Arena is parallel execution layer — bot trades normally (paper/live), same dec
 
 ## 2026-03-21 - Extraction Enrichment: Multi-Period MAs + Channel Price Levels + BB Fix
 
-**Preprocessor Summary Gaps** (Dennis report: SZN2 bots hitting PARSE_FAIL):
+**Preprocessor Summary Gaps** (user report: SZN2 bots hitting PARSE_FAIL):
 - Channel indicators (Donchian, BB, Keltner) only showed `%pos`/`%B` — missing actual price levels
 - EMA only computed period-20 — no EMA50/EMA200 available to strategies
 - BB preprocessor never wired up — `calculate_bollinger_bands()` bypassed advanced preprocessor entirely
@@ -452,7 +452,7 @@ New MI data source: daily cross-market intelligence report produced by Sebastian
 
 **OHLCV Stale Cache Bug** (`market_intelligence/cache/manager.py`, `catalog/data_types/market_data/ohlcv.yaml`):
 - MI gateway cached OHLCV data 1 hour (`mi:candles:*` TTL 3600s), masking real-time WebSocket cache (`ws:candles:*`)
-- 30m bots saw identical prices across 2-3 consecutive cycles (Dennis report)
+- 30m bots saw identical prices across 2-3 consecutive cycles (user report)
 - Fix: `ttl: 0` in ohlcv.yaml, `cache/manager.py` skips set/get when `ttl <= 0`
 - Existed since Universal Data Layer (Oct 2025, commit `6ddb347`)
 

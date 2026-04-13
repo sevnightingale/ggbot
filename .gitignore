@@ -66,6 +66,9 @@ ggshot-*-*-*/
 # Temporary paper trading data
 **/paper_trade_data/
 
+# Activity export files (contain user trading data)
+*_activities_*.json
+
 # Node.js dependencies (for hackathon demos)
 node_modules/
 package-lock.json

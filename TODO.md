@@ -74,7 +74,7 @@ Current capacity: ~100 bots with zero changes. Tuning knobs when needed:
 
 **Status**: 🔵 PLANNED — Phase 1 complete and verified in production
 **Planning Doc**: [DOCS/todo/LLM_DRIVEN_SL_TP.md](DOCS/todo/LLM_DRIVEN_SL_TP.md)
-**Origin**: Dennis feedback analysis → Sev confirmed SL/TP as the actionable item
+**Origin**: Power user feedback analysis → SL/TP confirmed as actionable item
 
 Phase 1 shipped (prompt-only). LLM now provides SL/TP on entry — verified working on both paper (Rhoda) and live (Hyperliquid) trades. Phase 2 enables mid-trade SL/TP updates.
 

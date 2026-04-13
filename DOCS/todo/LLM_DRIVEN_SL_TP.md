@@ -1,7 +1,7 @@
 # LLM-Driven SL/TP — Planning Doc
 
 **Status**: PHASE 1 COMPLETE (verified in production 2026-03-21)
-**Origin**: Dennis feedback (DOCS/analysis/Dennis_feedback.md) + Sev confirmation
+**Origin**: Power user feedback (DOCS/analysis/user_feedback_risk_engine.md)
 **Created**: 2026-03-20
 
 ---
