@@ -65,7 +65,13 @@ def _generate_p256_keypair() -> tuple[str, str]:
     """
     Generate a fresh P-256 keypair for signer registration.
 
-    Returns (private_key_pem_base64, public_key_uncompressed_base64).
+    Returns (private_key_pem_base64, public_key_spki_der_base64).
+
+    Public key is emitted as SPKI-DER (SubjectPublicKeyInfo) base64 — the format
+    Privy expects for signer registration. Raw uncompressed X9.62 point (0x04 prefix)
+    causes 500 on the signer approve endpoint; SPKI wraps the same point in an
+    AlgorithmIdentifier envelope (prefix bytes 30 59 30 13 06 07 2a 86 48 ce 3d 02 01 ...).
+    Ref: https://docs.privy.io/api-reference/signers/authenticate
 
     The acp-cli ships a native binary (acp-cli-signer) that keeps private keys in the
     OS keychain. That pattern doesn't apply to a server — we keep the private key in
@@ -78,13 +84,13 @@ def _generate_p256_keypair() -> tuple[str, str]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    pub_point = pub.public_bytes(
-        encoding=serialization.Encoding.X962,
-        format=serialization.PublicFormat.UncompressedPoint,
+    pub_spki_der = pub.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     return (
         base64.b64encode(priv_pem).decode("ascii"),
-        base64.b64encode(pub_point).decode("ascii"),
+        base64.b64encode(pub_spki_der).decode("ascii"),
     )
 
 

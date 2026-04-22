@@ -44,7 +44,11 @@ export default function AcpV2TestPage() {
   const [authError, setAuthError] = useState<string | null>(null)
 
   // Agent state
-  const [agentName, setAgentName] = useState(() => `ggbot-test-${new Date().toISOString().slice(0, 10)}`)
+  const [agentName, setAgentName] = useState(() => {
+    const now = new Date()
+    const stamp = `${now.toISOString().slice(0, 10)}-${now.toISOString().slice(11, 16).replace(':', '')}`
+    return `ggbot-test-${stamp}`
+  })
   const [agent, setAgent] = useState<AgentInfo | null>(null)
   const [signerStatus, setSignerStatus] = useState<SignerStatus>('idle')
   const [signerError, setSignerError] = useState<string | null>(null)
