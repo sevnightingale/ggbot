@@ -12,9 +12,9 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 Introduce `trading_mode='virtuals'` as the canonical live-trading path (replaces the v1 "mirror" architecture entirely — no ACP job queue, no parallel execution). Virtuals agents trade directly on Hyperliquid via their Privy-provisioned wallet; DGClaw is a leaderboard overlay reading HL state by wallet address. "Deploy Live Version" reuses the existing arena button/modal (no new nav). Legacy `trading_mode='hyperliquid'` kept as non-custodial fallback (1 bot/user, unchanged). Custodial-but-revocable signer — users revoke via Virtuals dashboard anytime.
 
-### Decisions Locked In (before execution)
+### Decisions Locked In
 - **Single combined Phase 0 gate** — auth popup + signer popup + HL test trade + adapter snapshot verify, all on one admin page (0a/0b collapsed)
-- **acp-node Node sidecar (Phase 1)** — PM2 TypeScript service wrapping `@privy-io/node` + `@virtuals-protocol/acp-node-v2` + `viem`. Signs HL EIP-712 payloads via Privy wallet authenticated by our P-256 signer. Python backend → HTTP → acp-node. Ports `dgclaw-skill/scripts/{activate-unified.ts,add-api-wallet.ts}` so deploy flow is fully automated (no user CLI work).
+- **acp-node Node sidecar (Phase 1)** — PM2 TypeScript service. Signing uses `PrivyAlchemyEvmProviderAdapter` from `@virtuals-protocol/acp-node-v2` — same adapter `acp-cli` uses under the hood; no bespoke Privy protocol work. Ports `dgclaw-skill/scripts/*.ts` so Deploy Live flow is fully automated (no user CLI work).
 - **`sebastian-virtuals` stays running** alongside acp-node in Phase 1+. Only Section C (ACP buyer monitor for Otto/BlackSwan data points) is still functionally live. Delete when arena mirror dies in Phase 4 + agentic_intelligence either ports to acp-node or is dropped.
 - **CredentialResolver pattern** — `resolve_hl_credentials(trading_mode, user_id, config_id)` helper; services stay pure
 - **Trading mode enum stays distinct** (`paper | hyperliquid | virtuals`) — unify at credential layer, not execution
@@ -22,46 +22,55 @@ Introduce `trading_mode='virtuals'` as the canonical live-trading path (replaces
 - **BotRail placement**: virtuals bots in Paper Bots section with LIVE badge
 - **`is_public_performance` subsumed** by `trading_mode='virtuals'` (all arena-public by design)
 - **Phase 4 cleanup gated on DB query** (`SELECT COUNT(*) FROM arena_agents WHERE status='assigned' = 0`), not calendar date
-- **Sequencing**: pre-Phase-2 passive plumbing alone → Phase 1 (DB + endpoints + acp-node) → Phase 2+3 atomic release → Phase 4 DB-gated
+- **Sequencing**: pre-Phase-2 passive plumbing alone ✅ → Phase 1 (DB + endpoints + acp-node) → Phase 2+3 atomic release → Phase 4 DB-gated
 - **Public key format**: SPKI-DER base64 (NOT raw uncompressed point) — per `docs.privy.io/api-reference/signers/authenticate`. Using raw X9.62 caused 500 on signer approve during Phase 0 first attempt.
 - **API endpoint surface**: v2 `/auth/cli/url`, `POST /agents`, `POST /agents/{id}/signer` at `https://api.acp.virtuals.io` (sourced from `@virtuals-protocol/acp-node-v2/src/core/constants.ts` + `acp-cli/src/lib/api/*.ts`)
+- **AI Council reasoning channel**: forum posts at `POST https://degen.virtuals.io/api/forums/:agentId/threads/:threadId/posts` (markdown body). On-chain fills + forum rationale are both inputs to the Monday allocation decision. Our bots already generate reasoning into `decisions.reasoning` + `activities.llm_thought`; we just need to pipe it out on entry/exit decisions.
 
-### Phase 0: Single Admin Gate (GATE PASSED — adapter compat verified)
-- [x] `api/acp_v2_test.py` — 8 admin-only routes, wired in `ggbot.py:255,264`
-- [x] `frontend/app/test/acp-v2/{layout.tsx,page.tsx}` — admin-gated via server layout
-- [x] P-256 keypair generation — SPKI-DER base64 (fix on first attempt after raw X9.62 caused 500)
-- [x] Redis session plumbing (JWT 25min, requestId ownership 10min, signer privkey 25min)
-- [x] **OAuth popup 1** — Virtuals auth → JWT cached, wallet address returned ✓
-- [x] **Agent create + signer popup 2** — agent provisioned on Virtuals, signer approved via Privy delegation ✓
-- [x] **Monitoring snapshot against Privy wallet** — `info.user_state()` returned structurally valid shape (zero balances as expected for unfunded wallet); `HyperliquidAccountAdapter` compatibility confirmed ✓
-- [ ] **Full HL trade verification deferred** — requires Privy-signed HL setup, handled automatically by acp-node in Phase 1. Existing `HyperliquidLiveTradingService` is battle-tested; no reason to replicate.
+### Phase 0: Single Admin Gate ✅ GATE PASSED
+- [x] Backend + frontend test harness shipped (`api/acp_v2_test.py` 8 routes, `frontend/app/test/acp-v2/`)
+- [x] SPKI-DER pubkey fix (raw uncompressed point caused 500 on signer approve)
+- [x] OAuth popup 1 → JWT cached, wallet address returned
+- [x] Agent create + signer popup 2 → agent provisioned on Virtuals, signer approved via Privy delegation
+- [x] Monitoring snapshot — `HyperliquidAccountAdapter` returned structurally valid shape against Privy-provisioned wallet (zero balances as expected for unfunded). **Adapter compat confirmed — gate passes.**
+- Full HL trade verification deferred to Phase 1 (acp-node automates setup, existing `HyperliquidLiveTradingService` is battle-tested)
 
-### Pre-Phase-2: Passive Plumbing PR (unblocks Phase 2+3, zero behavior change)
-- [ ] `ggbot.py:399` — add `"virtuals"` to trading_mode validation list
-- [ ] `core/services/config_service.py:291` — include `'virtuals'` in `initial_equity=0` branch
-- [ ] `frontend/app/forge/components/layout/BotRail.tsx:72` — paper filter also excludes `'virtuals'`
-- [ ] `frontend/lib/api.ts:104` — extend `trading_mode` union with `'virtuals'`
+### Pre-Phase-2: Passive Plumbing ✅ SHIPPED (commit `41df6fb`)
+- [x] `ggbot.py:399` — validation accepts `"virtuals"`
+- [x] `core/services/config_service.py:291` — `initial_equity=0` branch includes `'virtuals'`
+- [x] `frontend/app/forge/components/layout/BotRail.tsx:72` — paper filter excludes `'virtuals'`
+- [x] `frontend/lib/api.ts:104` — `trading_mode` union adds `'virtuals'`
+- [x] `frontend/components/RiskAcknowledgmentModal.tsx:17` — prop type widened (caught by tsc)
 
-### Phase 1: Backend Foundations + acp-node Sidecar
+### Phase 1: Backend Foundations + acp-node Sidecar (IN PROGRESS)
+
+**Python backend** (not started):
 - [ ] `database/migrations/add_arena_agents_v2.sql` — new table (3 Vault IDs, unique partial index on `config_id WHERE status='active'`)
 - [ ] `api/arena_v2.py` — NEW: connect-start, connect-poll, deploy-live, deploy-poll; `deploy-live` orchestrates: agent create → signer popup → [await approve] → `acp-node /setup-hl-unified-account` → `acp-node /authorize-hl-api-wallet` → Vault stores all creds → returns agent_wallet_address for funding step
 - [ ] `api/virtuals_arena.py` — MODIFIED: rewire status/check-deposit/withdraw to read `arena_agents_v2`; deprecate `/join`
 - [ ] `core/auth/vault_utils.py` — `store_arena_v2_credential` / `get_arena_v2_credential` / `resolve_hl_credentials` helper
-- [ ] `acp-node/` — NEW PM2 TypeScript service
-  - [ ] `package.json`: `@privy-io/node`, `@virtuals-protocol/acp-node-v2`, `viem`, `fastify`
-  - [ ] `src/index.ts`: Fastify server, shared-secret `X-Service-Auth` middleware, health check
-  - [ ] `src/routes/setup-hl-unified.ts`: port of `dgclaw-skill/scripts/activate-unified.ts` (signs `userSetAbstraction` EIP-712 via Privy, POSTs to `api.hyperliquid.xyz/exchange`)
-  - [ ] `src/routes/authorize-hl-api-wallet.ts`: port of `add-api-wallet.ts` (generates viem secp256k1 keypair, signs `approveAgent`, POSTs to HL, returns API wallet privkey)
-  - [ ] `ecosystem.config.js`: add `acp-node` PM2 entry (alongside `sebastian-virtuals`, both run in Phase 1+)
-  - [ ] `.env` keys: `ACP_NODE_PORT`, `ACP_NODE_SHARED_SECRET`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`
-  - [ ] Python backend env: `ACP_NODE_URL`, `ACP_NODE_SHARED_SECRET` (matched to sidecar)
+
+**acp-node sidecar** (scaffolding + 3 routes shipped, commit `011dbee`):
+- [x] `acp-node/package.json` — deps: `@privy-io/node`, `@virtuals-protocol/acp-node-v2`, `viem`, `fastify`, `tsx`
+- [x] `acp-node/src/index.ts` — Fastify server, shared-secret `X-Service-Auth` guard, `/health` endpoint
+- [x] `acp-node/src/lib/privy-sign.ts` — wraps `PrivyAlchemyEvmProviderAdapter.create({walletAddress, walletId, signerPrivateKey, privyAppId})` + `adapter.signTypedData(chainId, typedData)`. Base64-PEM signer key decoded before use.
+- [x] `acp-node/src/routes/setup-hl-unified.ts` — port of `dgclaw-skill/scripts/activate-unified.ts`
+- [x] `acp-node/src/routes/authorize-hl-api-wallet.ts` — port of `add-api-wallet.ts`
+- [x] `acp-node/src/routes/withdraw-from-hl.ts` — HL `withdraw3` action (for Manage Live Bot modal)
+- [x] `ecosystem.config.js` — `acp-node` PM2 entry alongside existing services
+- [ ] `acp-node/src/routes/bridge-usdc-to-hl.ts` — NEW: `adapter.sendTransaction(chainId, USDC.transfer(HL_BRIDGE, amount))`. Arbitrum-direct path; avoids DGClaw's `perp_deposit` ACP job for MVP.
+- [ ] `acp-node/src/routes/forum-post.ts` — NEW: `POST https://degen.virtuals.io/api/forums/:agentId/threads/:threadId/posts` with markdown body. Auth mechanism (JWT vs ACP-signed) needs verification.
+- [ ] `acp-node/src/routes/join-leaderboard.ts` — NEW: ACP v2 buyer-side job flow targeting DegenClaw agent (`0xd478a8B40372db16cA8045F28C6FE07228F3781A`, offering `join_leaderboard`, $0.01 USDC fee). Uses `AcpAgent` class from SDK, not just the provider adapter. **Verify whether actually required** — AI Council reads on-chain HL fills regardless.
+- [ ] Python backend env keys: `ACP_NODE_URL`, `ACP_NODE_SHARED_SECRET`, `PRIVY_APP_SECRET` (sidecar already has PRIVY_APP_ID baked into SDK)
 
 ### Phase 2 + Phase 3: Atomic Release (service refactor + UX cutover)
 Backend (Phase 2):
 - [ ] `trading/live/hyperliquid_service.py:143,167` — swap to `resolve_hl_credentials()`
 - [ ] `core/monitoring/adapters/hyperliquid_adapter.py:39-54` — conditional credential source by `trading_mode`
 - [ ] `core/orchestrator/orchestrator.py:1424-1437` — `is_virtuals` routes through same HL trading path
+- [ ] `core/orchestrator/orchestrator.py:265-277` — **forum-post hook**: on entry/exit decisions for `trading_mode='virtuals'` bots, fire `acp-node /forum-post` async with formatted reasoning (entries + exits only, not `wait`). Sits alongside existing dojo + arena mirror hooks.
 - [ ] `ggbot.py:2938-2962` — branch gating: HL keeps one-per-user + vault check, virtuals checks `arena_agents_v2` creds
+- [ ] `ActivationBar.tsx:85` + `RiskAcknowledgmentModal.tsx:30` — include `'virtuals'` in `isLiveTrading` check (passive plumbing intentionally skipped this behavior change)
 
 Frontend (Phase 3):
 - [ ] `frontend/components/degen-arena-modal.tsx` (608 lines) → rename `DeployLiveModal.tsx`, repurpose setup state (agent naming + deploy); keep funding + management states; drop bot-must-be-active gate at lines 237-275

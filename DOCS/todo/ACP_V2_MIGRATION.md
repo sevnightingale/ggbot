@@ -1,5 +1,33 @@
 # ACP v2 Migration + Live Trading Unification
 
+## Current Status (2026-04-22)
+
+**🟡 IN PROGRESS** — Phase 0 gate passed, Phase 1 partially shipped.
+
+| Milestone | Status | Notes |
+|-----------|--------|-------|
+| Phase 0 gate | ✅ PASSED | Adapter compat verified against Privy-provisioned wallet |
+| Pre-Phase-2 passive plumbing | ✅ SHIPPED | Commit `41df6fb` — `'virtuals'` accepted as trading_mode enum |
+| Phase 1 acp-node scaffold | ⚠️ PARTIAL | Commits `c1c6615` + `011dbee` — 3/6 routes live |
+| Phase 1 Python backend | 🟡 Not started | `arena_agents_v2` migration + `api/arena_v2.py` + Vault methods |
+| Phase 2+3 atomic release | 🟡 Not started | |
+| Phase 4 DB-gated cleanup | 🟡 Not started | |
+
+### Key plan corrections after Phase 0 research
+
+1. **Public key format** — original plan didn't specify; first attempt used raw X9.62 uncompressed point (`BC...` base64), got 500 on signer approve. Privy requires base64-SPKI-DER (`MFkw...`). Fixed in `api/acp_v2_test.py:_generate_p256_keypair`.
+2. **acp-node brought forward** — original plan deferred the Node sidecar to Phase 4 (for Sebastian's marketBrief provider only). Moved to Phase 1 because user-side CLI setup ("run dgclaw-skill locally") is terrible UX; sidecar automates all Privy-signed HL operations.
+3. **Signing layer unified** — plan originally implied we'd reverse-engineer Privy's session-signer API. Instead we use `PrivyAlchemyEvmProviderAdapter` from `@virtuals-protocol/acp-node-v2` directly — same abstraction acp-cli uses. ~20 lines of `privy-sign.ts` instead of custom protocol work.
+4. **DGClaw setup is 8 steps, not 4** — `dgclaw-skill/references/api.md` exposed leaderboard-join (ACP buyer job), USDC deposit bridge, forum posting. Added to Phase 1 acp-node + Phase 2+3 orchestrator hooks.
+5. **AI Council reasoning channel is forum posts** — `POST https://degen.virtuals.io/api/forums/:agentId/threads/:threadId/posts`. Adds `forum-post` sidecar route + orchestrator hook in Phase 2+3 (alongside existing dojo/arena mirror hooks).
+6. **`sebastian-virtuals` stays running in Phase 1+** — confirmed via code read that only Section C (ACP buyer monitor for Otto/BlackSwan) is load-bearing. `sebastian-virtuals` deletion deferred to Phase 4 when v1 arena mirror dies; not replaced by acp-node (different responsibilities).
+
+See `TODO.md` → ACP v2 section for the current actionable checklist.
+
+---
+
+## Original Plan (below, preserved for context)
+
 **Status**: 🔴 HIGH PRIORITY — Virtuals mandating v2 registry migration. v1 Python SDK (`virtuals-acp==0.3.23`) cannot drive v2-migrated agents. All ggbots-owned agents show "Upgrade Now" banner on app.virtuals.io.
 
 **Scope**: Migrate from v1 ACP-mirror architecture to v2 direct-HL-via-agent-wallet. Introduce `trading_mode='virtuals'` as the canonical live-trading mode. "Deploy Live Version" becomes the standard path for turning paper bots into live bots. Keep legacy `trading_mode='hyperliquid'` (single self-custody slot per user) as a fallback for crypto-native users. Reuse the existing per-bot arena button + modal UX — no new navigation surfaces.

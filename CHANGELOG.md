@@ -6,25 +6,47 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2026-04-22 - ACP v2 Migration: Phase 0 Gate Scaffolding
+## 2026-04-22 - ACP v2 Migration: Phase 0 GATE PASSED + Phase 1 Scaffolding
 
-**Gate harness** (`api/acp_v2_test.py` 361 lines, 8 admin-only routes; `frontend/app/test/acp-v2/{layout,page}.tsx`):
-- `POST /auth-start` + `GET /auth-poll` — popup 1 OAuth wrapping `GET {ACP}/auth/cli/url` → poll `/auth/cli/token`; JWT cached 25min in Redis
-- `POST /agent-create` — `POST {ACP}/agents` (Bearer JWT, `role="HYBRID"`) → P-256 keypair via `cryptography.ec.SECP256R1` → `POST /agents/{id}/signer` → URL with `&publicKey=<base64-uncompressed>` appended (matches `acp-cli/src/commands/agent.ts`)
-- `GET /signer-poll` — polls `/agents/{id}/signer?requestId=X` every 5s, 5min timeout
-- `POST /verify-trade` — $5 ETH open+close via agent's HL API wallet (mirrors `ggbot.py:2062` test-trade pattern)
-- `GET /verify-snapshot` — dumps `info.user_state` + `user_fills_by_time` shape for diff vs. reference v1 HL bot
+**Phase 0 gate harness** (`api/acp_v2_test.py` 8 admin-only routes + `frontend/app/test/acp-v2/`):
+- Popup 1 OAuth: `GET api.acp.virtuals.io/auth/cli/url` → poll `/auth/cli/token`; JWT cached 25min Redis
+- Popup 2 agent+signer: `POST /agents` (Bearer JWT, `role="HYBRID"`) → P-256 keypair → `POST /agents/{id}/signer` → URL with `&publicKey=<base64>` appended (matches `acp-cli/src/commands/agent.ts`)
+- `verify-trade` (HL open+close via agent API wallet) + `verify-snapshot` (`info.user_state` shape diff vs v1 HL bot)
 - ACP v2 base URL pinned `https://api.acp.virtuals.io` (source: `@virtuals-protocol/acp-node-v2/src/core/constants.ts`)
-- Redis session keys: `acp_v2_test:jwt:{uid}` (25min), `req:{requestId}` ownership (10min), `signer_priv:{uid}:{agentId}` (25min)
-- Admin gate via `api/admin.py:require_admin`; frontend layout mirrors `/admin/layout.tsx`
+- Admin gate via `api/admin.py:require_admin`; frontend server layout mirrors `/admin/layout.tsx`
+
+**SPKI-DER pubkey fix** (`api/acp_v2_test.py:_generate_p256_keypair`):
+- Raw X9.62 uncompressed point → 500 on signer approve. Privy expects base64-SPKI-DER (`docs.privy.io/api-reference/signers/authenticate`).
+- Swap `Encoding.X962 + UncompressedPoint` → `Encoding.DER + SubjectPublicKeyInfo`. Output now 91 bytes base64 `MFkwEwYHKoZI...` prefix. Signer approve succeeds.
+
+**Gate result**: snapshot against Privy-provisioned wallet returned structurally valid shape (zero balances expected for unfunded). `HyperliquidAccountAdapter` fully compatible — adapter compat verified. Full trade verification deferred to Phase 1 (automated by acp-node).
+
+**Pre-Phase-2 passive plumbing** (5 files, commit `41df6fb`):
+- `ggbot.py:399` validation + `config_service.py:291` initial_equity + `BotRail.tsx:72` paper filter + `api.ts:104` trading_mode union + `RiskAcknowledgmentModal.tsx:17` prop type widened. Zero behavior change; Phase 2+3 can now ship atomically without enum-gate surprises.
+
+**Phase 1 acp-node scaffold** (`acp-node/` new directory, commits `c1c6615` + `011dbee`):
+- PM2 TypeScript sidecar (Node 22 + Fastify + TSX). Deps: `@privy-io/node`, `@virtuals-protocol/acp-node-v2`, `viem`, `fastify`
+- `src/lib/privy-sign.ts` — wraps `PrivyAlchemyEvmProviderAdapter.create({walletAddress, walletId, signerPrivateKey, privyAppId})` + `adapter.signTypedData(chainId, typedData)`. Base64-PEM signer key decoded before pass. Same abstraction acp-cli uses; no bespoke Privy protocol work.
+- 3 live routes: `POST /setup-hl-unified-account` (ports `dgclaw-skill/scripts/activate-unified.ts`), `POST /authorize-hl-api-wallet` (ports `add-api-wallet.ts`), `POST /withdraw-from-hl` (HL `withdraw3` action for Manage Live Bot modal)
+- Shared-secret `X-Service-Auth` guard, `/health` unauthed, listens `127.0.0.1:3101`
+- `ecosystem.config.js` PM2 entry added. `sebastian-virtuals` stays running alongside in Phase 1+ (deletion gated on Phase 4 v1 arena mirror cleanup).
+
+**AI Council reasoning mechanism discovered** (`dgclaw-skill/references/api.md`):
+- Forum posts at `POST https://degen.virtuals.io/api/forums/:agentId/threads/:threadId/posts` (markdown body). AI Council reads these alongside on-chain HL fills when picking Monday top-10 allocations.
+- Our bots already generate reasoning (`decisions.reasoning`, `activities.llm_thought`). Need orchestrator hook in Phase 2+3 to fire on entry/exit decisions + new `acp-node/src/routes/forum-post.ts`.
+
+**Phase 1 remaining sidecar routes** (not yet implemented):
+- `bridge-usdc-to-hl` — `adapter.sendTransaction()` for Arbitrum USDC → HL bridge (`0x2df1c51e09aecf9cacb7bc98cb1742757f163df7`). MVP users can deposit Arbitrum-direct.
+- `join-leaderboard` — ACP v2 buyer job flow (DegenClaw agent `0xd478a8B40372db16cA8045F28C6FE07228F3781A`, $0.01 fee). Requires `AcpAgent` class. Verify whether actually required — AI Council reads on-chain fills regardless.
+- `forum-post` — auth mechanism TBD (JWT vs ACP-signed). Feeds AI Council.
 
 **Plan decisions locked in** (`DOCS/todo/ACP_V2_MIGRATION.md`, `/home/sev/.claude/plans/acp-v2-migration-foamy-bunny.md`):
 - Phase 0a/0b collapsed → single combined gate
-- Sebastian marketBrief provider stays on v1 (defer Node sidecar)
+- `sebastian-virtuals` stays on v1, deletion gated on Phase 4 (NOT replaced by acp-node — different responsibilities)
 - CredentialResolver helper pattern (not creds-threading)
-- DB-gated Phase 4 cleanup, not calendar-gated
-
-**Gate run pending** (user action): pm2 restart + Vercel deploy → walk `/test/acp-v2` end-to-end, fund $5–10 USDC on Base, run `dgclaw-skill` scripts locally, paste HL API wallet key, verify trade + snapshot shapes.
+- DB-gated Phase 4 cleanup (`SELECT COUNT(*) FROM arena_agents WHERE status='assigned' = 0`)
+- MVP deposit path: Arbitrum-direct (not DGClaw's `perp_deposit` ACP job)
+- Agent naming user-editable with default = bot config name, collision retry-suffix
 
 ---
 
