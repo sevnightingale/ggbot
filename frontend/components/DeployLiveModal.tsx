@@ -258,7 +258,7 @@ export function DeployLiveModal({
     <div className="space-y-4">
       <p className="text-sm text-[var(--text-muted)]">
         First, connect your Virtuals Protocol account. This one-time step lets ggbots
-        spin up agent wallets on your behalf. You'll get a second approval popup
+        spin up agent wallets on your behalf. You&apos;ll get a second approval popup
         per bot for signer registration.
       </p>
       <VirtualsConnectButton
@@ -275,7 +275,7 @@ export function DeployLiveModal({
     <div className="space-y-4">
       <p className="text-sm text-[var(--text-muted)]">
         Deploying this paper bot creates a dedicated Virtuals agent with its own
-        Hyperliquid wallet. You'll get one approval popup; after that ggbots handles
+        Hyperliquid wallet. You&apos;ll get one approval popup; after that ggbots handles
         the rest — account activation, API wallet authorization, and leaderboard
         registration once funded.
       </p>
