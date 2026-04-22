@@ -263,6 +263,35 @@ module.exports = {
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
+    },
+    // acp-node — ACP v2 Privy-signed HL setup sidecar (Phase 1+)
+    {
+      name: 'acp-node',
+      script: '/home/sev/ggbot/acp-node/src/index.ts',
+      interpreter: '/home/sev/ggbot/acp-node/node_modules/.bin/tsx',
+      cwd: '/home/sev/ggbot/acp-node',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        ACP_NODE_PORT: process.env.ACP_NODE_PORT || '3101',
+        ACP_NODE_SHARED_SECRET: process.env.ACP_NODE_SHARED_SECRET,
+        PRIVY_APP_ID: process.env.PRIVY_APP_ID || 'cltsev9j90f67yhyw4sngtrpv',
+        PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
+        HL_API_URL: process.env.HL_API_URL || 'https://api.hyperliquid.xyz/exchange',
+        HL_CHAIN_ID: process.env.HL_CHAIN_ID || '42161',
+        LOG_LEVEL: process.env.LOG_LEVEL || 'info'
+      },
+      error_file: 'logs/acp-node-error.log',
+      out_file: 'logs/acp-node-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
     }
   ]
 };
