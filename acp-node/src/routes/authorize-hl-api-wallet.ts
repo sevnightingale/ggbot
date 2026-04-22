@@ -63,6 +63,7 @@ export function registerAuthorizeHlApiWallet(app: FastifyInstance) {
         agentWalletAddress,
         agentWalletId,
         signerPrivateKey,
+        chainId: CHAIN_ID,
         typedData,
       })
     } catch (err) {

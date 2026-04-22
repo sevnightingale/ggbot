@@ -3,6 +3,7 @@ import Fastify from 'fastify'
 import { sharedSecretGuard } from './lib/auth.js'
 import { registerSetupHlUnified } from './routes/setup-hl-unified.js'
 import { registerAuthorizeHlApiWallet } from './routes/authorize-hl-api-wallet.js'
+import { registerWithdrawFromHl } from './routes/withdraw-from-hl.js'
 
 const PORT = Number(process.env.ACP_NODE_PORT || 3101)
 const SHARED_SECRET = process.env.ACP_NODE_SHARED_SECRET
@@ -28,6 +29,7 @@ app.register(async (authedScope) => {
   authedScope.addHook('preHandler', sharedSecretGuard(SHARED_SECRET))
   registerSetupHlUnified(authedScope)
   registerAuthorizeHlApiWallet(authedScope)
+  registerWithdrawFromHl(authedScope)
 })
 
 app.listen({ port: PORT, host: '127.0.0.1' }).then((addr) => {

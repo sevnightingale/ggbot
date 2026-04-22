@@ -31,6 +31,17 @@ export const ApproveAgentTypes = {
   ],
 } as const
 
+// Hyperliquid withdraw3 — returns USDC from HL to an EVM address on Arbitrum.
+// Protocol charges a small fee (currently $1 flat), settles on Arbitrum.
+export const WithdrawTypes = {
+  'HyperliquidTransaction:Withdraw': [
+    { name: 'hyperliquidChain', type: 'string' },
+    { name: 'destination', type: 'string' },
+    { name: 'amount', type: 'string' },
+    { name: 'time', type: 'uint64' },
+  ],
+} as const
+
 export function parseSignature(sig: string): { r: `0x${string}`; s: `0x${string}`; v: number } {
   const raw = sig.startsWith('0x') ? sig.slice(2) : sig
   return {

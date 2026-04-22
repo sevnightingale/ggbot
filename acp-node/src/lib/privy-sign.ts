@@ -1,23 +1,25 @@
-// Privy-wallet EIP-712 signing via our registered P-256 delegated signer.
+// Privy-wallet EIP-712 signing via the Virtuals v2 SDK's provider adapter.
 //
-// TODO(Phase 1 integration): wire up to @privy-io/node + @virtuals-protocol/acp-node-v2.
+// We don't talk to @privy-io/node directly — we use PrivyAlchemyEvmProviderAdapter
+// from @virtuals-protocol/acp-node-v2, which is the exact same abstraction that
+// acp-cli (and transitively dgclaw-skill) uses under the hood. The adapter wraps
+// the Privy session-signer authentication protocol so we don't have to.
 //
-// What this function must do end-to-end:
-//   1. Initialize Privy client (PrivyClient({ appId, appSecret }))
-//   2. Load the P-256 signer private key (passed in as base64-PEM) into a KeyQuorum / session-signer context
-//   3. Call privy.walletApi.ethereum.signTypedData({ walletId, typedData }) with the Privy-wallet's walletId
-//      — Privy authenticates the request via our signer, then signs the typed data with the embedded wallet's secp256k1 key
-//   4. Return the 0x-prefixed hex signature (r || s || v, 65 bytes)
+// The adapter's factory method — PrivyAlchemyEvmProviderAdapter.create({ ... }) —
+// accepts our signer private key in memory, returning an object with a typed
+// IEvmProviderAdapter interface (sendTransaction, signTypedData, etc).
 //
-// Reference:
-//   - @virtuals-protocol/acp-cli/src/lib/api/agent.ts — uses `addSignerWithUrl` which is the registration half of this same flow
-//   - @virtuals-protocol/acp-cli/src/commands/wallet.ts — `wallet sign-typed-data` command (the escape hatch dgclaw-skill scripts call via execSync)
-//   - docs.privy.io/api-reference/signers — session signer auth + signing
+// Ref:
+//   - @virtuals-protocol/acp-node-v2/src/providers/evm/privyAlchemyEvmProviderAdapter.ts
+//   - @virtuals-protocol/acp-node-v2/src/providers/types.ts (IEvmProviderAdapter)
+
+import { PrivyAlchemyEvmProviderAdapter } from '@virtuals-protocol/acp-node-v2'
 
 export interface SignTypedDataRequest {
   agentWalletAddress: `0x${string}`
   agentWalletId: string
-  signerPrivateKey: string  // base64-encoded PEM, from our Vault
+  signerPrivateKey: string          // base64-encoded PEM (PKCS8) — decoded before use
+  chainId: number
   typedData: {
     domain: Record<string, unknown>
     types: Record<string, readonly { name: string; type: string }[]>
@@ -26,12 +28,32 @@ export interface SignTypedDataRequest {
   }
 }
 
+function decodeSignerKey(b64: string): string {
+  // Our Python backend stores the private key as base64(PEM). Decode to raw PEM
+  // string since that's what @privy-io/node's generateAuthorizationSignature expects.
+  return Buffer.from(b64, 'base64').toString('utf-8')
+}
+
 export async function signTypedDataWithPrivy(req: SignTypedDataRequest): Promise<string> {
-  // Deliberately throws until we verify the exact @privy-io/node session-signer API.
-  // Swapping the throw for a live call is a ~30-line change once we confirm the shape.
-  void req
-  throw new Error(
-    'privy-sign: NotImplemented. See TODO in src/lib/privy-sign.ts. ' +
-    'Expected call: privy.walletApi.ethereum.signTypedData({ walletId, typedData }) with session signer auth.',
-  )
+  const adapter = await PrivyAlchemyEvmProviderAdapter.create({
+    walletAddress: req.agentWalletAddress,
+    walletId: req.agentWalletId,
+    signerPrivateKey: decodeSignerKey(req.signerPrivateKey),
+    privyAppId: process.env.PRIVY_APP_ID,
+  })
+
+  return adapter.signTypedData(req.chainId, req.typedData)
+}
+
+export async function getEvmAdapter(opts: {
+  agentWalletAddress: `0x${string}`
+  agentWalletId: string
+  signerPrivateKey: string
+}) {
+  return PrivyAlchemyEvmProviderAdapter.create({
+    walletAddress: opts.agentWalletAddress,
+    walletId: opts.agentWalletId,
+    signerPrivateKey: decodeSignerKey(opts.signerPrivateKey),
+    privyAppId: process.env.PRIVY_APP_ID,
+  })
 }

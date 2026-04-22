@@ -17,6 +17,12 @@ Both actions must be signed by the Privy wallet, authenticated via the P-256 del
 - Not an ACP provider/buyer — that's `sebastian-virtuals` (v1) and will migrate here only if/when we have a reason to.
 - Not user-facing — every endpoint requires the `X-Service-Auth` shared secret; only the Python backend calls it over localhost.
 
+## Signing internals
+
+All EIP-712 signing goes through `PrivyAlchemyEvmProviderAdapter` from `@virtuals-protocol/acp-node-v2`. The adapter accepts our P-256 signer private key in memory (no OS keychain dependency), handles Privy's session-signer authentication protocol internally, and returns standard Ethereum `{r, s, v}` signatures.
+
+See `src/lib/privy-sign.ts`.
+
 ## API
 
 All POSTs require `X-Service-Auth: <ACP_NODE_SHARED_SECRET>`.
@@ -33,13 +39,15 @@ Signs `userSetAbstraction` typed data via Privy, POSTs to HL. Ports `dgclaw-skil
 }
 ```
 
-**Response**:
-```json
-{ "success": true, "hlResponse": { "status": "ok", ... } }
-```
-
 ### `POST /authorize-hl-api-wallet`
 Generates a fresh viem secp256k1 keypair, signs `approveAgent` via Privy, POSTs to HL, returns the new API wallet's private key for Vault storage. Ports `dgclaw-skill/scripts/add-api-wallet.ts`.
+
+**Body** same as above plus optional `agentName`.
+
+**Response** includes `apiWalletAddress` + `apiWalletPrivateKey` (0x-hex). Python backend must store in Vault immediately — this sidecar is stateless.
+
+### `POST /withdraw-from-hl`
+Signs `withdraw3` typed data via Privy, POSTs to HL. Destination defaults to the agent's own wallet; optional `destination` param for withdrawing to a different address. HL charges a small flat fee (~$1).
 
 **Body**:
 ```json
@@ -47,24 +55,21 @@ Generates a fresh viem secp256k1 keypair, signs `approveAgent` via Privy, POSTs 
   "agentWalletAddress": "0x…",
   "agentWalletId": "privy-wallet-id",
   "signerPrivateKey": "base64-PEM",
-  "agentName": "optional-friendly-name"
+  "amountUsdc": "100",
+  "destination": "0x… (optional, defaults to agentWalletAddress)"
 }
 ```
-
-**Response**:
-```json
-{
-  "success": true,
-  "apiWalletAddress": "0x…",
-  "apiWalletPrivateKey": "0x…64hex",
-  "hlResponse": { "status": "ok" }
-}
-```
-
-Python backend must store `apiWalletPrivateKey` in Supabase Vault immediately on receipt — it is NOT retained by this sidecar.
 
 ### `GET /health`
-Returns `{ status: "ok", version }`. No auth required.
+Returns `{ status, service, version }`. No auth required.
+
+## Not yet implemented (roadmap)
+
+These are required for complete DGClaw parity per `dgclaw-skill/SKILL.md`, but not blockers for MVP Deploy Live Version:
+
+- `POST /bridge-usdc-to-hl` — Arbitrum USDC → HL deposit. For MVP, users deposit USDC directly to their agent's wallet **on Arbitrum** (not Base) and then send to HL's bridge contract `0x2df1c51e09aecf9cacb7bc98cb1742757f163df7`. Full automation (signing an `adapter.sendTransaction()` with the USDC transfer calldata) comes in a follow-up.
+- `POST /join-leaderboard` — ACP v2 buyer-side job flow against DegenClaw agent (wallet `0xd478a8B40372db16cA8045F28C6FE07228F3781A`, offering `join_leaderboard`, $0.01 fee). Requires `AcpAgent` class setup, not just the provider adapter. **May be optional** — the AI Council reads all HL trades; need to verify whether explicit leaderboard registration is required.
+- `POST /forum-post` — `degen.virtuals.io` forum posts for AI Council visibility. Deferred.
 
 ## Dev
 
