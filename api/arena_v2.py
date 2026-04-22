@@ -305,13 +305,25 @@ async def deploy_live(
     agent = payload.get("data") or payload
     virtuals_agent_id = str(agent.get("id") or "")
     wallet_address = agent.get("walletAddress")
-    wallet_id = agent.get("walletId") or agent.get("privyWalletId")
+
+    # Privy wallet ID lives inside walletProviders[] — one entry per chain.
+    # We want the EVM Privy wallet; Solana is irrelevant for HL trading.
+    wallet_id: Optional[str] = None
+    for provider_entry in agent.get("walletProviders") or []:
+        if (
+            provider_entry.get("provider") == "PRIVY"
+            and provider_entry.get("chainType") == "EVM"
+        ):
+            wallet_id = (provider_entry.get("metadata") or {}).get("walletId")
+            if wallet_id:
+                break
 
     if not virtuals_agent_id or not wallet_address or not wallet_id:
         raise HTTPException(
             502,
-            f"Agent response missing required fields (id/walletAddress/walletId): "
-            f"{json.dumps(agent)[:300]}",
+            f"Agent response missing required fields "
+            f"(id={bool(virtuals_agent_id)}, walletAddress={bool(wallet_address)}, "
+            f"evmPrivyWalletId={bool(wallet_id)}): {json.dumps(agent)[:300]}",
         )
 
     # ------------------------------------------------------------------
