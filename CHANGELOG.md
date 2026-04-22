@@ -6,6 +6,28 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-22 - ACP v2 Migration: Phase 0 Gate Scaffolding
+
+**Gate harness** (`api/acp_v2_test.py` 361 lines, 8 admin-only routes; `frontend/app/test/acp-v2/{layout,page}.tsx`):
+- `POST /auth-start` + `GET /auth-poll` — popup 1 OAuth wrapping `GET {ACP}/auth/cli/url` → poll `/auth/cli/token`; JWT cached 25min in Redis
+- `POST /agent-create` — `POST {ACP}/agents` (Bearer JWT, `role="HYBRID"`) → P-256 keypair via `cryptography.ec.SECP256R1` → `POST /agents/{id}/signer` → URL with `&publicKey=<base64-uncompressed>` appended (matches `acp-cli/src/commands/agent.ts`)
+- `GET /signer-poll` — polls `/agents/{id}/signer?requestId=X` every 5s, 5min timeout
+- `POST /verify-trade` — $5 ETH open+close via agent's HL API wallet (mirrors `ggbot.py:2062` test-trade pattern)
+- `GET /verify-snapshot` — dumps `info.user_state` + `user_fills_by_time` shape for diff vs. reference v1 HL bot
+- ACP v2 base URL pinned `https://api.acp.virtuals.io` (source: `@virtuals-protocol/acp-node-v2/src/core/constants.ts`)
+- Redis session keys: `acp_v2_test:jwt:{uid}` (25min), `req:{requestId}` ownership (10min), `signer_priv:{uid}:{agentId}` (25min)
+- Admin gate via `api/admin.py:require_admin`; frontend layout mirrors `/admin/layout.tsx`
+
+**Plan decisions locked in** (`DOCS/todo/ACP_V2_MIGRATION.md`, `/home/sev/.claude/plans/acp-v2-migration-foamy-bunny.md`):
+- Phase 0a/0b collapsed → single combined gate
+- Sebastian marketBrief provider stays on v1 (defer Node sidecar)
+- CredentialResolver helper pattern (not creds-threading)
+- DB-gated Phase 4 cleanup, not calendar-gated
+
+**Gate run pending** (user action): pm2 restart + Vercel deploy → walk `/test/acp-v2` end-to-end, fund $5–10 USDC on Base, run `dgclaw-skill` scripts locally, paste HL API wallet key, verify trade + snapshot shapes.
+
+---
+
 ## 2026-04-07 - Activity Log Export (Forge → Download)
 
 **Feature**: Users can download bot's activity log as a plain JSON file for offline review/analysis. Fills gap — existing `GET /activities/{config_id}` hard-caps at 1000 rows, unusable for bots past p90 (2,363 activities).

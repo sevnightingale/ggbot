@@ -9,9 +9,35 @@ import uuid
 import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import psycopg2.errors
 from core.common.db import get_db_connection
 from core.common.logger import logger
 from core.domain import UserProfile
+
+
+# User-friendly messages keyed by FK constraint name. Anything not listed falls
+# back to a generic message that names the blocking table.
+_DELETE_BLOCK_MESSAGES = {
+    "arena_pledges_config_id_fkey":
+        "Cannot delete: this bot has active arena pledges (on-chain USX stakes). "
+        "Unstake first to preserve fund safety.",
+    "arena_registrations_config_id_fkey":
+        "Cannot delete: this bot is registered in an arena competition. "
+        "Unregister first.",
+}
+
+
+class ConfigDeletionBlocked(Exception):
+    """Raised when a config cannot be deleted due to a FK constraint.
+
+    Carries the blocking constraint name so the API layer can map to a
+    useful 409 response.
+    """
+
+    def __init__(self, constraint_name: str, message: str):
+        self.constraint_name = constraint_name
+        self.message = message
+        super().__init__(message)
 
 
 class BotConfigV2:
@@ -587,29 +613,40 @@ class ConfigService:
         Returns:
             True if deleted successfully, False otherwise
         """
+        # Verify config exists and user has access
+        existing_config = await self.get_config(config_id, user_id)
+        if not existing_config:
+            self._log.warning(f"Config {config_id} not found for user {user_id}")
+            return False
+
         try:
-            # Verify config exists and user has access
-            existing_config = await self.get_config(config_id, user_id)
-            if not existing_config:
-                self._log.warning(f"Config {config_id} not found for user {user_id}")
-                return False
-            
-            # Delete from database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
                         DELETE FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
-                    
+
                     if cur.rowcount == 0:
                         return False
-                        
+
                 conn.commit()
-            
+
             self._log.info(f"Deleted config {config_id} for user {user_id}")
             return True
-            
+
+        except psycopg2.errors.ForeignKeyViolation as e:
+            constraint = getattr(e.diag, "constraint_name", "") or ""
+            table = getattr(e.diag, "table_name", "") or "related records"
+            message = _DELETE_BLOCK_MESSAGES.get(
+                constraint,
+                f"Cannot delete: blocked by related records in '{table}'."
+            )
+            self._log.warning(
+                f"Delete blocked for config {config_id} by constraint {constraint}"
+            )
+            raise ConfigDeletionBlocked(constraint, message) from e
+
         except Exception as e:
             self._log.error(f"Failed to delete config {config_id}: {e}")
             return False

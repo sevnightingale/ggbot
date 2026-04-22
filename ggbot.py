@@ -80,7 +80,7 @@ async def get_mock_user_for_dev():
     )
 
 # local — services
-from core.services.config_service import ConfigService, BotConfigV2, config_service
+from core.services.config_service import ConfigService, BotConfigV2, ConfigDeletionBlocked, config_service
 from core.services.user_service import UserService, user_service
 from core.services.llm_service import LLMService, llm_service
 from core.services.indicator_service import IndicatorService
@@ -105,6 +105,36 @@ def _check_dojo_lock(config_id: str) -> None:
         raise HTTPException(
             status_code=400,
             detail="Bot is locked for an active Dojo match. Forfeit to unlock."
+        )
+
+
+async def _check_arena_assignment(config_id: str) -> None:
+    """Raise 409 if bot has an assigned Degen Arena agent holding live funds.
+
+    DGClaw lite agents hold real USDC (ACP fee reserve on Base + pool balance
+    on Hyperliquid). Deleting the bot would leave the user with no UI path to
+    withdraw — the Degen Arena modal looks up the agent by config_id. Users
+    must withdraw funds and release the agent first.
+    """
+    from core.common.db import db_fetch_one
+    row = await db_fetch_one(
+        """
+        SELECT agent_name, wallet_address, hl_subaccount_address
+        FROM arena_agents
+        WHERE assigned_config_id = %s AND status = 'assigned'
+        """,
+        (config_id,)
+    )
+    if row:
+        agent_name = row[0]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot delete: this bot has an assigned Degen Arena agent "
+                f"({agent_name}) which may hold live funds on DGClaw. "
+                f"Open the Degen Arena modal, withdraw all funds, and release "
+                f"the agent before deleting this bot."
+            )
         )
 
 
@@ -222,6 +252,7 @@ from api.admin import router as admin_router
 from api.public import router as public_router
 from api.usage import router as usage_router
 from api.virtuals_arena import router as virtuals_arena_router
+from api.acp_v2_test import router as acp_v2_test_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
@@ -231,6 +262,7 @@ app.include_router(admin_router)
 app.include_router(public_router)
 app.include_router(usage_router)
 app.include_router(virtuals_arena_router)
+app.include_router(acp_v2_test_router)
 
 
 # Orchestrator instance (used by "Run Now" and signal validation endpoints)
@@ -1001,7 +1033,11 @@ async def delete_config(
 ) -> Dict[str, Any]:
     """Delete a configuration. Scheduler reconcile loop auto-removes orphaned jobs."""
     _check_dojo_lock(config_id)
-    success = await config_service.delete_config(config_id, current_user.user_id)
+    await _check_arena_assignment(config_id)
+    try:
+        success = await config_service.delete_config(config_id, current_user.user_id)
+    except ConfigDeletionBlocked as e:
+        raise HTTPException(status_code=409, detail=e.message)
 
     if not success:
         raise HTTPException(status_code=404, detail="Configuration not found")

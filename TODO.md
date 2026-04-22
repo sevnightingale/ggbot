@@ -4,6 +4,84 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 ---
 
+## 🚀 **ACP v2 Migration + Live Trading Unification** [ACP_V2_MIGRATION.md]
+
+**Status**: 🟡 IN PROGRESS — Phase 0 scaffolding shipped (2026-04-22). Gate run pending.
+**Planning Doc**: [DOCS/todo/ACP_V2_MIGRATION.md](DOCS/todo/ACP_V2_MIGRATION.md)
+**Execution Plan**: `/home/sev/.claude/plans/acp-v2-migration-foamy-bunny.md`
+
+Introduce `trading_mode='virtuals'` as the canonical live-trading path (replaces the v1 "mirror" architecture entirely — no ACP job queue, no parallel execution). Virtuals agents trade directly on Hyperliquid via their Privy-provisioned wallet; DGClaw is a leaderboard overlay reading HL state by wallet address. "Deploy Live Version" reuses the existing arena button/modal (no new nav). Legacy `trading_mode='hyperliquid'` kept as non-custodial fallback (1 bot/user, unchanged). Custodial-but-revocable signer — users revoke via Virtuals dashboard anytime.
+
+### Decisions Locked In (before execution)
+- **Single combined Phase 0 gate** — auth popup + signer popup + HL test trade + adapter snapshot verify, all on one admin page (0a/0b collapsed)
+- **Sebastian marketBrief provider stays on v1** — marketBrief is reachable outside ACP; defer Node sidecar until Python v2 SDK lands or v1 genuinely breaks
+- **CredentialResolver pattern** — `resolve_hl_credentials(trading_mode, user_id, config_id)` helper; services stay pure
+- **Trading mode enum stays distinct** (`paper | hyperliquid | virtuals`) — unify at credential layer, not execution
+- **Agent naming**: user-editable, default = bot config name, handle collision with retry-suffix
+- **BotRail placement**: virtuals bots in Paper Bots section with LIVE badge
+- **`is_public_performance` subsumed** by `trading_mode='virtuals'` (all arena-public by design)
+- **Phase 4 cleanup gated on DB query** (`SELECT COUNT(*) FROM arena_agents WHERE status='assigned' = 0`), not calendar date
+- **Sequencing**: pre-Phase-2 passive plumbing alone → Phase 1 alone → Phase 2+3 atomic release → Phase 4 DB-gated
+- **API endpoint surface**: v2 `/auth/cli/url`, `POST /agents`, `POST /agents/{id}/signer` at `https://api.acp.virtuals.io` (sourced from `@virtuals-protocol/acp-node-v2/src/core/constants.ts` + `acp-cli/src/lib/api/*.ts`)
+
+### Phase 0: Single Admin Gate (SCAFFOLDING COMPLETE — gate run pending)
+- [x] `api/acp_v2_test.py` (361 lines, 8 routes) — wired in `ggbot.py:255,264`
+- [x] `frontend/app/test/acp-v2/{layout.tsx,page.tsx}` — admin-gated via server layout
+- [x] P-256 keypair generation via Python `cryptography`, uncompressed-point base64 (matches CLI wire format)
+- [x] Redis session plumbing (JWT 25min, requestId ownership 10min, signer privkey 25min)
+- [ ] **Run gate end-to-end** (user action):
+  - [ ] pm2 restart ggbot + Vercel deploy → visit `/test/acp-v2` as admin
+  - [ ] Complete "Connect Virtuals" → agent created + signer approved in popups
+  - [ ] Fund agent wallet with $5–10 USDC on Base
+  - [ ] Run `dgclaw-skill/scripts/activate-unified.ts` + `add-api-wallet.ts` locally
+  - [ ] Paste HL API wallet key into UI → Run test trade + snapshot dump
+  - [ ] Visually diff snapshot JSON against reference v1 HL bot snapshot
+- [ ] **Gate decision**: if snapshot/trade fails, reassess before Phase 1
+
+### Pre-Phase-2: Passive Plumbing PR (unblocks Phase 2+3, zero behavior change)
+- [ ] `ggbot.py:399` — add `"virtuals"` to trading_mode validation list
+- [ ] `core/services/config_service.py:291` — include `'virtuals'` in `initial_equity=0` branch
+- [ ] `frontend/app/forge/components/layout/BotRail.tsx:72` — paper filter also excludes `'virtuals'`
+- [ ] `frontend/lib/api.ts:104` — extend `trading_mode` union with `'virtuals'`
+
+### Phase 1: Backend Foundations
+- [ ] `database/migrations/add_arena_agents_v2.sql` — new table (3 Vault IDs, unique partial index on `config_id WHERE status='active'`)
+- [ ] `api/arena_v2.py` — NEW: connect-start, connect-poll, deploy-live, deploy-poll
+- [ ] `api/virtuals_arena.py` — MODIFIED: rewire status/check-deposit/withdraw to read `arena_agents_v2`; deprecate `/join`
+- [ ] `core/auth/vault_utils.py` — `store_arena_v2_credential` / `get_arena_v2_credential` / `resolve_hl_credentials` helper
+
+### Phase 2 + Phase 3: Atomic Release (service refactor + UX cutover)
+Backend (Phase 2):
+- [ ] `trading/live/hyperliquid_service.py:143,167` — swap to `resolve_hl_credentials()`
+- [ ] `core/monitoring/adapters/hyperliquid_adapter.py:39-54` — conditional credential source by `trading_mode`
+- [ ] `core/orchestrator/orchestrator.py:1424-1437` — `is_virtuals` routes through same HL trading path
+- [ ] `ggbot.py:2938-2962` — branch gating: HL keeps one-per-user + vault check, virtuals checks `arena_agents_v2` creds
+
+Frontend (Phase 3):
+- [ ] `frontend/components/degen-arena-modal.tsx` (608 lines) → rename `DeployLiveModal.tsx`, repurpose setup state (agent naming + deploy); keep funding + management states; drop bot-must-be-active gate at lines 237-275
+- [ ] `frontend/app/forge/components/monitor/ActivationBar.tsx:474-503` — tri-state button based on `trading_mode`; hide for `trading_mode='hyperliquid'`
+- [ ] `frontend/components/VirtualsConnectButton.tsx` — NEW (popup 1 handler; used in Settings + inline in modal)
+- [ ] `frontend/components/SettingsModal.tsx:245-328` — add "Connect Virtuals" subsection above Hyperliquid
+- [ ] Rename BotRail pinned slot label "Live Trading" → "Hyperliquid ggbot"
+
+Deletions (atomic with v2 activation):
+- [ ] `POST /api/v2/bot/{config_id}/promote-to-live` at `ggbot.py:3050-3152`
+- [ ] `promoteToLive()` in `frontend/lib/api.ts` + `onPromoteToLive` prop threading in `BotRail.tsx:42,61,218`
+- [ ] "Promote to Live" 3-dot-menu item in `BotManagementMenu.tsx`
+
+### Phase 4: DB-gated Cleanup (fires only when `arena_agents` has zero assigned rows)
+- [ ] Admin bot (`b9d9bf00-a89a-4df7-9f7f-abcfff7e7d85`) manual migration via degen.virtuals.io "Migrate" → redeploy as virtuals bot
+- [ ] Delete `trading/virtuals/dgclaw_service.py` (483 lines) + `claw_api.py` trade methods + simplify `arena_sync.py`
+- [ ] Delete orchestrator arena block (`core/orchestrator/orchestrator.py:255-263` + `:373-379`) + helpers at `:965-1247` (`_is_arena_enabled`, `_enqueue_arena_trade`, `_get_user_arena_agent`, `_execute_claw_arena_trade`, `_arena_to_pair`, `_reconcile_arena_position`)
+- [ ] Retire `arena:trade_queue` Redis key
+- [ ] Remove `virtuals-acp==0.3.23` from `requirements.txt`
+- [ ] **Keep**: `sebastian_virtuals.py`, `core/services/acp_client.py`, legacy `arena_agents` table (audit)
+
+### Phase 5: Existing Arena Users Migration
+- Sebastian handles manually at end (out of scope for this plan)
+
+---
+
 ## 🥋 **The Dojo** (Phases 1-4 COMPLETE)
 
 **Status**: 🟢 COMPLETE — All 4 phases deployed
@@ -166,6 +244,12 @@ Four real-time hooks (paper TP/SL, HL fill detection, manual close, reconciler) 
 - [ ] Phase 1 admin bot fix: `user_id='system'` fails UUID validation in activity logger
 - [ ] Tokenize ggbot-003 (or keep retired)
 - [ ] End-to-end: wait for bot entry signal → verify arena mirror fires (close sync now fully covered)
+- [ ] **"Release Agent" flow** (unblocks bot deletion when arena-assigned)
+  - Context: as of 2026-04-20, deleting a bot with an assigned `arena_agents` row is blocked at both app layer (`_check_arena_assignment` in `ggbot.py`) and DB layer (`arena_agents_assigned_config_id_fkey` ON DELETE RESTRICT). No UI path exists to release the agent, so users with an arena agent currently can't delete their bot.
+  - Backend: `POST /api/v2/virtuals-arena/{config_id}/release` — verify DGClaw balance ≈ $0 + no open positions, then NULL out `assigned_config_id`/`assigned_user_id`/`user_wallet_address`/`assigned_at`, set `status='available'`. Idempotent.
+  - Safety: refuse release if DGClaw account balance > dust threshold (say $0.50) or any open positions on HL subaccount. Surface a clear error telling user to withdraw first.
+  - Frontend: "Release Agent" button in Degen Arena modal, visible only when balance is ~$0 and no open positions. Confirm dialog explains the agent returns to the pool and won't be reassigned to this bot.
+  - Test path: The Technician (`fdf83abb-...`) currently assigned `ggbot-004` — good candidate for first release once funds withdrawn.
 
 ---
 
