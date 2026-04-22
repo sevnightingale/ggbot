@@ -477,17 +477,133 @@ export class ApiClient {
     return await response.json()
   }
 
-  async promoteToLive(configId: string): Promise<{ status: string; live_config_id: string; version: number; message: string }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/promote-to-live`, {
-      method: 'POST'
+  // -----------------------------------------------------------------------
+  // ACP v2 / Deploy Live Version — replaces the old "Promote to Live" flow
+  // -----------------------------------------------------------------------
+
+  async arenaV2ConnectStart(): Promise<{ authUrl: string; requestId: string }> {
+    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/connect-start`, {
+      method: 'POST',
     })
+    if (!res.ok) throw new Error((await res.text()) || 'Failed to start Virtuals connect')
+    return await res.json()
+  }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Failed to promote to live' }))
-      throw new Error(error.detail || 'Failed to promote to live')
+  async arenaV2ConnectPoll(requestId: string): Promise<{ status: 'pending' | 'completed'; walletAddress?: string }> {
+    const res = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/arena/connect-poll?requestId=${encodeURIComponent(requestId)}`,
+    )
+    if (!res.ok) throw new Error('Failed to poll Virtuals connect')
+    return await res.json()
+  }
+
+  async arenaV2ConnectionStatus(): Promise<{ connected: boolean; ttl_seconds?: number | null }> {
+    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/connection-status`)
+    if (!res.ok) throw new Error('Failed to read Virtuals connection status')
+    return await res.json()
+  }
+
+  async arenaV2Disconnect(): Promise<{ status: string }> {
+    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/disconnect`, {
+      method: 'POST',
+    })
+    if (!res.ok) throw new Error('Failed to disconnect from Virtuals')
+    return await res.json()
+  }
+
+  async arenaV2DeployLive(sourceConfigId: string, agentName?: string): Promise<{
+    new_config_id: string
+    agent_record_id: string
+    virtuals_agent_id: string
+    agent_wallet_address: string
+    signerUrl: string
+    signerRequestId: string
+  }> {
+    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/deploy-live`, {
+      method: 'POST',
+      body: JSON.stringify({ source_config_id: sourceConfigId, agent_name: agentName }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Deploy failed' }))
+      throw new Error(err.detail || 'Deploy failed')
     }
+    return await res.json()
+  }
 
-    return await response.json()
+  async arenaV2DeployPoll(requestId: string): Promise<{
+    status: 'pending' | 'completed' | 'error'
+    stage?: string
+    signerStatus?: string
+    reason?: string
+    detail?: unknown
+    config_id?: string
+    agent_wallet_address?: string
+    api_wallet_address?: string
+    agent_name?: string
+  }> {
+    const res = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/arena/deploy-poll?requestId=${encodeURIComponent(requestId)}`,
+    )
+    if (!res.ok) throw new Error('Failed to poll deploy')
+    return await res.json()
+  }
+
+  async arenaV2Status(configId: string): Promise<{
+    status: 'not_deployed' | 'provisioning' | 'active'
+    agent_name?: string
+    agent_wallet_address?: string
+    virtuals_agent_id?: string
+    arbitrum_usdc_balance?: number | null
+    hl_account_value?: number | null
+    hl_withdrawable?: number | null
+    hl_positions?: Array<{
+      coin: string
+      size: number
+      entry_price: number
+      unrealized_pnl: number
+      margin_used: number
+    }>
+    hl_api_wallet_authorized?: boolean
+    leaderboard_joined?: boolean
+  }> {
+    const res = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/arena/status?config_id=${encodeURIComponent(configId)}`,
+    )
+    if (!res.ok) throw new Error('Failed to read arena v2 status')
+    return await res.json()
+  }
+
+  async arenaV2CheckDeposit(configId: string): Promise<{
+    status: 'bridged' | 'insufficient' | 'bridge_failed' | 'rpc_error'
+    balance?: number
+    balance_before?: number
+    bridge_amount?: number
+    reserve_kept?: number
+    tx_hash?: string
+    message?: string
+    leaderboard?: { joined: boolean; detail?: unknown } | null
+    detail?: unknown
+  }> {
+    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/check-deposit`, {
+      method: 'POST',
+      body: JSON.stringify({ config_id: configId }),
+    })
+    if (!res.ok) throw new Error('check-deposit failed')
+    return await res.json()
+  }
+
+  async arenaV2Withdraw(configId: string, amount: number, destination?: string): Promise<{
+    status: string
+    amount?: number
+    destination?: string
+    detail?: unknown
+  }> {
+    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/withdraw`, {
+      method: 'POST',
+      body: JSON.stringify({ config_id: configId, amount, destination }),
+    })
+    if (!res.ok) throw new Error('Withdraw failed')
+    return await res.json()
   }
 
   async closePosition(configId: string, tradeId: string): Promise<{ status: string; trade_id: string; close_price: number; realized_pnl: number; message: string }> {

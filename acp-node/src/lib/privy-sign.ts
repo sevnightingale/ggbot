@@ -7,13 +7,18 @@
 //
 // The adapter's factory method — PrivyAlchemyEvmProviderAdapter.create({ ... }) —
 // accepts our signer private key in memory, returning an object with a typed
-// IEvmProviderAdapter interface (sendTransaction, signTypedData, etc).
+// IEvmProviderAdapter interface (sendCalls, signTypedData, etc).
+//
+// Default chains = [base]. For Arbitrum txs (HL bridge deposit) we must pass
+// chains: [base, arbitrum] explicitly.
 //
 // Ref:
-//   - @virtuals-protocol/acp-node-v2/src/providers/evm/privyAlchemyEvmProviderAdapter.ts
-//   - @virtuals-protocol/acp-node-v2/src/providers/types.ts (IEvmProviderAdapter)
+//   - @virtuals-protocol/acp-node-v2/dist/providers/evm/privyAlchemyEvmProviderAdapter.js
+//   - @virtuals-protocol/acp-node-v2/dist/providers/types.d.ts (IEvmProviderAdapter)
 
 import { PrivyAlchemyEvmProviderAdapter } from '@virtuals-protocol/acp-node-v2'
+import type { Chain } from 'viem'
+import { base } from 'viem/chains'
 
 export interface SignTypedDataRequest {
   agentWalletAddress: `0x${string}`
@@ -35,6 +40,8 @@ function decodeSignerKey(b64: string): string {
 }
 
 export async function signTypedDataWithPrivy(req: SignTypedDataRequest): Promise<string> {
+  // signTypedData doesn't need RPC — the domain carries chainId. Default [base]
+  // is fine even when chainId=42161 (Hyperliquid signatures).
   const adapter = await PrivyAlchemyEvmProviderAdapter.create({
     walletAddress: req.agentWalletAddress,
     walletId: req.agentWalletId,
@@ -45,15 +52,19 @@ export async function signTypedDataWithPrivy(req: SignTypedDataRequest): Promise
   return adapter.signTypedData(req.chainId, req.typedData)
 }
 
-export async function getEvmAdapter(opts: {
+export interface GetAdapterOptions {
   agentWalletAddress: `0x${string}`
   agentWalletId: string
   signerPrivateKey: string
-}) {
+  chains?: Chain[]                  // defaults to [base]; pass [base, arbitrum] for bridge txs
+}
+
+export async function getEvmAdapter(opts: GetAdapterOptions) {
   return PrivyAlchemyEvmProviderAdapter.create({
     walletAddress: opts.agentWalletAddress,
     walletId: opts.agentWalletId,
     signerPrivateKey: decodeSignerKey(opts.signerPrivateKey),
     privyAppId: process.env.PRIVY_APP_ID,
+    chains: opts.chains ?? [base],
   })
 }

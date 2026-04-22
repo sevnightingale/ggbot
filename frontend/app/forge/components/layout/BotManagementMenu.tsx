@@ -10,7 +10,7 @@ interface BotManagementMenuProps {
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
   onResetAccount?: (configId: string) => void
-  onPromoteToLive?: (configId: string) => void
+  onDeployLive?: (configId: string) => void
   isBotAction: boolean
   hasUnsavedChanges?: boolean
   isLiveBot?: boolean
@@ -22,7 +22,7 @@ export function BotManagementMenu({
   onDuplicate,
   onDelete,
   onResetAccount,
-  onPromoteToLive,
+  onDeployLive,
   isBotAction,
   hasUnsavedChanges = false,
   isLiveBot = false
@@ -33,7 +33,7 @@ export function BotManagementMenu({
   const [newName, setNewName] = useState(bot.config_name)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
-  const [showPromoteConfirm, setShowPromoteConfirm] = useState(false)
+  const [showDeployConfirm, setShowDeployConfirm] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -51,7 +51,7 @@ export function BotManagementMenu({
         setIsOpen(false)
         setShowDeleteConfirm(false)
         setShowResetConfirm(false)
-        setShowPromoteConfirm(false)
+        setShowDeployConfirm(false)
         if (isRenamingLocal) {
           handleRenameCancel() // Automatically discard changes
         }
@@ -104,14 +104,14 @@ export function BotManagementMenu({
     setShowResetConfirm(false)
   }
 
-  const handlePromoteClick = () => {
-    setShowPromoteConfirm(true)
+  const handleDeployClick = () => {
+    setShowDeployConfirm(true)
     setIsOpen(false)
   }
 
-  const handlePromoteConfirm = () => {
-    onPromoteToLive?.(bot.config_id)
-    setShowPromoteConfirm(false)
+  const handleDeployConfirm = () => {
+    onDeployLive?.(bot.config_id)
+    setShowDeployConfirm(false)
   }
 
   if (isRenamingLocal) {
@@ -223,29 +223,29 @@ export function BotManagementMenu({
     )
   }
 
-  if (showPromoteConfirm) {
+  if (showDeployConfirm) {
     return (
-      <div ref={menuRef} data-bot-menu className="absolute right-0 top-8 z-50 min-w-56 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+      <div ref={menuRef} data-bot-menu className="absolute right-0 top-8 z-50 min-w-64 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
         <div className="p-3">
           <div className="text-xs text-[var(--text-primary)] mb-2">
-            Promote to Live?
+            Deploy Live Version?
           </div>
           <div className="text-xs text-[var(--text-muted)] mb-3">
-            This will copy &ldquo;{bot.config_name}&rdquo;&apos;s strategy to your live bot, replacing any current live strategy.
-            <div className="mt-2">
-              Your paper bot will keep running for comparison.
-            </div>
+            This duplicates &ldquo;{bot.config_name}&rdquo; into a Hyperliquid-trading
+            agent on Virtuals Protocol. You&apos;ll approve a signer popup, then
+            fund the agent&apos;s wallet with USDC on Arbitrum.
+            <div className="mt-2">Your paper bot keeps running for comparison.</div>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={handlePromoteConfirm}
+              onClick={handleDeployConfirm}
               disabled={isBotAction}
               className="flex-1 px-2 py-1 text-xs bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50"
             >
-              {isBotAction ? 'Promoting...' : 'Promote'}
+              {isBotAction ? 'Deploying...' : 'Deploy'}
             </button>
             <button
-              onClick={() => setShowPromoteConfirm(false)}
+              onClick={() => setShowDeployConfirm(false)}
               className="flex-1 px-2 py-1 text-xs border border-[var(--border)] rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
             >
               Cancel
@@ -282,14 +282,14 @@ export function BotManagementMenu({
               <Edit2 className="h-3.5 w-3.5" />
               Rename
             </button>
-            {!isLiveBot && onPromoteToLive && (
+            {!isLiveBot && onDeployLive && bot.trading_mode !== 'virtuals' && (
               <button
-                onClick={handlePromoteClick}
+                onClick={handleDeployClick}
                 disabled={isBotAction}
                 className="w-full px-3 py-2 text-left text-xs text-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Rocket className="h-3.5 w-3.5" />
-                Promote to Live
+                Deploy Live Version
               </button>
             )}
             {!isLiveBot && (

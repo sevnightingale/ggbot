@@ -51,6 +51,7 @@ interface ActivationBarProps {
   onStart: () => void
   onStop: () => void
   onManualTrigger: () => void
+  onDeployLive?: (configId: string) => void  // Opens DeployLiveModal
   metrics?: AccountMetrics | null  // KPI metrics from SSE
   latestActivity?: Activity | null  // Latest activity for status display
 }
@@ -64,6 +65,7 @@ export function ActivationBar({
   onStart,
   onStop,
   onManualTrigger,
+  onDeployLive,
   metrics,
   latestActivity
 }: ActivationBarProps) {
@@ -82,7 +84,7 @@ export function ActivationBar({
                              userProfile?.can_activate_bots &&
                              !userProfile?.has_available_credits
 
-  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'hyperliquid'
+  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'hyperliquid' || selectedBot.trading_mode === 'virtuals'
   // Hyperliquid single-bot model uses real account equity (like paper), not cumulative P&L
   const usePnlOnlyKPIs = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
   const isRegisteredForArena = selectedBot.is_public_performance === true
@@ -99,8 +101,12 @@ export function ActivationBar({
     total_usage_usd: number
   } | null>(null)
 
-  // Arena status: 'none' | 'joined' | 'funded'
-  const [arenaState, setArenaState] = useState<'none' | 'joined' | 'funded'>('none')
+  // Derived tri-state for the Deploy Live Version button on virtuals bots.
+  // 'deploy' = paper bot, button deploys a live copy.
+  // 'needs_funds' = virtuals bot but HL account is empty (awaiting bridge).
+  // 'manage' = virtuals bot with HL balance (running).
+  // null = hyperliquid self-custody bot (button hidden, pinned slot handles it).
+  const [v2Funded, setV2Funded] = useState<boolean>(false)
 
   useEffect(() => {
     // Skip optimistic placeholder bots (temp IDs from duplication)
@@ -120,25 +126,33 @@ export function ActivationBar({
       }
     }
 
-    const fetchArenaStatus = async () => {
+    const fetchV2Status = async () => {
+      if (selectedBot.trading_mode !== 'virtuals') {
+        setV2Funded(false)
+        return
+      }
       try {
-        const data = await apiClient.getArenaStatus(selectedBot.config_id)
-        if (data.status === 'joined') {
-          setArenaState((data.dgclaw_balance || 0) > 0 ? 'funded' : 'joined')
-        } else {
-          setArenaState('none')
-        }
+        const s = await apiClient.arenaV2Status(selectedBot.config_id)
+        setV2Funded((s.hl_account_value ?? 0) > 0)
       } catch {
-        // Non-critical
+        // Non-critical — default to not funded; user can retry via the button
       }
     }
 
     fetchConfigUsage()
-    fetchArenaStatus()
-    // Refresh every 5 minutes while component is mounted
-    const interval = setInterval(() => { fetchConfigUsage(); fetchArenaStatus() }, 5 * 60 * 1000)
+    fetchV2Status()
+    // Refresh every 5 minutes while component is mounted (v2 status refreshed
+    // more often from inside DeployLiveModal when it's open).
+    const interval = setInterval(() => { fetchConfigUsage(); fetchV2Status() }, 5 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [selectedBot.config_id])
+  }, [selectedBot.config_id, selectedBot.trading_mode])
+
+  const deployButtonState: 'deploy' | 'needs_funds' | 'manage' | null =
+    selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
+      ? 'deploy'
+      : selectedBot.trading_mode === 'virtuals'
+        ? (v2Funded ? 'manage' : 'needs_funds')
+        : null
 
   // Calculate daily cost display: actual avg when usage exists, estimate when not
   const getDailyCostDisplay = (): { text: string; title: string } | null => {
@@ -282,10 +296,17 @@ export function ActivationBar({
               freeRunsRemaining={freeRunsRemaining}
               isPaperTrading={isPaperTrading}
               isRegisteredForArena={isRegisteredForArena}
-              arenaState={arenaState}
+              deployButtonState={deployButtonState}
               onManualTrigger={handleManualTrigger}
               onToggleActive={isActive ? onStop : handleActivate}
-              onDegenArena={() => setDegenArenaOpen(true)}
+              onDeployLive={() => {
+                if (onDeployLive) {
+                  onDeployLive(selectedBot.config_id)
+                } else {
+                  // Legacy fallback — open the old Degen Arena modal
+                  setDegenArenaOpen(true)
+                }
+              }}
               onArena={() => setArenaModalOpen(true)}
             />
           </div>
@@ -320,10 +341,17 @@ export function ActivationBar({
               freeRunsRemaining={freeRunsRemaining}
               isPaperTrading={isPaperTrading}
               isRegisteredForArena={isRegisteredForArena}
-              arenaState={arenaState}
+              deployButtonState={deployButtonState}
               onManualTrigger={handleManualTrigger}
               onToggleActive={isActive ? onStop : handleActivate}
-              onDegenArena={() => setDegenArenaOpen(true)}
+              onDeployLive={() => {
+                if (onDeployLive) {
+                  onDeployLive(selectedBot.config_id)
+                } else {
+                  // Legacy fallback — open the old Degen Arena modal
+                  setDegenArenaOpen(true)
+                }
+              }}
               onArena={() => setArenaModalOpen(true)}
             />
           </div>
@@ -448,12 +476,6 @@ export function ActivationBar({
         isOpen={degenArenaOpen}
         onClose={() => {
           setDegenArenaOpen(false)
-          // Refresh arena state so button updates after deposit/join
-          apiClient.getArenaStatus(selectedBot.config_id).then(data => {
-            if (data.status === 'joined') {
-              setArenaState((data.dgclaw_balance || 0) > 0 ? 'funded' : 'joined')
-            }
-          }).catch(() => {})
         }}
         configId={selectedBot.config_id}
         configName={selectedBot.config_name || 'Untitled Bot'}
@@ -474,33 +496,42 @@ interface KPICardProps {
 function ActionButtons({
   isActive, isStarting, isStopping, isManualTriggering,
   canRunOnce, dojoLocked, canAccess, freeRunsRemaining,
-  isPaperTrading, isRegisteredForArena, arenaState,
-  onManualTrigger, onToggleActive, onDegenArena, onArena,
+  isPaperTrading, isRegisteredForArena, deployButtonState,
+  onManualTrigger, onToggleActive, onDeployLive, onArena,
 }: {
   isActive: boolean; isStarting: boolean; isStopping: boolean; isManualTriggering: boolean
   canRunOnce: boolean; dojoLocked: boolean; canAccess: (feature: string) => boolean; freeRunsRemaining: number
-  isPaperTrading: boolean; isRegisteredForArena: boolean; arenaState: 'none' | 'joined' | 'funded'
-  onManualTrigger: () => void; onToggleActive: () => void; onDegenArena: () => void; onArena: () => void
+  isPaperTrading: boolean; isRegisteredForArena: boolean
+  deployButtonState: 'deploy' | 'needs_funds' | 'manage' | null
+  onManualTrigger: () => void; onToggleActive: () => void; onDeployLive: () => void; onArena: () => void
 }) {
   return (
     <div className="flex items-center gap-2">
-      <button
-        onClick={onDegenArena}
-        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors ${
-          arenaState === 'funded'
-            ? 'border-green-500/30 bg-green-500/10 text-green-500'
-            : 'border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-        }`}
-      >
-        {arenaState === 'funded' ? (
-          <CheckCircle className="h-4 w-4" />
-        ) : (
-          <Trophy className="h-4 w-4" />
-        )}
-        <span className="hidden sm:inline">
-          {arenaState === 'funded' ? 'Manage Arena Agent' : arenaState === 'joined' ? 'Arena: Needs Funds' : 'Enter Degen Arena'}
-        </span>
-      </button>
+      {deployButtonState && (
+        <button
+          onClick={onDeployLive}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors ${
+            deployButtonState === 'manage'
+              ? 'border-green-500/30 bg-green-500/10 text-green-500'
+              : deployButtonState === 'needs_funds'
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-500'
+                : 'border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+          }`}
+        >
+          {deployButtonState === 'manage' ? (
+            <CheckCircle className="h-4 w-4" />
+          ) : (
+            <Trophy className="h-4 w-4" />
+          )}
+          <span className="hidden sm:inline">
+            {deployButtonState === 'manage'
+              ? 'Manage Live Bot'
+              : deployButtonState === 'needs_funds'
+                ? 'Live Bot: Needs Funds'
+                : 'Deploy Live Version'}
+          </span>
+        </button>
+      )}
 
       {/* Enter Arena — hidden until S2 registration API ready */}
       {false && isPaperTrading && (

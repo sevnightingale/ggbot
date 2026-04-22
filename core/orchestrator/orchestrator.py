@@ -1352,14 +1352,19 @@ class GGBotOrchestrator:
             is_live = trading_mode == 'symphony'
             is_aster = trading_mode == 'aster'
             is_hyperliquid = trading_mode == 'hyperliquid'
+            is_virtuals = trading_mode == 'virtuals'
+            # Both hyperliquid-mode and virtuals-mode bots trade on HL and
+            # land in live_trades with provider='hyperliquid'. CredentialResolver
+            # inside hyperliquid_service picks the right API wallet.
+            is_hl_path = is_hyperliquid or is_virtuals
 
             if trading_action == "close":
                 try:
                     from core.common.db import db_fetch_one
                     open_positions = []
 
-                    if is_live or is_aster or is_hyperliquid:
-                        provider = 'hyperliquid' if is_hyperliquid else ('aster' if is_aster else 'symphony')
+                    if is_live or is_aster or is_hl_path:
+                        provider = 'hyperliquid' if is_hl_path else ('aster' if is_aster else 'symphony')
                         result = await db_fetch_one("""
                             SELECT batch_id FROM live_trades
                             WHERE config_id = %s AND provider = %s AND closed_at IS NULL
@@ -1389,11 +1394,12 @@ class GGBotOrchestrator:
 
                     position = open_positions[0]
 
-                    if is_hyperliquid:
+                    if is_hl_path:
                         trade_result = await self.hyperliquid_trading.close_position(
                             position['batch_id'],
                             user_id,
-                            close_reason='position_management'
+                            close_reason='position_management',
+                            trading_mode=trading_mode,
                         )
                     elif is_aster:
                         trade_result = await self.aster_trading.close_position(
@@ -1421,9 +1427,27 @@ class GGBotOrchestrator:
                         "error": f"Failed to close position: {str(e)}"
                     }
             else:
-                if is_hyperliquid:
+                if is_hl_path:
+                    # Tag the intent with trading_mode so the service knows
+                    # whether to resolve user or virtuals-agent credentials.
+                    trading_intent = {**trading_intent, "trading_mode": trading_mode}
                     trade_result = await self.hyperliquid_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 Hyperliquid live trade completed: {trade_result.get('status')} for {symbol}")
+                    self._log.info(
+                        f"V2 Hyperliquid live trade completed: {trade_result.get('status')} "
+                        f"for {symbol} (mode={trading_mode})"
+                    )
+                    # Forum post hook for virtuals bots — AI Council reads these
+                    # for Monday top-10 picks. Fire-and-forget so trade path stays fast.
+                    if is_virtuals and trade_result.get('status') in ('executed', 'success'):
+                        try:
+                            asyncio.create_task(self._post_virtuals_forum_entry(
+                                config=config,
+                                user_id=user_id,
+                                trade_result=trade_result,
+                                decision_result=decision_result,
+                            ))
+                        except Exception as e:
+                            self._log.warning(f"Forum post hook failed (non-fatal): {e}")
                 elif is_aster:
                     trade_result = await self.aster_trading.execute_trade_intent(trading_intent)
                     self._log.info(f"V2 AsterDEX live trade completed: {trade_result.get('status')} for {symbol}")
@@ -1442,3 +1466,78 @@ class GGBotOrchestrator:
                 "status": "error",
                 "error": str(e)
             }
+
+    async def _post_virtuals_forum_entry(
+        self,
+        config: BotConfigV2,
+        user_id: str,
+        trade_result: Dict[str, Any],
+        decision_result: Dict[str, Any],
+    ) -> None:
+        """
+        Post the LLM rationale for a virtuals-mode trade to the agent's
+        DegenClaw forum thread so the AI Council can read it alongside
+        on-chain fills when picking the Monday top-10 allocation.
+
+        Fire-and-forget: if the forum rejects the post or the sidecar is
+        unreachable, we log and move on — missing a forum post never blocks
+        a trade.
+        """
+        try:
+            from core.auth.vault_utils import get_arena_v2_credential
+            from core.services.acp_node_client import acp_node_post
+
+            creds = await get_arena_v2_credential(config.config_id)
+            if not creds:
+                self._log.warning(
+                    f"forum-post skipped: no arena_v2 row for config {config.config_id}"
+                )
+                return
+
+            thread_id = creds.get('dgclaw_forum_thread_id')
+            if not thread_id:
+                # Thread discovery is not yet wired — skip until we've seeded
+                # a thread_id on the arena_agents_v2 row. The trade itself
+                # already succeeded; this is supplemental AI Council visibility.
+                self._log.debug(
+                    f"forum-post skipped: no dgclaw_forum_thread_id on {config.config_id}"
+                )
+                return
+
+            symbol = trade_result.get('symbol') or decision_result.get('symbol', '?')
+            side = trade_result.get('side') or decision_result.get('action', '?')
+            reasoning = decision_result.get('reasoning') or trade_result.get('reason', '')
+            entry_price = trade_result.get('entry_price')
+            confidence = decision_result.get('confidence')
+
+            lines = [
+                f"**{side.upper()} {symbol}**",
+                f"entry: ${entry_price:.4f}" if entry_price else "",
+                f"confidence: {confidence:.2f}" if confidence else "",
+                "",
+                reasoning[:2000] if reasoning else "",
+            ]
+            body = "\n".join(l for l in lines if l)
+
+            result = await acp_node_post(
+                "/forum-post",
+                {
+                    "agentWalletAddress": creds['agent_wallet_address'],
+                    "agentWalletId": creds['wallet_id'],
+                    "signerPrivateKey": creds['signer_private_key'],
+                    "agentId": creds['virtuals_agent_id'],
+                    "threadId": thread_id,
+                    "body": body,
+                },
+                timeout_seconds=30,
+            )
+            if result.get('_httpStatus') == 200 and result.get('success'):
+                self._log.info(
+                    f"forum-post ok: agent={creds['virtuals_agent_id']} symbol={symbol}"
+                )
+            else:
+                self._log.warning(
+                    f"forum-post failed for {creds['virtuals_agent_id']}: {result}"
+                )
+        except Exception as e:
+            self._log.warning(f"forum-post hook exception (non-fatal): {e}")

@@ -36,21 +36,36 @@ class HyperliquidAccountAdapter(AccountAdapter):
         # Cache wallet address per user_id to avoid repeated Vault lookups
         self._wallet_cache: Dict[str, str] = {}  # user_id -> wallet_address
 
-    async def _get_wallet_address(self, user_id: str) -> Optional[str]:
-        """Get wallet address from cache or Vault."""
-        if user_id in self._wallet_cache:
-            return self._wallet_cache[user_id]
+    async def _get_wallet_address(
+        self,
+        user_id: str,
+        trading_mode: str = 'hyperliquid',
+        config_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Get wallet address from cache or Vault. CredentialResolver picks the
+        right wallet based on trading_mode: personal HL wallet for 'hyperliquid'
+        mode, Privy agent wallet for 'virtuals' mode.
+
+        Cache key includes config_id so a user's personal HL wallet never
+        collides with their virtuals agent wallets.
+        """
+        cache_key = f"{user_id}:{config_id or '-'}"
+        if cache_key in self._wallet_cache:
+            return self._wallet_cache[cache_key]
 
         try:
-            from core.auth.vault_utils import VaultManager
-            credentials = await VaultManager.get_hyperliquid_credential(user_id)
+            from core.auth.vault_utils import resolve_hl_credentials
+            credentials = await resolve_hl_credentials(trading_mode, user_id, config_id)
             if not credentials:
                 return None
             wallet = credentials['wallet_address']
-            self._wallet_cache[user_id] = wallet
+            self._wallet_cache[cache_key] = wallet
             return wallet
         except Exception as e:
-            self._log.error(f"Failed to get Hyperliquid wallet for user {user_id}: {e}")
+            self._log.error(
+                f"Failed to get HL wallet for user={user_id} mode={trading_mode}: {e}"
+            )
             return None
 
     async def get_current_snapshot(self, config_id: str) -> Optional[AccountSnapshot]:
@@ -61,11 +76,12 @@ class HyperliquidAccountAdapter(AccountAdapter):
         Cross-references positions with live_trades to attribute to this config.
         """
         try:
-            # Get user_id and config details
+            # Get user_id, trading_mode, and selected_pair from config
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT user_id, config_data->>'selected_pair' FROM configurations WHERE config_id = %s",
+                        "SELECT user_id, config_data->>'selected_pair', trading_mode "
+                        "FROM configurations WHERE config_id = %s",
                         (config_id,)
                     )
                     result = cur.fetchone()
@@ -74,9 +90,11 @@ class HyperliquidAccountAdapter(AccountAdapter):
                         return None
                     user_id = str(result[0])
                     selected_pair = result[1]
+                    trading_mode = result[2] or 'hyperliquid'
 
-            # Get wallet address
-            wallet = await self._get_wallet_address(user_id)
+            # Get wallet address — virtuals bots read from arena_agents_v2,
+            # hyperliquid bots read from user_profiles (same adapter, different creds).
+            wallet = await self._get_wallet_address(user_id, trading_mode, config_id)
             if not wallet:
                 self._log.warning(f"No Hyperliquid wallet for user {user_id}")
                 return None

@@ -7,6 +7,7 @@ import { useDataSources, useLatestActivity, useBotList } from '@/lib/queries'
 import { ThemeProvider } from '@/lib/theme'
 import { PermissionProvider, usePermissions } from '@/lib/permissions'
 import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
+import { DeployLiveModal } from '@/components/DeployLiveModal'
 import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { useBatchedConfigSave } from '@/lib/hooks/useBatchedConfigSave'
 import { Header } from './components/layout/Header'
@@ -83,6 +84,12 @@ function ForgeApp() {
   // Arena S2 banner removed — Season 2 postponed, DGClaw is active arena
   const [showOnboardingTour, setShowOnboardingTour] = useState(false)
   const [liveTradingSetupOpen, setLiveTradingSetupOpen] = useState(false)
+  const [deployLiveModalState, setDeployLiveModalState] = useState<{
+    open: boolean
+    sourceConfigId?: string
+    virtualsConfigId?: string
+    sourceConfigName?: string
+  }>({ open: false })
 
   // Onboarding tour steps - shown after first bot creation
   // Steps auto-navigate between tabs to show key features
@@ -1055,20 +1062,23 @@ function ForgeApp() {
     }
   }
 
-  const handlePromoteToLive = async (configId: string) => {
-    setIsBotAction(true)
-    try {
-      const result = await apiClient.promoteToLive(configId)
-      if (result.live_config_id) {
-        // Refresh bot list to pick up the updated live bot
-        const configs = await apiClient.listConfigs()
-        setAllBots(configs)
-        setSelectedConfigId(result.live_config_id)
-      }
-    } catch (error) {
-      console.error('Failed to promote to live:', error)
-    } finally {
-      setIsBotAction(false)
+  const handleDeployLive = (configId: string) => {
+    // Open DeployLiveModal for this paper bot. The modal itself drives the
+    // Virtuals connect + signer approval + headless HL setup flow.
+    const source = allBots.find(b => b.config_id === configId)
+    if (source?.trading_mode === 'virtuals') {
+      // Already live — open in management state
+      setDeployLiveModalState({
+        open: true,
+        virtualsConfigId: configId,
+        sourceConfigName: source.config_name,
+      })
+    } else {
+      setDeployLiveModalState({
+        open: true,
+        sourceConfigId: configId,
+        sourceConfigName: source?.config_name,
+      })
     }
   }
 
@@ -1190,7 +1200,7 @@ function ForgeApp() {
             onSelect={handleBotSelection}
             onCreateNew={() => setBotCreationModalOpen(true)}
             onOpenHyperliquidSetup={() => setLiveTradingSetupOpen(true)}
-            onPromoteToLive={handlePromoteToLive}
+            onDeployLive={handleDeployLive}
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
@@ -1229,6 +1239,7 @@ function ForgeApp() {
                   onStart={handleStart}
                   onStop={handleStop}
                   onManualTrigger={handleManualTrigger}
+                  onDeployLive={handleDeployLive}
                   metrics={metrics}
                   latestActivity={latestActivity}
                 />
@@ -1320,7 +1331,7 @@ function ForgeApp() {
         onSelect={handleBotSelection}
         onCreateNew={() => setBotCreationModalOpen(true)}
         onOpenHyperliquidSetup={() => setLiveTradingSetupOpen(true)}
-        onPromoteToLive={handlePromoteToLive}
+        onDeployLive={handleDeployLive}
         isCreatingNew={isCreatingNew}
         onRename={handleRenameBot}
         onDuplicate={handleDuplicateBot}
@@ -1345,6 +1356,20 @@ function ForgeApp() {
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
         forceOpen={allBots.length === 0}
+      />
+
+      {/* Deploy Live Version Modal — handles popup 1, popup 2, funding, management */}
+      <DeployLiveModal
+        open={deployLiveModalState.open}
+        onOpenChange={(open) => setDeployLiveModalState(s => ({ ...s, open }))}
+        sourceConfigId={deployLiveModalState.sourceConfigId}
+        virtualsConfigId={deployLiveModalState.virtualsConfigId}
+        sourceConfigName={deployLiveModalState.sourceConfigName}
+        onDeployComplete={async (newConfigId) => {
+          const configs = await apiClient.listConfigs()
+          setAllBots(configs)
+          setSelectedConfigId(newConfigId)
+        }}
       />
 
       {/* Live Trading Setup Modal (opened from BotRail live slot) */}

@@ -1049,3 +1049,305 @@ async def get_arena_credential_by_user(user_id: str) -> Optional[Dict[str, Any]]
 async def get_arena_credential_by_config(config_id: str) -> Optional[Dict[str, Any]]:
     """Get arena agent for a bot config. Convenience wrapper."""
     return await VaultManager.get_arena_credential_by_config(config_id)
+
+
+# =========================================================================
+# Low-level vault primitives
+# =========================================================================
+
+async def create_vault_secret(name: str, value: str) -> Optional[str]:
+    """Create an opaque Vault secret. Returns the UUID (as str), or None."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT vault.create_secret(%s, %s) as id;",
+                    (value, name),
+                )
+                row = cur.fetchone()
+                conn.commit()
+                return str(row[0]) if row else None
+    except Exception as e:
+        logger.error(f"create_vault_secret failed for '{name}': {e}")
+        return None
+
+
+async def get_vault_secret(vault_id: str) -> Optional[str]:
+    """Read back a Vault secret by its UUID. Returns plaintext or None."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT decrypted_secret FROM vault.decrypted_secrets WHERE id = %s",
+                    (vault_id,),
+                )
+                row = cur.fetchone()
+                return row[0] if row else None
+    except Exception as e:
+        logger.error(f"get_vault_secret failed for {vault_id}: {e}")
+        return None
+
+
+# =========================================================================
+# Arena v2 (Virtuals ACP v2) — signer + HL API wallet + DGClaw API key
+# =========================================================================
+#
+# Stored alongside arena_agents_v2 rows. Each row gets up to 3 vault
+# secrets — signer is mandatory (created at agent provisioning), the other
+# two land when the corresponding acp-node route completes.
+
+async def store_arena_v2_signer(
+    agent_record_id: str,
+    signer_private_key_b64: str,
+) -> Optional[str]:
+    """
+    Store the P-256 signer private key for a v2 arena agent in Vault and
+    patch the arena_agents_v2 row with the vault ID.
+
+    Returns the vault_secret_id, or None on failure.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                vault_name = f"arena_v2_signer_{agent_record_id}"
+                cur.execute(
+                    "SELECT vault.create_secret(%s, %s) as secret_id;",
+                    (signer_private_key_b64, vault_name),
+                )
+                vault_id = cur.fetchone()[0]
+
+                cur.execute(
+                    """
+                    UPDATE arena_agents_v2
+                    SET signer_private_key_vault_id = %s,
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (vault_id, agent_record_id),
+                )
+                conn.commit()
+                logger.info(f"arena_v2: stored signer key for agent_record {agent_record_id}")
+                return str(vault_id)
+    except Exception as e:
+        logger.error(f"arena_v2: store_arena_v2_signer failed for {agent_record_id}: {e}")
+        return None
+
+
+async def store_arena_v2_hl_api_wallet(
+    agent_record_id: str,
+    hl_api_wallet_key: str,
+) -> Optional[str]:
+    """Store the HL API wallet private key for a v2 arena agent."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                vault_name = f"arena_v2_hl_api_{agent_record_id}"
+                cur.execute(
+                    "SELECT vault.create_secret(%s, %s) as secret_id;",
+                    (hl_api_wallet_key, vault_name),
+                )
+                vault_id = cur.fetchone()[0]
+
+                cur.execute(
+                    """
+                    UPDATE arena_agents_v2
+                    SET hl_api_wallet_key_vault_id = %s,
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (vault_id, agent_record_id),
+                )
+                conn.commit()
+                logger.info(f"arena_v2: stored HL API wallet key for agent_record {agent_record_id}")
+                return str(vault_id)
+    except Exception as e:
+        logger.error(f"arena_v2: store_arena_v2_hl_api_wallet failed for {agent_record_id}: {e}")
+        return None
+
+
+async def store_arena_v2_dgclaw_key(
+    agent_record_id: str,
+    dgclaw_api_key: str,
+) -> Optional[str]:
+    """Store the DGClaw API key for a v2 arena agent."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                vault_name = f"arena_v2_dgclaw_{agent_record_id}"
+                cur.execute(
+                    "SELECT vault.create_secret(%s, %s) as secret_id;",
+                    (dgclaw_api_key, vault_name),
+                )
+                vault_id = cur.fetchone()[0]
+
+                cur.execute(
+                    """
+                    UPDATE arena_agents_v2
+                    SET dgclaw_api_key_vault_id = %s,
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (vault_id, agent_record_id),
+                )
+                conn.commit()
+                logger.info(f"arena_v2: stored DGClaw key for agent_record {agent_record_id}")
+                return str(vault_id)
+    except Exception as e:
+        logger.error(f"arena_v2: store_arena_v2_dgclaw_key failed for {agent_record_id}: {e}")
+        return None
+
+
+async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Load the active arena_agents_v2 row for a config, with all vault secrets
+    decrypted and returned as plaintext. Shape matches what acp-node sidecar
+    requests need — signerPrivateKey (base64 PEM), hlApiWalletKey (0x-hex),
+    optional dgclawApiKey.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, user_id, virtuals_agent_id, agent_name,
+                           agent_wallet_address, wallet_id,
+                           signer_private_key_vault_id,
+                           hl_api_wallet_key_vault_id,
+                           dgclaw_api_key_vault_id,
+                           dgclaw_forum_thread_id,
+                           status
+                    FROM arena_agents_v2
+                    WHERE config_id = %s AND status = 'active'
+                    """,
+                    (config_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+
+                (
+                    agent_record_id, user_id, virtuals_agent_id, agent_name,
+                    agent_wallet_address, wallet_id,
+                    signer_vault_id, hl_vault_id, dgclaw_vault_id,
+                    forum_thread_id, status,
+                ) = row
+
+                def _decrypt(vault_id: Any) -> Optional[str]:
+                    if not vault_id:
+                        return None
+                    cur.execute(
+                        "SELECT decrypted_secret FROM vault.decrypted_secrets WHERE id = %s",
+                        (vault_id,),
+                    )
+                    r = cur.fetchone()
+                    return r[0] if r else None
+
+                signer_private_key = _decrypt(signer_vault_id)
+                hl_api_wallet_key = _decrypt(hl_vault_id)
+                dgclaw_api_key = _decrypt(dgclaw_vault_id)
+
+                if not signer_private_key:
+                    logger.error(
+                        f"arena_v2: signer key missing in vault for agent {agent_record_id}"
+                    )
+                    return None
+
+                return {
+                    'agent_record_id': str(agent_record_id),
+                    'user_id': str(user_id),
+                    'virtuals_agent_id': virtuals_agent_id,
+                    'agent_name': agent_name,
+                    'agent_wallet_address': agent_wallet_address,
+                    'wallet_id': wallet_id,
+                    'signer_private_key': signer_private_key,  # base64-PEM
+                    'hl_api_wallet_key': hl_api_wallet_key,    # 0x-hex or None
+                    'dgclaw_api_key': dgclaw_api_key,          # plaintext or None
+                    'dgclaw_forum_thread_id': forum_thread_id,
+                    'status': status,
+                }
+    except Exception as e:
+        logger.error(f"arena_v2: get_arena_v2_credential failed for config {config_id}: {e}")
+        return None
+
+
+async def get_arena_v2_by_agent_id(virtuals_agent_id: str) -> Optional[Dict[str, Any]]:
+    """Lookup by Virtuals agent id — used during deploy-poll before config_id link."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, user_id, config_id, virtuals_agent_id, agent_name,
+                           agent_wallet_address, wallet_id,
+                           signer_private_key_vault_id,
+                           hl_api_wallet_key_vault_id,
+                           dgclaw_api_key_vault_id,
+                           status
+                    FROM arena_agents_v2
+                    WHERE virtuals_agent_id = %s
+                    """,
+                    (virtuals_agent_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return {
+                    'agent_record_id': str(row[0]),
+                    'user_id': str(row[1]),
+                    'config_id': str(row[2]) if row[2] else None,
+                    'virtuals_agent_id': row[3],
+                    'agent_name': row[4],
+                    'agent_wallet_address': row[5],
+                    'wallet_id': row[6],
+                    'signer_private_key_vault_id': str(row[7]) if row[7] else None,
+                    'hl_api_wallet_key_vault_id': str(row[8]) if row[8] else None,
+                    'dgclaw_api_key_vault_id': str(row[9]) if row[9] else None,
+                    'status': row[10],
+                }
+    except Exception as e:
+        logger.error(f"arena_v2: get_arena_v2_by_agent_id failed for {virtuals_agent_id}: {e}")
+        return None
+
+
+async def resolve_hl_credentials(
+    trading_mode: str,
+    user_id: str,
+    config_id: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """
+    Single source of truth for Hyperliquid credential resolution.
+
+    - trading_mode='hyperliquid' → user-attached HL credentials
+    - trading_mode='virtuals'    → per-agent HL API wallet via arena_agents_v2
+
+    Returns a dict with at least {api_wallet_key, wallet_address} or None.
+    Fields mirror what HyperliquidLiveTradingService expects today, so
+    callers don't have to care about the underlying trading_mode.
+    """
+    if trading_mode == 'hyperliquid':
+        return await VaultManager.get_hyperliquid_credential(user_id)
+
+    if trading_mode == 'virtuals':
+        if not config_id:
+            logger.error("arena_v2: resolve_hl_credentials requires config_id for virtuals mode")
+            return None
+        creds = await get_arena_v2_credential(config_id)
+        if not creds:
+            return None
+        hl_key = creds.get('hl_api_wallet_key')
+        if not hl_key:
+            logger.error(
+                f"arena_v2: config {config_id} has no HL API wallet key — "
+                f"authorize-hl-api-wallet may not have completed"
+            )
+            return None
+        return {
+            'api_wallet_key': hl_key,
+            'wallet_address': creds['agent_wallet_address'],
+            'trading_mode': 'virtuals',
+            'agent_record_id': creds['agent_record_id'],
+            'virtuals_agent_id': creds['virtuals_agent_id'],
+        }
+
+    logger.error(f"arena_v2: unsupported trading_mode for HL resolution: {trading_mode}")
+    return None

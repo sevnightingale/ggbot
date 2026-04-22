@@ -15,7 +15,7 @@ interface MobileNavProps {
   onSelect: (configId: string) => void
   onCreateNew: () => void
   onOpenHyperliquidSetup?: () => void
-  onPromoteToLive?: (configId: string) => void
+  onDeployLive?: (configId: string) => void
   isCreatingNew: boolean
   onRename: (configId: string, newName: string) => void
   onDuplicate: (configId: string) => void
@@ -37,7 +37,7 @@ export function MobileNav({
   onSelect,
   onCreateNew,
   onOpenHyperliquidSetup,
-  onPromoteToLive,
+  onDeployLive,
   isCreatingNew,
   onRename,
   onDuplicate,
@@ -135,7 +135,7 @@ export function MobileNav({
                 }}
                 onCreateNew={onCreateNew}
                 onOpenHyperliquidSetup={onOpenHyperliquidSetup}
-                onPromoteToLive={onPromoteToLive}
+                onDeployLive={onDeployLive}
                 isCreatingNew={isCreatingNew}
                 onRename={onRename}
                 onDuplicate={onDuplicate}

@@ -121,77 +121,89 @@ class HyperliquidLiveTradingService:
         sz_decimals = exchange.info.asset_to_sz_decimals[asset]
         return round(sz, sz_decimals)
 
-    async def _get_exchange(self, user_id: str) -> Optional[Exchange]:
+    async def _get_exchange(
+        self,
+        user_id: str,
+        trading_mode: str = 'hyperliquid',
+        config_id: Optional[str] = None,
+    ) -> Optional[Exchange]:
         """
-        Initialize Hyperliquid Exchange SDK with user's API wallet from Vault.
-
-        The Exchange is initialized with:
-        - wallet: The API wallet (signs transactions)
-        - base_url: Hyperliquid API URL
-        - account_address: The user's MAIN wallet address (where funds live)
-
-        This tells the SDK "sign with API wallet, but trade on behalf of main wallet".
+        Initialize Hyperliquid Exchange SDK with whatever credentials the
+        trading_mode resolves to (user-attached HL creds or virtuals-agent
+        HL API wallet). CredentialResolver is the single source of truth.
 
         Args:
             user_id: User UUID
+            trading_mode: 'hyperliquid' or 'virtuals'
+            config_id: Required when trading_mode='virtuals' — resolves the
+                       config's arena_agents_v2 row.
 
         Returns:
             Exchange instance, or None if credentials not found
         """
         try:
-            from core.auth.vault_utils import VaultManager
-            credentials = await VaultManager.get_hyperliquid_credential(user_id)
+            from core.auth.vault_utils import resolve_hl_credentials
+            credentials = await resolve_hl_credentials(trading_mode, user_id, config_id)
             if not credentials:
-                self._log.error(f"No Hyperliquid credentials found for user {user_id}")
+                self._log.error(
+                    f"No HL credentials for user={user_id} mode={trading_mode} config={config_id}"
+                )
                 return None
 
             api_wallet_key = credentials['api_wallet_key']
             wallet_address = credentials['wallet_address']
 
-            # Create the API wallet object from private key
             wallet = eth_account.Account.from_key(api_wallet_key)
-
-            # Initialize Exchange: sign with API wallet, trade on main wallet's account
             exchange = Exchange(
                 wallet,
                 self.base_url,
-                account_address=wallet_address
+                account_address=wallet_address,
             )
-
             return exchange
 
         except Exception as e:
-            self._log.error(f"Failed to initialize Hyperliquid Exchange for user {user_id}: {e}")
+            self._log.error(
+                f"Failed to initialize Hyperliquid Exchange for user={user_id} "
+                f"mode={trading_mode}: {e}"
+            )
             return None
 
-    async def _get_info(self, user_id: str) -> Optional[tuple]:
+    async def _get_info(
+        self,
+        user_id: str,
+        trading_mode: str = 'hyperliquid',
+        config_id: Optional[str] = None,
+    ) -> Optional[tuple]:
         """
-        Get Hyperliquid Info SDK + wallet address for a user.
+        Get Hyperliquid Info SDK + wallet address for a user or a virtuals
+        agent (depending on trading_mode).
 
-        Uses cached shared Info instance and per-user wallet address cache
-        to avoid redundant Vault lookups and Info() constructor calls.
-
-        Returns:
-            Tuple of (Info instance, wallet_address), or None if credentials not found
+        Wallet addresses cached per (user_id, config_id) key to avoid
+        redundant Vault lookups without cross-contamination between a user's
+        personal HL account and their virtuals bots.
         """
+        cache_key = f"{user_id}:{config_id or '-'}"
         try:
-            # Check wallet cache first
-            if user_id in self._wallet_cache:
-                return (self._info, self._wallet_cache[user_id])
+            if cache_key in self._wallet_cache:
+                return (self._info, self._wallet_cache[cache_key])
 
-            from core.auth.vault_utils import VaultManager
-            credentials = await VaultManager.get_hyperliquid_credential(user_id)
+            from core.auth.vault_utils import resolve_hl_credentials
+            credentials = await resolve_hl_credentials(trading_mode, user_id, config_id)
             if not credentials:
-                self._log.error(f"No Hyperliquid credentials found for user {user_id}")
+                self._log.error(
+                    f"No HL credentials for user={user_id} mode={trading_mode} config={config_id}"
+                )
                 return None
 
             wallet_address = credentials['wallet_address']
-            self._wallet_cache[user_id] = wallet_address
-
+            self._wallet_cache[cache_key] = wallet_address
             return (self._info, wallet_address)
 
         except Exception as e:
-            self._log.error(f"Failed to initialize Hyperliquid Info for user {user_id}: {e}")
+            self._log.error(
+                f"Failed to initialize Hyperliquid Info for user={user_id} "
+                f"mode={trading_mode}: {e}"
+            )
             return None
 
     async def _check_existing_trade(self, decision_id: str) -> Optional[str]:
@@ -248,8 +260,11 @@ class HyperliquidLiveTradingService:
             Position quantity in base asset (e.g., 0.001 BTC)
         """
         try:
+            trading_mode = getattr(config, 'trading_mode', 'hyperliquid')
+            config_id = getattr(config, 'config_id', None)
+
             # Step 1: Query Hyperliquid account state
-            info_result = await self._get_info(user_id)
+            info_result = await self._get_info(user_id, trading_mode, config_id)
             if not info_result:
                 self._log.warning("Could not query Hyperliquid account, using minimum quantity")
                 return 0.001
@@ -361,6 +376,7 @@ class HyperliquidLiveTradingService:
             # Extract intent data
             config_id = intent["config_id"]
             user_id = intent["user_id"]
+            trading_mode = intent.get("trading_mode", "hyperliquid")
             symbol = intent["symbol"]
             action = intent["action"]
             confidence = intent["confidence"]
@@ -375,7 +391,7 @@ class HyperliquidLiveTradingService:
 
             self._log.info(
                 f"Executing Hyperliquid live trade: {action.upper()} {symbol} "
-                f"(confidence={confidence:.3f})"
+                f"(confidence={confidence:.3f}, mode={trading_mode})"
             )
 
             # Step 1: Idempotency check
@@ -389,8 +405,9 @@ class HyperliquidLiveTradingService:
                         "reason": "Trade already executed (idempotency protection)"
                     }
 
-            # Step 2: Get Exchange instance (loads user's API wallet from Vault)
-            exchange = await self._get_exchange(user_id)
+            # Step 2: Get Exchange instance — CredentialResolver picks the right
+            # wallet based on trading_mode (user HL creds vs arena_agents_v2 row).
+            exchange = await self._get_exchange(user_id, trading_mode, config_id)
             if not exchange:
                 return {
                     "status": "failed",
@@ -762,7 +779,7 @@ class HyperliquidLiveTradingService:
             # Get current account balance for response
             account_balance = 0.0
             try:
-                info_result = await self._get_info(user_id)
+                info_result = await self._get_info(user_id, trading_mode, config_id)
                 if info_result:
                     info, wallet_address = info_result
                     user_state = info.user_state(wallet_address)
@@ -798,7 +815,13 @@ class HyperliquidLiveTradingService:
                 "batch_id": None
             }
 
-    async def close_position(self, batch_id: str, user_id: str, close_reason: str = 'position_management') -> Dict[str, Any]:
+    async def close_position(
+        self,
+        batch_id: str,
+        user_id: str,
+        close_reason: str = 'position_management',
+        trading_mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Close an open position by batch_id.
 
@@ -806,6 +829,8 @@ class HyperliquidLiveTradingService:
             batch_id: Trade batch ID from live_trades
             user_id: User UUID (for loading credentials)
             close_reason: Why the position was closed (e.g. 'position_management', 'manual')
+            trading_mode: Optional — caller-passed trading_mode saves a DB lookup.
+                          Falls back to DB by trade_record.config_id.
 
         Returns:
             Close result with status
@@ -824,6 +849,17 @@ class HyperliquidLiveTradingService:
             sl_order_id = trade_record.get("stop_loss_order_id")
             tp_order_id = trade_record.get("take_profit_order_id")
 
+            # Resolve trading_mode if not provided by caller
+            if trading_mode is None and config_id:
+                from core.common.db import db_fetch_one
+                row = await db_fetch_one(
+                    "SELECT trading_mode FROM configurations WHERE config_id = %s",
+                    (config_id,),
+                )
+                trading_mode = (row[0] if row else None) or 'hyperliquid'
+            elif trading_mode is None:
+                trading_mode = 'hyperliquid'
+
             # Convert to Hyperliquid symbol
             hl_symbol = self._get_hyperliquid_symbol(symbol)
             if not hl_symbol:
@@ -833,7 +869,7 @@ class HyperliquidLiveTradingService:
                 }
 
             # Step 2: Get Exchange instance
-            exchange = await self._get_exchange(user_id)
+            exchange = await self._get_exchange(user_id, trading_mode, config_id)
             if not exchange:
                 return {
                     "status": "failed",
@@ -863,7 +899,7 @@ class HyperliquidLiveTradingService:
             size_usd = 0.0
             unrealized_pnl = 0.0
             try:
-                info_result = await self._get_info(user_id)
+                info_result = await self._get_info(user_id, trading_mode, config_id)
                 if info_result:
                     info, wallet_address = info_result
                     user_state = info.user_state(wallet_address)
@@ -1041,7 +1077,13 @@ class HyperliquidLiveTradingService:
         with live_trades to find positions belonging to this config.
         """
         try:
-            info_result = await self._get_info(user_id)
+            from core.common.db import db_fetch_one
+            tm_row = await db_fetch_one(
+                "SELECT trading_mode FROM configurations WHERE config_id = %s",
+                (config_id,),
+            )
+            trading_mode = (tm_row[0] if tm_row else None) or 'hyperliquid'
+            info_result = await self._get_info(user_id, trading_mode, config_id)
             if not info_result:
                 return []
 
@@ -1100,7 +1142,13 @@ class HyperliquidLiveTradingService:
     async def get_account_metrics(self, config_id: str, user_id: str) -> Dict[str, Any]:
         """Get account metrics from Hyperliquid."""
         try:
-            info_result = await self._get_info(user_id)
+            from core.common.db import db_fetch_one
+            tm_row = await db_fetch_one(
+                "SELECT trading_mode FROM configurations WHERE config_id = %s",
+                (config_id,),
+            )
+            trading_mode = (tm_row[0] if tm_row else None) or 'hyperliquid'
+            info_result = await self._get_info(user_id, trading_mode, config_id)
             if not info_result:
                 return {
                     "status": "failed",

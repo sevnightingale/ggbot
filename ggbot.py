@@ -253,6 +253,7 @@ from api.public import router as public_router
 from api.usage import router as usage_router
 from api.virtuals_arena import router as virtuals_arena_router
 from api.acp_v2_test import router as acp_v2_test_router
+from api.arena_v2 import router as arena_v2_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
@@ -263,6 +264,7 @@ app.include_router(public_router)
 app.include_router(usage_router)
 app.include_router(virtuals_arena_router)
 app.include_router(acp_v2_test_router)
+app.include_router(arena_v2_router)
 
 
 # Orchestrator instance (used by "Run Now" and signal validation endpoints)
@@ -2935,7 +2937,7 @@ async def start_bot(
         # =====================================================================
 
         # =====================================================================
-        # HYPERLIQUID-SPECIFIC CHECKS
+        # LIVE-MODE CHECKS (hyperliquid / virtuals)
         # =====================================================================
         if config.trading_mode == 'hyperliquid':
             # 1. Credential check — user must have completed Hyperliquid setup
@@ -2961,6 +2963,25 @@ async def start_bot(
                 raise HTTPException(
                     status_code=400,
                     detail="You already have an active live bot. Stop it before starting another."
+                )
+        elif config.trading_mode == 'virtuals':
+            # Virtuals bots are keyed to arena_agents_v2 rows — each config has
+            # its own Privy wallet + HL API wallet, so the 1-per-user cap does
+            # NOT apply. The gate is simply: is the agent provisioned?
+            from core.auth.vault_utils import get_arena_v2_credential
+            v2_creds = await get_arena_v2_credential(config_id)
+            if not v2_creds:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Virtuals agent not provisioned. Deploy via Deploy Live Version."
+                )
+            if not v2_creds.get('hl_api_wallet_key'):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Virtuals agent still provisioning — HL API wallet not yet "
+                        "authorized. Complete the deploy flow first."
+                    )
                 )
         # =====================================================================
 
@@ -3047,111 +3068,6 @@ async def stop_bot(
     except Exception as e:
         logger.error(f"Failed to stop bot {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to stop bot: {str(e)}")
-
-
-@app.post("/api/v2/bot/{config_id}/promote-to-live")
-async def promote_to_live(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Promote a paper bot's strategy to the user's single live trading bot."""
-    try:
-        # 1. Get source config and validate
-        source = await config_service.get_config(config_id, current_user.user_id)
-        if not source:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        if source.trading_mode == 'hyperliquid':
-            raise HTTPException(status_code=400, detail="This bot is already live")
-
-        # 2. Permission check — subscription required
-        profile = await user_service.get_profile(current_user.user_id)
-        if not profile.can_activate_bots:
-            raise HTTPException(
-                status_code=403,
-                detail="Subscription required to use live trading."
-            )
-
-        # 3. Find the user's live bot (created during Hyperliquid setup)
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT config_id FROM configurations
-                    WHERE user_id = %s AND trading_mode = 'hyperliquid' LIMIT 1
-                """, (current_user.user_id,))
-                existing = cur.fetchone()
-
-        if not existing:
-            raise HTTPException(
-                status_code=400,
-                detail="No live trading bot found. Connect Hyperliquid in Settings first."
-            )
-
-        live_config_id = str(existing[0])
-
-        # 4. Build config_data from source — copy strategy fields only
-        live_config_data = {
-            "schema_version": source.schema_version,
-            "selected_pair": source.selected_pair,
-            "extraction": source.extraction,
-            "decision": source.decision,
-            "trading": source.trading,
-            "llm_config": source.llm_config,
-            "telegram_integration": {},
-        }
-
-        # 5. Update the live bot's strategy
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE configurations
-                    SET config_data = %s, updated_at = NOW()
-                    WHERE config_id = %s AND user_id = %s
-                """, (json.dumps(live_config_data), live_config_id, current_user.user_id))
-                conn.commit()
-
-        # 6. Log strategy_updated activity with version number
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT COUNT(*) FROM activities
-                    WHERE config_id = %s AND activity_type = 'strategy_updated'
-                """, (live_config_id,))
-                version = cur.fetchone()[0] + 1
-
-        from core.common.activity_logger import log_activity_safe
-        log_activity_safe(
-            config_id=live_config_id,
-            user_id=current_user.user_id,
-            activity_type='strategy_updated',
-            activity_source='user_action',
-            summary=f"Strategy promoted from '{source.config_name}'",
-            details={
-                'version': version,
-                'source_config_id': config_id,
-                'source_config_name': source.config_name,
-                'config_snapshot': live_config_data,
-                'changed_fields': ['selected_pair', 'extraction', 'decision', 'llm_config', 'trading'],
-            },
-            importance=8
-        )
-
-        logger.info(f"Promoted bot {config_id} to live {live_config_id} (v{version})")
-
-        return {
-            "status": "promoted",
-            "live_config_id": live_config_id,
-            "version": version,
-            "source_config_id": config_id,
-            "message": f"Strategy v{version} promoted from '{source.config_name}'"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to promote bot {config_id} to live: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to promote to live: {str(e)}")
 
 
 @app.post("/api/v2/bot/{config_id}/reset-account")
