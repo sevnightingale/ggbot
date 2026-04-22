@@ -288,7 +288,7 @@ class ConfigService:
             # Store in database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    initial_equity = 0 if config.trading_mode in ('hyperliquid', 'symphony', 'aster') else 10000.00
+                    initial_equity = 0 if config.trading_mode in ('hyperliquid', 'symphony', 'aster', 'virtuals') else 10000.00
                     cur.execute("""
                         INSERT INTO configurations
                         (config_id, user_id, config_type, config_name, config_data, trading_mode, symphony_agent_id, initial_equity, created_at, updated_at)

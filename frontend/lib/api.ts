@@ -101,7 +101,7 @@ export interface BotConfiguration {
   config_type: string
   config_data: ConfigData
   state: 'active' | 'inactive'
-  trading_mode?: 'paper' | 'symphony' | 'aster' | 'hyperliquid'
+  trading_mode?: 'paper' | 'symphony' | 'aster' | 'hyperliquid' | 'virtuals'
   symphony_agent_id?: string
   profile_image_url?: string | null
   is_public_performance?: boolean

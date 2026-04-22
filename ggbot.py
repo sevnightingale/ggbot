@@ -398,8 +398,8 @@ async def create_config(
     trading_mode = request.trading_mode
 
     # Validate trading mode
-    if trading_mode not in ["paper", "hyperliquid"]:
-        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper' or 'hyperliquid'")
+    if trading_mode not in ["paper", "hyperliquid", "virtuals"]:
+        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper', 'hyperliquid', or 'virtuals'")
 
     # NOTE: No subscription check here — users can CREATE live trading bots on any tier.
     # The real gate is bot ACTIVATION (start_bot endpoint) which checks can_activate_bots.

@@ -68,8 +68,8 @@ export function BotRail({
   accounts = [],
   className = ''
 }: BotRailProps) {
-  // Paper bots only (live bot shown separately)
-  const paperBots = bots.filter(b => b.trading_mode !== 'hyperliquid')
+  // Paper bots only (live bots — both hyperliquid self-custody and virtuals — shown separately)
+  const paperBots = bots.filter(b => b.trading_mode !== 'hyperliquid' && b.trading_mode !== 'virtuals')
   const currentBotCount = paperBots.length
 
   const handleCreateNew = () => {

@@ -14,7 +14,7 @@ interface RiskAcknowledgmentModalProps {
   isOpen: boolean
   onClose: () => void
   onAccept: () => void
-  tradingMode: 'paper' | 'symphony' | 'aster' | 'hyperliquid'
+  tradingMode: 'paper' | 'symphony' | 'aster' | 'hyperliquid' | 'virtuals'
   botName: string
 }
 
