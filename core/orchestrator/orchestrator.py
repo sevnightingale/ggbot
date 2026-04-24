@@ -1418,6 +1418,20 @@ class GGBotOrchestrator:
                         )
 
                     self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol} (mode={trading_mode})")
+
+                    # Forum-post exit hook for virtuals bots — mirror the entry-side
+                    # hook below. AI Council reads both sides of the trade.
+                    if is_virtuals and trade_result.get('status') in ('success', 'closed', 'executed'):
+                        try:
+                            asyncio.create_task(self._post_virtuals_forum_entry(
+                                config=config,
+                                user_id=user_id,
+                                trade_result={**trade_result, "action": "close", "symbol": symbol},
+                                decision_result=decision_result,
+                            ))
+                        except Exception as e:
+                            self._log.warning(f"Forum post exit hook failed (non-fatal): {e}")
+
                     return trade_result
 
                 except Exception as e:
@@ -1505,18 +1519,39 @@ class GGBotOrchestrator:
                 return
 
             symbol = trade_result.get('symbol') or decision_result.get('symbol', '?')
-            side = trade_result.get('side') or decision_result.get('action', '?')
+            side = str(trade_result.get('side') or decision_result.get('action', '?'))
             reasoning = decision_result.get('reasoning') or trade_result.get('reason', '')
             entry_price = trade_result.get('entry_price')
+            exit_price = trade_result.get('exit_price') or trade_result.get('close_price')
             confidence = decision_result.get('confidence')
 
-            lines = [
-                f"**{side.upper()} {symbol}**",
-                f"entry: ${entry_price:.4f}" if entry_price else "",
-                f"confidence: {confidence:.2f}" if confidence else "",
-                "",
-                reasoning[:2000] if reasoning else "",
-            ]
+            # Detect exit vs entry — orchestrator sets action='close' on the close path.
+            is_exit = (
+                side.lower() in ('close', 'exit', 'sell')
+                or trade_result.get('action') == 'close'
+                or decision_result.get('action') in ('close', 'exit')
+            )
+
+            if is_exit:
+                pnl = trade_result.get('realized_pnl') or trade_result.get('pnl')
+                pnl_pct = trade_result.get('pnl_percentage') or trade_result.get('realized_pnl_pct')
+                header = f"**EXIT {symbol}**"
+                lines = [
+                    header,
+                    f"exit: ${exit_price:.4f}" if exit_price else "",
+                    f"pnl: {'+' if pnl and pnl >= 0 else ''}${pnl:.2f}" if pnl is not None else "",
+                    f"pnl%: {pnl_pct:+.2f}%" if pnl_pct is not None else "",
+                    "",
+                    reasoning[:2000] if reasoning else "",
+                ]
+            else:
+                lines = [
+                    f"**{side.upper()} {symbol}**",
+                    f"entry: ${entry_price:.4f}" if entry_price else "",
+                    f"confidence: {confidence:.2f}" if confidence else "",
+                    "",
+                    reasoning[:2000] if reasoning else "",
+                ]
             body = "\n".join(l for l in lines if l)
 
             result = await acp_node_post(

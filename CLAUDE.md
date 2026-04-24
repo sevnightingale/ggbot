@@ -168,52 +168,46 @@ trading_result = await self._run_trading_v2(config, decision_result)
 
 ---
 
-## Permission System Pattern
+## Permission & Gating System
 
-**CRITICAL**: Premium feature permissions use @property methods on UserProfile, NOT standalone functions.
+**Single source of truth**: `can_activate_bots` on `UserProfile` (`core/domain/user_profile.py:116`). This is the only real permission. All other `can_use_*` properties (`can_use_premium_features`, `can_use_live_trading`, `can_publish_telegram_signals`, `can_use_signal_validation`, `is_premium_user`) are **deprecated aliases** that return `can_activate_bots`. Do not create new feature-specific permission properties.
 
-### Backend Pattern (core/domain/user_profile.py)
 ```python
 @property
-def can_use_live_trading(self) -> bool:
-    """Check if user can use Symphony live trading."""
-    return self.can_use_premium_features
+def can_activate_bots(self) -> bool:
+    return (
+        self.subscription_tier in [PREPAID, USAGE_BASED, PRO] and
+        self.has_active_subscription and
+        not self.subscription_expired
+    )
 ```
 
-### Usage in API Endpoints (ggbot.py)
+### Two-Layer Gating Model
+
+**Layer 1 — Activation gate** (inline, synchronous):
+- `start_bot` endpoint (`ggbot.py:2905`): checks `can_activate_bots` → 403 if false. PREPAID tier also checks `get_user_credit_balance() > 0` → 402 if empty.
+- Orchestrator `run_autonomous_cycle` (`core/orchestrator/orchestrator.py:136`): re-checks `can_activate_bots` per run. Exceptions: free first run (`!first_run_used`) and free manual runs (`free_runs_remaining > 0`). If permission lost mid-lifecycle, auto-sets bot `state='inactive'` and scheduler drops the job within 10s.
+- **Does NOT re-check credit balance per run** — this is intentional. Credit enforcement is Layer 2.
+
+**Layer 2 — Async credit enforcement** (out-of-band, polling):
+- `core/monitoring/usage_monitor.py` runs inside the `account-monitor` PM2 service, polling every 60s.
+- **PREPAID users** (crypto/credit-purchase tier): hard-pauses bots when `net_balance <= 0` by flipping `state='inactive'`. Worst-case overage window: ~70s (60s check + 10s reconcile).
+- **USAGE_BASED users** (Stripe metered): soft — notifies on low/depleted but lets bots keep running (overage billed via Stripe). Only hard-pauses on subscription `past_due`.
+- Writes pause reason to Redis `bot:pause_reason:{config_id}` (24h TTL) for frontend display.
+- LLM cost accrual flows into `activities.platform_cost_usd` (prepaid, all-time) or Redis `usage:user:{uid}:{YYYY-MM}` (usage-based, monthly) — monitor subtracts from credit pool.
+
+### Adding New Features
+
+New premium-gated features should check `can_activate_bots` directly — do not add new `can_use_*` properties. If frontend needs to know about a capability, expose `can_activate_bots` via `/api/v2/me` and gate UI on that.
+
 ```python
-# Load profile
-profile = await user_service.get_profile(user_id)
+# Backend
+if not profile.can_activate_bots:
+    raise HTTPException(403, "Subscription required")
 
-# Check permission directly on profile object
-if profile.can_use_live_trading:
-    # Execute premium feature
+# Frontend (frontend/lib/permissions.tsx)
+if (!userProfile.can_activate_bots) return <UpgradePrompt />
 ```
-
-### Exposing to Frontend (/me endpoint)
-```python
-# In /api/v2/me endpoint response
-{
-    "can_use_premium_features": profile.can_use_premium_features,
-    "can_publish_telegram_signals": profile.can_publish_telegram_signals,
-    "can_use_signal_validation": profile.can_use_signal_validation,
-    "can_use_live_trading": profile.can_use_live_trading  # Add new permissions here
-}
-```
-
-### Frontend Integration (frontend/lib/permissions.tsx)
-```typescript
-// 1. Add to UserProfile interface
-interface UserProfile {
-  can_use_live_trading: boolean  // New permission
-}
-
-// 2. Add to canAccess switch
-case 'live_trading':
-  return userProfile.can_use_live_trading
-```
-
-**DO NOT create standalone permission functions** - always use @property methods on UserProfile class.
 
 ---
 

@@ -79,8 +79,10 @@ def _generate_p256_keypair() -> tuple[str, str]:
     """
     priv = ec.generate_private_key(ec.SECP256R1())
     pub = priv.public_key()
-    priv_pem = priv.private_bytes(
-        encoding=serialization.Encoding.PEM,
+    # Private key must be base64(PKCS8-DER), NOT base64(PEM) —
+    # Privy's importPKCS8PrivateKey decodes base64 → expects raw DER bytes.
+    priv_der = priv.private_bytes(
+        encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
@@ -89,7 +91,7 @@ def _generate_p256_keypair() -> tuple[str, str]:
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     return (
-        base64.b64encode(priv_pem).decode("ascii"),
+        base64.b64encode(priv_der).decode("ascii"),
         base64.b64encode(pub_spki_der).decode("ascii"),
     )
 

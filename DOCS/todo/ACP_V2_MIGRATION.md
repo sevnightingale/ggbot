@@ -1,6 +1,15 @@
 # ACP v2 Migration + Live Trading Unification
 
-## Current Status (2026-04-22)
+> 🚨 **2026-04-24 — THIS DOC IS PARTIALLY SUPERSEDED.** Read [ACP_V2_SESSION_HANDOFF.md](ACP_V2_SESSION_HANDOFF.md) first. Key discoveries from a full day of live-testing:
+>
+> - The whole `/bridge-usdc-to-hl` approach is architecturally wrong. Deposits are ACP `perp_deposit` jobs, not on-chain bridges from the agent wallet.
+> - DGClaw's provider agent is still on ACP v1 (`--legacy` flag). Our v2 SDK ↔ v1 provider interop is unverified.
+> - User USDC must land on Base chain, not Arbitrum. Virtuals' Alchemy paymaster is Base-only.
+> - Work is paused mid-pivot. User must choose between Option A (fix v2 path), B (revert to lite-agent pool), or C (ship existing HL self-custody + defer v2).
+>
+> The sections below describe the plan-as-designed, which is still valuable reference, but should NOT be executed without first reading the handoff doc.
+
+## Current Status (2026-04-22, PRE-PIVOT)
 
 **🟡 IN PROGRESS** — Phase 0 gate passed, Phase 1 partially shipped.
 

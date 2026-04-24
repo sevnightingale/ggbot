@@ -4,9 +4,9 @@ import { sharedSecretGuard } from './lib/auth.js'
 import { registerSetupHlUnified } from './routes/setup-hl-unified.js'
 import { registerAuthorizeHlApiWallet } from './routes/authorize-hl-api-wallet.js'
 import { registerWithdrawFromHl } from './routes/withdraw-from-hl.js'
-import { registerBridgeUsdcToHl } from './routes/bridge-usdc-to-hl.js'
 import { registerJoinLeaderboard } from './routes/join-leaderboard.js'
 import { registerForumPost } from './routes/forum-post.js'
+import { registerDeposit } from './routes/deposit.js'
 
 const PORT = Number(process.env.ACP_NODE_PORT || 3101)
 const SHARED_SECRET = process.env.ACP_NODE_SHARED_SECRET
@@ -33,9 +33,9 @@ app.register(async (authedScope) => {
   registerSetupHlUnified(authedScope)
   registerAuthorizeHlApiWallet(authedScope)
   registerWithdrawFromHl(authedScope)
-  registerBridgeUsdcToHl(authedScope)
   registerJoinLeaderboard(authedScope)
   registerForumPost(authedScope)
+  registerDeposit(authedScope)
 })
 
 app.listen({ port: PORT, host: '127.0.0.1' }).then((addr) => {

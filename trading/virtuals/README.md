@@ -1,7 +1,17 @@
 # Virtuals DGClaw Trading
 
-**Status**: In Progress (2026-03-25)
-**Trading Mode**: `trading_mode: 'virtuals'`
+**Status**: Phase 1 + Phase 2 COMPLETE (2026-04-07). PROVEN WORKING IN PRODUCTION.
+**Parallel work**: A separate ACP v2 migration track is mid-pivot — see [DOCS/todo/ACP_V2_SESSION_HANDOFF.md](../../DOCS/todo/ACP_V2_SESSION_HANDOFF.md).
+
+> ⚠️ **Read this before touching anything in this directory.**
+>
+> Two orthogonal tracks exist:
+>
+> 1. **This file documents the v1 arena mirror architecture** — `arena_agents` table, lite-agent pool, `claw_api.py`, `api/virtuals_arena.py`. Ships the "Enter Degen Arena" button on ActivationBar. Proven, working, mirrors trades from paper/HL bots to DGClaw via ACP v1 jobs.
+>
+> 2. **A parallel ACP v2 migration attempt** lives in `api/arena_v2.py`, `database/migrations/add_arena_agents_v2.sql`, `acp-node/` sidecar. Intent: replace the mirror architecture with "each user gets their own Virtuals agent that IS the HL trader." As of 2026-04-24, this work is **mid-pivot** after discovering deposits must go through `perp_deposit` ACP jobs, not on-chain bridges. See the session handoff doc.
+>
+> **Neither track is actively dying — the v1 lite-agent-pool path (this doc) is the shipped, working option users use today.** The v2 migration is a possible upgrade, not a replacement in progress.
 
 Trade perpetuals on the Virtuals DGClaw arena via ACP (Agent Commerce Protocol). All trades are on-chain ACP transactions executed on Hyperliquid through the DGClaw agent. Every trade generates ACP volume for $GG token graduation.
 

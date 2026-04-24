@@ -553,7 +553,7 @@ export class ApiClient {
     agent_name?: string
     agent_wallet_address?: string
     virtuals_agent_id?: string
-    arbitrum_usdc_balance?: number | null
+    base_usdc_balance?: number | null
     hl_account_value?: number | null
     hl_withdrawable?: number | null
     hl_positions?: Array<{
@@ -573,20 +573,34 @@ export class ApiClient {
     return await res.json()
   }
 
-  async arenaV2CheckDeposit(configId: string): Promise<{
-    status: 'bridged' | 'insufficient' | 'bridge_failed' | 'rpc_error'
+  async arenaV2CheckDeposit(configId: string, amount: number): Promise<{
+    status:
+      | 'deposited'
+      | 'amount_too_low'
+      | 'insufficient'
+      | 'deposit_failed'
+      | 'deposited_but_hl_setup_failed'
+      | 'rpc_error'
     balance?: number
     balance_before?: number
-    bridge_amount?: number
+    requested?: number
+    amount?: number
+    minimum?: number
+    reserve?: number
+    max_depositable?: number
     reserve_kept?: number
-    tx_hash?: string
+    deposit_job_id?: string
     message?: string
+    hl_setup?: { unified_activated?: boolean; api_wallet_address?: string } | null
     leaderboard?: { joined: boolean; detail?: unknown } | null
+    forum_thread_id?: string | null
+    stage?: string
+    hint?: string
     detail?: unknown
   }> {
     const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/check-deposit`, {
       method: 'POST',
-      body: JSON.stringify({ config_id: configId }),
+      body: JSON.stringify({ config_id: configId, amount }),
     })
     if (!res.ok) throw new Error('check-deposit failed')
     return await res.json()

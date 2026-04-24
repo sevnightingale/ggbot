@@ -1197,12 +1197,46 @@ async def store_arena_v2_dgclaw_key(
         return None
 
 
+async def store_arena_v2_forum_thread_id(
+    agent_record_id: str,
+    thread_id: str,
+) -> bool:
+    """Persist the DGClaw forum thread id so orchestrator forum-post hook fires."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE arena_agents_v2
+                    SET dgclaw_forum_thread_id = %s,
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (thread_id, agent_record_id),
+                )
+                conn.commit()
+                logger.info(
+                    f"arena_v2: stored forum thread id for agent_record {agent_record_id}"
+                )
+                return True
+    except Exception as e:
+        logger.error(
+            f"arena_v2: store_arena_v2_forum_thread_id failed for {agent_record_id}: {e}"
+        )
+        return False
+
+
 async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
     """
-    Load the active arena_agents_v2 row for a config, with all vault secrets
+    Load the arena_agents_v2 row for a config, with all vault secrets
     decrypted and returned as plaintext. Shape matches what acp-node sidecar
     requests need — signerPrivateKey (base64 PEM), hlApiWalletKey (0x-hex),
     optional dgclawApiKey.
+
+    Returns rows in ANY status (provisioning/active) so deploy-time UIs can
+    show wallet/agent info during setup. Callers that need an *active-only*
+    agent (e.g. resolve_hl_credentials) must check creds['status'] themselves.
+    Excludes status='retired' — those are genuinely dead.
     """
     try:
         with get_db_connection() as conn:
@@ -1217,7 +1251,9 @@ async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
                            dgclaw_forum_thread_id,
                            status
                     FROM arena_agents_v2
-                    WHERE config_id = %s AND status = 'active'
+                    WHERE config_id = %s AND status <> 'retired'
+                    ORDER BY created_at DESC
+                    LIMIT 1
                     """,
                     (config_id,),
                 )
@@ -1333,6 +1369,14 @@ async def resolve_hl_credentials(
             return None
         creds = await get_arena_v2_credential(config_id)
         if not creds:
+            return None
+        # Runtime trading requires a fully-deployed agent. Provisioning agents
+        # are still mid-setup and can't trade yet.
+        if creds.get('status') != 'active':
+            logger.error(
+                f"arena_v2: config {config_id} agent status={creds.get('status')} "
+                f"(not active) — cannot resolve HL credentials yet"
+            )
             return None
         hl_key = creds.get('hl_api_wallet_key')
         if not hl_key:

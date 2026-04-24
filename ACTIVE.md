@@ -1,88 +1,86 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-04-11 02:41:46 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-04-24 06:17:00 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 359
+- **Total Users**: 360
 - **Prepaid Users**: 22 (22 active subscriptions)
-- **Free Users**: 331
-- **Users with Bots**: 346 (96.4%)
+- **Free Users**: 332
+- **Users with Bots**: 347 (96.4%)
 
 ### Bot Statistics
-- **Total Bots**: 562
-- **Active Bots**: 34 (6.0%)
-  - Paper: 31
+- **Total Bots**: 563
+- **Active Bots**: 29 (5.2%)
+  - Paper: 27
   - Symphony (Live): 0
   - Aster (DEX): 0
-  - Hyperliquid (Live): 3
-- **Inactive Bots**: 528
+  - Hyperliquid (Live): 2
+- **Inactive Bots**: 534
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 8,294
-  - Wins: 2,802
-  - Losses: 5,492
-  - Platform Win Rate: 33.78%
-  - Total P&L: $112,018.41
+- **Total Trades (All Time)**: 8,404
+  - Wins: 2,873
+  - Losses: 5,531
+  - Platform Win Rate: 34.19%
+  - Total P&L: $114,654.26
 - **Recent Activity**:
-  - Last 24 hours: 56 trades
-  - Last 7 days: 372 trades
-  - Last 30 days: 891 trades
+  - Last 24 hours: 18 trades
+  - Last 7 days: 130 trades
+  - Last 30 days: 873 trades
 
 ### Open Positions
-- **Open Positions**: 20
+- **Open Positions**: 6
 - **Unique Symbols**: 3
-- **Total Exposure**: $228,275.21
+- **Total Exposure**: $106,803.92
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,181.45
+- **Average Balance**: $10,186.20
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **ETH/USDT**: 20 bots
-- **BTC/USDT**: 13 bots
-- **SOL/USDT**: 1 bots
+- **ETH/USDT**: 15 bots
+- **BTC/USDT**: 14 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 1374 decisions (avg confidence: 45.4%)
-- **enter**: 59 decisions (avg confidence: 72.0%)
-- **exit**: 26 decisions (avg confidence: 61.5%)
-- **long**: 2 decisions (avg confidence: 75.0%)
+- **wait**: 804 decisions (avg confidence: 23.0%)
+- **enter**: 18 decisions (avg confidence: 72.4%)
+- **exit**: 14 decisions (avg confidence: 71.8%)
 
 ### System Health
-- **Decisions (last hour)**: 60
+- **Decisions (last hour)**: 35
 - **Status**: 🟢 HEALTHY
 
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $703.16 (margin: $289.53, 41.2%)
-- **Last 30d Revenue**: $113.50 from 24 users
-- **Month-to-Date**: $54.02 (projected: ~$147.33)
-- **Avg LTV (paid)**: $21.63
+- **All-Time Revenue**: $751.25 (margin: $309.33, 41.2%)
+- **Last 30d Revenue**: $123.28 from 20 users
+- **Month-to-Date**: $106.74 (projected: ~$133.42)
+- **Avg LTV (paid)**: $23.35
 
 ### Conversion Funnel
 - **Signup → Created Bot**: 95.8%
-- **Signup → Ran Bot**: 66.0%
-- **Signup → Paid**: 7.8% (28/359)
-- **Post-Monetization (Jan+)**: 20.2% (19/94)
+- **Signup → Ran Bot**: 66.1%
+- **Signup → Paid**: 7.8% (28/360)
+- **Post-Monetization (Jan+)**: 20.0% (19/95)
 
 ### Engagement
-- **DAU/WAU/MAU**: 10/11/24
-- **DAU/WAU Stickiness**: 90.9%
-- **Power Users (4+/8wk)**: 11
+- **DAU/WAU/MAU**: 6/9/20
+- **DAU/WAU Stickiness**: 66.7%
+- **Power Users (4+/8wk)**: 10
 
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 5
-- **Active Bots**: 3
-- **Total Volume**: $61,515.34
+- **Active Bots**: 2
+- **Total Volume**: $70,973.23
 
 ## 🖥️ System Resources
 
@@ -90,25 +88,26 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 3MB | 1d 7h | 17 |
-| ggbot | 🟢 online | 2.8% | 246MB | 1d 7h | 26 |
-| account-monitor | 🟢 online | 0.9% | 28MB | 1d 7h | 17 |
-| market-data-ws | 🟢 online | 0.7% | 16MB | 1d 7h | 18 |
-| ggbot-scheduler | 🟢 online | 0.1% | 296MB | 1d 7h | 23 |
-| sebastian-virtuals | 🟢 online | 0% | 22MB | 1d 7h | 11 |
-| sebastian-bot | 🟢 online | 0.1% | 58MB | 4h 29m | 1 |
-| sebastian-chrome | 🟢 online | 0.5% | 67MB | 5h 30m | 0 |
-| sebastian-telegram | 🟢 online | 0% | 23MB | 5h 28m | 0 |
+| error-alerts | 🟢 online | 0% | 33MB | 10m | 0 |
+| account-monitor | 🟢 online | 1.1% | 192MB | 10m | 0 |
+| market-data-ws | 🟢 online | 0.6% | 217MB | 10m | 0 |
+| ggbot-scheduler | 🟢 online | 0% | 223MB | 10m | 0 |
+| sebastian-virtuals | 🟢 online | 0% | 91MB | 10m | 0 |
+| sebastian-chrome | 🟢 online | 0.2% | 223MB | 10m | 0 |
+| sebastian-telegram | 🟢 online | 0% | 40MB | 10m | 0 |
+| sebastian-bot | 🟢 online | 0.2% | 71MB | 10m | 0 |
+| ggbot | 🟢 online | 1.5% | 253MB | 10m | 0 |
+| acp-node | 🟢 online | 0% | 63MB | 7m | 1 |
 
 ### VM Resources
 
-- **Disk**: 48G / 78G (61%)
-- **Memory**: 1.7Gi / 3.8Gi
-- **CPU Load**: 0.25 / 0.12 / 0.10 (1m/5m/15m)
+- **Disk**: 53G / 78G (69%)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.37 / 0.52 / 0.40 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 44.42M)
+- **Redis**: 🟢 connected (Memory: 24.31M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -561,9 +560,40 @@ df -h
 - **Roadmap & Tasks**: `TODO.md` - Current development tasks and priorities
 - **Complete History**: `CHANGELOG.md` - All completed features, fixes, and improvements
 
+---
+
+## 🏟️ Arena Tables — Naming Disambiguation
+
+The schema contains four tables with "arena" in the name. They sound similar but represent **three distinct features** built at different times. This section exists because we've iterated on our own ggArena concept while also integrating with Virtuals' Degen Arena — the names overlap. Read this before touching any arena-related code or migrations.
+
+| Table | Feature | What it stores | Live funds? | FK on `config_id` |
+|-------|---------|----------------|-------------|-------------------|
+| `arena_agents` | **Degen Arena** (Virtuals DGClaw integration) | 1 row per Virtuals lite agent in our pool. When assigned to a bot, holds the agent's Base wallet, HL subaccount, token info, and vault refs to ACP/DGClaw API keys | **YES** — wallet holds ACP fee reserve, HL subaccount holds live positions, DGClaw pool tracks real USDC | `assigned_config_id` → configurations, **ON DELETE RESTRICT** (added 2026-04-20) |
+| `arena_pledges` | **ggArena** (our competition — USX staking) | On-chain USX stakes by community members betting on which bot wins a season. Records `tx_hash`, `usx_amount`, `wallet_address` | **YES** (indirect) — represents real on-chain USX; must preserve for prize distribution | `config_id` → configurations, **ON DELETE NO ACTION** (intentional — protects audit trail) |
+| `arena_registrations` | **ggArena Season 2** (deferred) | Bot entries in a specific ggArena season. Starting balance, final rank, eligibility flags. Currently unused — Season 2 is deferred in favor of Degen Arena | No | `config_id` → configurations, **ON DELETE NO ACTION** (intentional — historical standings) |
+| `dojo_matches` | **The Dojo** (Elo-based 1v1) | Copy-trade match instances between two bots. Uses `challenger_config_id` / `opponent_config_id`, not the generic `config_id` column | No (mirrored $10k paper) | `challenger_config_id` / `opponent_config_id` → configurations, **ON DELETE NO ACTION** (blocked by `_check_dojo_lock` at app layer) |
+
+### Why the distinction matters
+
+- **Deleting a bot** must check `arena_agents` first. If the bot has an assigned agent, the user has live USDC on DGClaw that they'd lose UI access to if we let the DELETE succeed. The DB-level RESTRICT is the safety net; the app-layer guard `_check_arena_assignment()` in `ggbot.py` returns a friendly 409 with the agent name.
+- **`arena_pledges` / `arena_registrations`** intentionally block deletion (NO ACTION) to preserve audit trails for on-chain events and competition results. Users expect prize payouts resolvable via historical records; orphaning those rows would break that.
+- **`elo_history`** now cascades on delete (changed 2026-04-20) because it's a pure internal audit of rating changes — nothing downstream depends on it once the bot is gone.
+
+### Design rule for future "arena" tables
+
+When adding any table that references `configurations.config_id`, apply this decision:
+
+| What the table records | FK rule |
+|------------------------|---------|
+| Outcomes of actions the bot took (ratings, stats, internal history) | **CASCADE** |
+| External obligations tied to the bot (stakes, payouts, live funds, on-chain tx) | **RESTRICT** or **NO ACTION** |
+| Pointers to external assets (wallets, API keys, vault refs for live funds) | **RESTRICT** |
+
+---
+
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-04-11 02:41:47 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-04-24 06:17:02 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -590,12 +620,18 @@ stripe_reported_at timestamptz?, account_balance numeric?, account_pnl numeric?,
 Idx: idx_agent_sessions_last_active(last_active_at), idx_agent_sessions_session_id(session_id)
 config_id uuid, session_id varchar(255), last_active_at timestamp?, created_at timestamp?, updated_at timestamp?
 
-### arena_agents (15 cols) | PK: id | UQ: wallet_address
+### arena_agents (15 cols) | PK: id | FK: assigned_config_id→configurations | UQ: wallet_address
 Idx: arena_agents_wallet_address_key(wallet_address), idx_arena_agents_config(assigned_config_id), idx_arena_agents_hl_subaccount(hl_subaccount_address), idx_arena_agents_status(status), idx_arena_...
 id int, virtuals_id int, agent_name varchar, wallet_address varchar, claw_api_key_vault_id uuid?
 dgclaw_api_key_vault_id uuid?, token_address varchar?, token_symbol varchar?, assigned_user_id uuid?
 assigned_at timestamptz?, status varchar?=available' varying, created_at timestamptz?, user_wallet_address varchar?
 assigned_config_id uuid?, hl_subaccount_address varchar(42)?
+
+### arena_agents_v2 (14 cols) | PK: id | FK: config_id→configurations | UQ: virtuals_agent_id
+Idx: arena_agents_v2_virtuals_agent_id_key(virtuals_agent_id), idx_arena_v2_config(config_id), idx_arena_v2_config_active(config_id), idx_arena_v2_user(user_id), idx_arena_v2_wallet(agent_wallet_ad...
+id uuid, user_id uuid, config_id uuid?, virtuals_agent_id text, agent_name text, agent_wallet_address varchar(42)
+wallet_id text, signer_private_key_vault_id uuid, hl_api_wallet_key_vault_id uuid?, dgclaw_api_key_vault_id uuid?
+dgclaw_forum_thread_id text?, status text=provisioning, created_at timestamptz, updated_at timestamptz
 
 ### arena_pledges (12 cols) | PK: id | FK: config_id→configurations | UQ: tx_hash
 Idx: arena_pledges_tx_hash_key(tx_hash), idx_arena_pledges_config(config_id), idx_arena_pledges_pledged_at(pledged_at), idx_arena_pledges_user(user_id), idx_arena_pledges_wallet(wallet_address)
@@ -786,7 +822,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-04-11 02:41:47 UTC
+Source: `core/config/models.py` | Auto-generated 2026-04-24 06:17:02 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

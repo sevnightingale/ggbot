@@ -22,7 +22,6 @@ holds the P-256 signer key in Vault and passes it to the sidecar per request.
 """
 
 import base64
-import copy
 import json
 import os
 import uuid
@@ -41,12 +40,14 @@ from core.auth.vault_utils import (
     get_arena_v2_credential,
     get_vault_secret,
     store_arena_v2_dgclaw_key,
+    store_arena_v2_forum_thread_id,
     store_arena_v2_hl_api_wallet,
 )
 from core.common.db import db_execute, db_fetch_all, db_fetch_one
 from core.common.logger import logger
 from core.services.acp_node_client import acp_node_post
-from core.services.arbitrum_rpc import get_usdc_balance
+from core.services.base_rpc import get_usdc_balance as get_base_usdc_balance
+from core.services.config_service import config_service
 
 router = APIRouter(prefix="/api/v2/arena", tags=["arena-v2"])
 
@@ -55,8 +56,8 @@ JWT_TTL_SEC = 25 * 60
 REQUEST_ID_TTL_SEC = 10 * 60
 DEPLOY_STATE_TTL_SEC = 30 * 60
 
-HL_BRIDGE_MIN_USDC = 5.0
-ACP_FEE_RESERVE = 1.0        # USDC kept on Arbitrum for join-leaderboard / future ACP fees
+DEPOSIT_MIN_USDC = 10.0      # User-facing minimum. DGClaw protocol minimum is $6; we enforce $10 for headroom.
+ACP_FEE_RESERVE = 1.0        # USDC kept on-chain (Base) for join-leaderboard / future ACP fees
 
 _redis = redis.from_url(
     os.getenv("REDIS_URL", "redis://localhost:6379"),
@@ -90,15 +91,18 @@ def _get_jwt(user_id: str) -> Optional[str]:
 def _generate_p256_keypair() -> tuple[str, str]:
     """
     P-256 keypair for Privy signer registration.
-    Returns (base64-PKCS8-PEM-private, base64-SPKI-DER-public).
+    Returns (base64-PKCS8-DER-private, base64-SPKI-DER-public).
 
-    SPKI-DER is load-bearing — Privy rejects raw X9.62 uncompressed points
-    with a generic 500 on the signer approve endpoint. See Phase 0 notes.
+    Both must be base64-wrapped DER bytes — PEM-wrapping the private key and
+    then base64'ing the whole PEM text was silently rejected by Privy with
+    "Invalid wallet authorization private key". Privy's docstring is explicit:
+    "base64-encoded PKCS8-formatted private key, with no PEM headers."
+    See @privy-io/node/src/lib/cryptography.ts::importPKCS8PrivateKey.
     """
     priv = ec.generate_private_key(ec.SECP256R1())
     pub = priv.public_key()
-    priv_pem = priv.private_bytes(
-        encoding=serialization.Encoding.PEM,
+    priv_der = priv.private_bytes(
+        encoding=serialization.Encoding.DER,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
@@ -107,7 +111,7 @@ def _generate_p256_keypair() -> tuple[str, str]:
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     return (
-        base64.b64encode(priv_pem).decode("ascii"),
+        base64.b64encode(priv_der).decode("ascii"),
         base64.b64encode(pub_spki_der).decode("ascii"),
     )
 
@@ -237,6 +241,30 @@ async def deploy_live(
     body: DeployLiveRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ):
+    """Thin wrapper so traceback-logging can wrap the whole flow."""
+    logger.info(
+        f"arena_v2 deploy-live ENTER: user={current_user.user_id[:8]} "
+        f"source={body.source_config_id[:8]} name={body.agent_name!r}"
+    )
+    try:
+        return await _deploy_live_impl(body, current_user)
+    except HTTPException:
+        raise
+    except Exception:
+        import traceback as _tb
+        logger.error(
+            f"arena_v2 deploy-live unhandled exception:\n{_tb.format_exc()}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="deploy-live failed (see ggbot.log for traceback)",
+        )
+
+
+async def _deploy_live_impl(
+    body: DeployLiveRequest,
+    current_user: AuthenticatedUser,
+) -> DeployLiveResponse:
     """
     Kick off the Deploy Live Version flow for a paper bot.
 
@@ -251,27 +279,19 @@ async def deploy_live(
     if not jwt:
         raise HTTPException(401, "Virtuals session missing or expired. Reconnect first.")
 
-    source = await db_fetch_one(
-        """
-        SELECT user_id, config_data, config_type, config_name, trading_mode
-        FROM configurations WHERE config_id = %s
-        """,
-        (body.source_config_id,),
-    )
-    if not source:
-        raise HTTPException(404, "Source config not found")
-    if str(source[0]) != current_user.user_id:
-        raise HTTPException(403, "Config belongs to another user")
-    if source[4] != "paper":
+    # Load source config through config_service — the same path Duplicate uses,
+    # so we get a validated BotConfigV2 object with all fields normalized.
+    source_cfg = await config_service.get_config(body.source_config_id, current_user.user_id)
+    if not source_cfg:
+        raise HTTPException(404, "Source config not found (or not owned by you)")
+    if source_cfg.trading_mode != "paper":
         raise HTTPException(
-            400, f"Can only deploy from paper bots; source is trading_mode='{source[4]}'"
+            400,
+            f"Can only deploy from paper bots; source is trading_mode='{source_cfg.trading_mode}'",
         )
 
-    source_config_data = source[1] if isinstance(source[1], dict) else json.loads(source[1])
-    source_type = source[2] or "scheduled_trading"
-    source_name = source[3] or source_config_data.get("name") or "ggbot"
-
-    agent_name = body.agent_name or source_name
+    agent_name = body.agent_name or f"{source_cfg.config_name or 'ggbot'} (live)"
+    logger.info(f"arena_v2 deploy-live STEP1: source loaded, agent_name={agent_name!r}")
 
     # ------------------------------------------------------------------
     # 1. Create Virtuals agent (one retry on name collision)
@@ -290,15 +310,46 @@ async def deploy_live(
             timeout=30,
         )
 
+    logger.info("arena_v2 deploy-live STEP2: calling Virtuals POST /agents")
     resp = _create_agent(agent_name)
-    if resp.status_code in (400, 409):
+    logger.info(
+        f"arena_v2 deploy-live STEP2 done: status={resp.status_code} body={resp.text[:300]}"
+    )
+
+    # Parse Virtuals' error shape: {"message": str | [str], "statusCode": int}
+    def _virtuals_error_detail(r: requests.Response) -> str:
+        try:
+            j = r.json() or {}
+            msg = j.get("message")
+            if isinstance(msg, list):
+                return "; ".join(str(x) for x in msg)
+            return str(msg or r.text[:200])
+        except Exception:
+            return r.text[:200]
+
+    # Retry only if the error looks like a name collision — NOT for agent-limit,
+    # role rejection, or any other 400 where changing the name won't help.
+    if resp.status_code == 409 or (
+        resp.status_code == 400
+        and "name" in _virtuals_error_detail(resp).lower()
+        and ("already" in _virtuals_error_detail(resp).lower()
+             or "exists" in _virtuals_error_detail(resp).lower()
+             or "taken" in _virtuals_error_detail(resp).lower())
+    ):
         retry_name = f"{agent_name}-{uuid.uuid4().hex[:4]}"
+        logger.info(f"arena_v2 deploy-live STEP2 retry with suffix: {retry_name}")
         resp = _create_agent(retry_name)
         if resp.status_code in (200, 201):
             agent_name = retry_name
+
     if resp.status_code not in (200, 201):
+        detail = _virtuals_error_detail(resp)
+        # Surface the real Virtuals error back to the UI so the user knows
+        # exactly what to fix (e.g. "Agent limit of 10 reached" → delete some
+        # agents on app.virtuals.io).
         raise HTTPException(
-            502, f"Virtuals agent create failed: {resp.status_code} {resp.text[:300]}"
+            status_code=400 if resp.status_code < 500 else 502,
+            detail=f"Virtuals rejected agent create: {detail}",
         )
 
     payload = resp.json() or {}
@@ -327,42 +378,53 @@ async def deploy_live(
         )
 
     # ------------------------------------------------------------------
-    # 2. Duplicate source config → trading_mode='virtuals'
+    # 2. Duplicate source config → trading_mode='virtuals' via the canonical
+    #    config_service.create_config() path (same as Duplicate button).
+    #    This runs validation + normalization via BotConfigV2.to_jsonb().
     # ------------------------------------------------------------------
-    new_config_id = str(uuid.uuid4())
-    new_config_data = copy.deepcopy(source_config_data)
-    new_config_data["trading_mode"] = "virtuals"
-    new_config_data["name"] = agent_name
+    duplicated_config_data = {
+        "config_type": source_cfg.config_type,
+        "schema_version": source_cfg.schema_version,
+        "selected_pair": source_cfg.selected_pair,
+        "extraction": source_cfg.extraction,
+        "decision": source_cfg.decision,
+        "trading": source_cfg.trading,
+        "llm_config": source_cfg.llm_config,
+        "telegram_integration": source_cfg.telegram_integration or {},
+        "agent_strategy": source_cfg.agent_strategy,
+    }
 
-    await db_execute(
-        """
-        INSERT INTO configurations (
-            config_id, user_id, config_type, config_name, config_data,
-            trading_mode, initial_equity, state, created_at, updated_at
-        ) VALUES (%s, %s, %s, %s, %s, 'virtuals', 0, 'inactive', NOW(), NOW())
-        """,
-        (
-            new_config_id,
-            current_user.user_id,
-            source_type,
-            agent_name,
-            json.dumps(new_config_data),
-        ),
+    logger.info("arena_v2 deploy-live STEP3: calling config_service.create_config")
+    new_cfg = await config_service.create_config(
+        user_id=current_user.user_id,
+        config_name=agent_name,
+        config_data=duplicated_config_data,
+        trading_mode="virtuals",
     )
+    if not new_cfg:
+        raise HTTPException(
+            500, "Failed to duplicate source config (validation rejected or DB write failed)"
+        )
+    new_config_id = new_cfg.config_id
+    logger.info(f"arena_v2 deploy-live STEP3 done: new_config_id={new_config_id[:8]}")
 
     # ------------------------------------------------------------------
     # 3. P-256 keypair + Vault storage
     # ------------------------------------------------------------------
+    logger.info("arena_v2 deploy-live STEP4: generating P-256 keypair")
     priv_b64, pub_b64 = _generate_p256_keypair()
     agent_record_id = str(uuid.uuid4())
     vault_name = f"arena_v2_signer_{agent_record_id}"
+    logger.info("arena_v2 deploy-live STEP4: create_vault_secret")
     signer_vault_id = await create_vault_secret(vault_name, priv_b64)
     if not signer_vault_id:
         raise HTTPException(500, "Failed to stash signer key in Vault")
+    logger.info(f"arena_v2 deploy-live STEP4 done: signer_vault_id={signer_vault_id[:8]}")
 
     # ------------------------------------------------------------------
     # 4. Insert arena_agents_v2 row
     # ------------------------------------------------------------------
+    logger.info("arena_v2 deploy-live STEP5: INSERT arena_agents_v2")
     await db_execute(
         """
         INSERT INTO arena_agents_v2 (
@@ -381,15 +443,18 @@ async def deploy_live(
             signer_vault_id,
         ),
     )
+    logger.info("arena_v2 deploy-live STEP5 done")
 
     # ------------------------------------------------------------------
     # 5. Signer registration URL (popup 2)
     # ------------------------------------------------------------------
+    logger.info("arena_v2 deploy-live STEP6: POST /agents/{id}/signer")
     signer_resp = requests.post(
         f"{ACP_SERVER_URL}/agents/{virtuals_agent_id}/signer",
         headers=headers,
         timeout=30,
     )
+    logger.info(f"arena_v2 deploy-live STEP6 done: status={signer_resp.status_code}")
     if signer_resp.status_code not in (200, 201):
         raise HTTPException(
             502,
@@ -447,14 +512,13 @@ async def deploy_poll(
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ) -> Dict[str, Any]:
     """
-    Drive the post-signer-approval headless setup.
+    Wait for the user to approve the Privy signer in popup 2.
 
-    Transitions tracked in Redis (arena_v2:deploy:<signerRequestId>):
-        signer_approved  → unified_done → authorized_done → active
-
-    Each call checks Virtuals signer status; once approved, runs the HL
-    setup actions in order via acp-node. Fully idempotent — a second call
-    after completion returns status='completed' immediately.
+    Once Virtuals reports signer.status=completed, the modal advances to the
+    Funding state. We deliberately do NOT call HL setup actions here —
+    Hyperliquid rejects userSetAbstraction and approveAgent on a zero-balance
+    wallet ("Must deposit before performing actions"). Those run later inside
+    /check-deposit, post-bridge, when HL can see the account.
     """
     raw = _redis.get(_deploy_key(requestId))
     if not raw:
@@ -463,9 +527,6 @@ async def deploy_poll(
     if state["user_id"] != current_user.user_id:
         raise HTTPException(403, "Deploy request not owned by this session")
 
-    # ------------------------------------------------------------------
-    # 1. Check Virtuals signer approval status (unless already approved)
-    # ------------------------------------------------------------------
     if not state.get("signer_approved"):
         jwt = _get_jwt(current_user.user_id)
         if not jwt:
@@ -496,109 +557,14 @@ async def deploy_poll(
             f"arena_v2 deploy-poll: signer approved agent={state['virtuals_agent_id']}"
         )
 
-    # ------------------------------------------------------------------
-    # 2. Fetch signer private key from Vault (needed for acp-node calls)
-    # ------------------------------------------------------------------
-    signer_priv = await get_vault_secret(state["signer_vault_id"])
-    if not signer_priv:
-        return {"status": "error", "stage": "vault", "reason": "signer key missing from vault"}
-
-    sidecar_payload_base = {
-        "agentWalletAddress": state["agent_wallet_address"],
-        "agentWalletId": state["virtuals_agent_id"],    # Virtuals agent ID used as walletId during signing
-        "signerPrivateKey": signer_priv,
-    }
-
-    # Privy wallet ID might actually be separate from agent ID. In the agent
-    # response we captured both — the deployment row stores the Privy walletId.
-    # Pull it fresh to be safe.
-    row = await db_fetch_one(
-        "SELECT wallet_id FROM arena_agents_v2 WHERE id = %s",
-        (state["agent_record_id"],),
-    )
-    if row and row[0]:
-        sidecar_payload_base["agentWalletId"] = row[0]
-
-    # ------------------------------------------------------------------
-    # 3. Activate HL unified account (EIP-712 userSetAbstraction)
-    # ------------------------------------------------------------------
-    if not state.get("unified_done"):
-        unified = await acp_node_post(
-            "/setup-hl-unified-account", sidecar_payload_base, timeout_seconds=60
-        )
-        if unified.get("_httpStatus") != 200 or not unified.get("success"):
-            logger.warning(f"arena_v2 deploy-poll: unified-account failed {unified}")
-            return {
-                "status": "error",
-                "stage": "unified_account",
-                "detail": unified,
-            }
-        state["unified_done"] = True
-        _redis.setex(_deploy_key(requestId), DEPLOY_STATE_TTL_SEC, json.dumps(state))
-        logger.info(
-            f"arena_v2 deploy-poll: HL unified account activated for "
-            f"agent={state['virtuals_agent_id']}"
-        )
-
-    # ------------------------------------------------------------------
-    # 4. Authorize HL API wallet (EIP-712 approveAgent) → store key
-    # ------------------------------------------------------------------
-    if not state.get("authorized_done"):
-        payload = {**sidecar_payload_base, "agentName": state["agent_name"][:40]}
-        authz = await acp_node_post(
-            "/authorize-hl-api-wallet", payload, timeout_seconds=60
-        )
-        if authz.get("_httpStatus") != 200 or not authz.get("success"):
-            logger.warning(f"arena_v2 deploy-poll: authorize-api-wallet failed {authz}")
-            return {
-                "status": "error",
-                "stage": "authorize_api_wallet",
-                "detail": authz,
-            }
-
-        api_wallet_key = authz.get("apiWalletPrivateKey")
-        if not api_wallet_key:
-            return {
-                "status": "error",
-                "stage": "authorize_api_wallet",
-                "reason": "sidecar returned success but no apiWalletPrivateKey",
-            }
-
-        hl_vault_id = await store_arena_v2_hl_api_wallet(
-            state["agent_record_id"], api_wallet_key
-        )
-        if not hl_vault_id:
-            return {
-                "status": "error",
-                "stage": "authorize_api_wallet",
-                "reason": "vault write failed for HL API wallet key",
-            }
-
-        state["authorized_done"] = True
-        state["api_wallet_address"] = authz.get("apiWalletAddress")
-        _redis.setex(_deploy_key(requestId), DEPLOY_STATE_TTL_SEC, json.dumps(state))
-        logger.info(
-            f"arena_v2 deploy-poll: HL API wallet authorized for "
-            f"agent={state['virtuals_agent_id']}"
-        )
-
-    # ------------------------------------------------------------------
-    # 5. Flip arena_agents_v2 to active
-    # ------------------------------------------------------------------
-    await db_execute(
-        """
-        UPDATE arena_agents_v2
-        SET status = 'active', updated_at = NOW()
-        WHERE id = %s AND status = 'provisioning'
-        """,
-        (state["agent_record_id"],),
-    )
-
+    # Signer approved. The agent is provisioned — now it's the user's turn to
+    # fund the Arbitrum wallet. Return completed so DeployLiveModal advances
+    # to the Funding stage; HL setup + API-wallet authorization happen inside
+    # /check-deposit once bridging has credited the HL unified account.
     return {
         "status": "completed",
         "config_id": state["new_config_id"],
         "agent_wallet_address": state["agent_wallet_address"],
-        "api_wallet_address": state.get("api_wallet_address"),
         "agent_name": state["agent_name"],
     }
 
@@ -615,7 +581,7 @@ async def arena_v2_status(
     """
     Current state of a virtuals bot — used by DeployLiveModal + ActivationBar.
 
-    Returns agent details, Arbitrum wallet balance, and HL account/positions
+    Returns agent details, Base wallet USDC balance, and HL account/positions
     via hyperliquid Info API. Safe to poll.
     """
     if not await _verify_ownership(config_id, current_user.user_id):
@@ -627,7 +593,7 @@ async def arena_v2_status(
 
     wallet = creds["agent_wallet_address"]
 
-    arbitrum_balance = await get_usdc_balance(wallet)
+    base_balance = await get_base_usdc_balance(wallet)
 
     # HL account state (reuse the info-only path to avoid touching the exchange).
     hl_account_value = None
@@ -667,7 +633,7 @@ async def arena_v2_status(
         "agent_name": creds["agent_name"],
         "agent_wallet_address": wallet,
         "virtuals_agent_id": creds["virtuals_agent_id"],
-        "arbitrum_usdc_balance": arbitrum_balance,
+        "base_usdc_balance": base_balance,
         "hl_account_value": hl_account_value,
         "hl_withdrawable": hl_withdrawable,
         "hl_positions": hl_positions,
@@ -678,6 +644,28 @@ async def arena_v2_status(
 
 class CheckDepositRequest(BaseModel):
     config_id: str
+    amount: float              # USDC to deposit; must be >= DEPOSIT_MIN_USDC
+
+
+def _extract_forum_thread_id(deliverable: Any) -> Optional[str]:
+    """
+    DGClaw's deliverable schemas aren't documented — check several plausible
+    field names + nested locations. Returns None if nothing matches.
+    """
+    if not isinstance(deliverable, dict):
+        return None
+    for key in ("forumThreadId", "forum_thread_id", "threadId", "thread_id"):
+        v = deliverable.get(key)
+        if v:
+            return str(v)
+    # Some providers nest under e.g. "metadata" or "data"
+    for outer in ("metadata", "data", "details"):
+        inner = deliverable.get(outer)
+        if isinstance(inner, dict):
+            nested = _extract_forum_thread_id(inner)
+            if nested:
+                return nested
+    return None
 
 
 @router.post("/check-deposit")
@@ -686,8 +674,11 @@ async def check_deposit(
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ) -> Dict[str, Any]:
     """
-    Check Arbitrum USDC balance, bridge to HL, and (first time) join the
-    DGClaw leaderboard. Keeps ACP_FEE_RESERVE on Arbitrum for ACP jobs.
+    Deposit USDC from the agent's Base wallet into its Hyperliquid account via
+    an ACP `perp_deposit` buyer job against DGClaw. On first deposit also runs
+    the HL setup actions (unified account + API wallet auth) and fire-forgets
+    the leaderboard-join ACP job. Persists any returned forum thread id for
+    the orchestrator forum-post hook.
     """
     if not await _verify_ownership(body.config_id, current_user.user_id):
         raise HTTPException(404, "Bot not found")
@@ -695,24 +686,37 @@ async def check_deposit(
     creds = await get_arena_v2_credential(body.config_id)
     if not creds:
         raise HTTPException(404, "No virtuals agent deployed for this config")
-    if not creds.get("hl_api_wallet_key"):
-        raise HTTPException(400, "HL API wallet not yet authorized")
+
+    # ------------------------------------------------------------------
+    # 1. Validate the requested deposit amount against minimum + balance
+    # ------------------------------------------------------------------
+    if body.amount < DEPOSIT_MIN_USDC:
+        return {
+            "status": "amount_too_low",
+            "minimum": DEPOSIT_MIN_USDC,
+            "requested": body.amount,
+            "message": f"Minimum deposit is ${DEPOSIT_MIN_USDC:.0f} USDC.",
+        }
 
     wallet = creds["agent_wallet_address"]
-    balance = await get_usdc_balance(wallet)
+    balance = await get_base_usdc_balance(wallet)
     if balance is None:
         return {
             "status": "rpc_error",
-            "message": "Could not read Arbitrum USDC balance — try again shortly.",
+            "message": "Could not read Base USDC balance — try again shortly.",
         }
-    if balance < HL_BRIDGE_MIN_USDC:
+
+    max_depositable = round(balance - ACP_FEE_RESERVE, 2)
+    if body.amount > max_depositable:
         return {
             "status": "insufficient",
             "balance": balance,
-            "minimum": HL_BRIDGE_MIN_USDC,
+            "requested": body.amount,
+            "reserve": ACP_FEE_RESERVE,
+            "max_depositable": max_depositable,
             "message": (
-                f"Balance ${balance:.2f} is below the ${HL_BRIDGE_MIN_USDC:.0f} "
-                f"HL bridge minimum. Send USDC on Arbitrum to {wallet}."
+                f"Balance ${balance:.2f} — after ${ACP_FEE_RESERVE:.2f} ACP-fee reserve, "
+                f"max depositable is ${max_depositable:.2f}. Send more USDC to {wallet} on Base."
             ),
         }
 
@@ -722,34 +726,133 @@ async def check_deposit(
         "signerPrivateKey": creds["signer_private_key"],
     }
 
-    # Reserve ACP_FEE_RESERVE for join-leaderboard and future ACP jobs
-    reserve = ACP_FEE_RESERVE if balance > HL_BRIDGE_MIN_USDC + ACP_FEE_RESERVE else 0.1
-    bridge_amount = round(balance - reserve, 2)
-    bridge_resp = await acp_node_post(
-        "/bridge-usdc-to-hl",
-        {**sidecar_base, "amountUsdc": f"{bridge_amount:.2f}"},
-        timeout_seconds=120,
+    # ------------------------------------------------------------------
+    # 2. Fire the ACP `perp_deposit` job against DGClaw (AWAITED — critical path).
+    #    DGClaw's provider internally bridges Base → Arbitrum → HL.
+    #    SLA is ~30min; we give the sidecar 1850s (30min + ~50s slack).
+    # ------------------------------------------------------------------
+    logger.info(
+        f"arena_v2 check-deposit: firing perp_deposit ${body.amount:.2f} "
+        f"agent={creds['virtuals_agent_id']} wallet={wallet[:10]}"
     )
-    if bridge_resp.get("_httpStatus") != 200 or not bridge_resp.get("success"):
-        logger.warning(f"arena_v2 check-deposit: bridge failed {bridge_resp}")
+    deposit_resp = await acp_node_post(
+        "/deposit",
+        {**sidecar_base, "amountUsdc": f"{body.amount:.2f}"},
+        timeout_seconds=1850,
+    )
+    if deposit_resp.get("_httpStatus") != 200 or not deposit_resp.get("success"):
+        logger.warning(f"arena_v2 check-deposit: deposit failed {deposit_resp}")
         return {
-            "status": "bridge_failed",
-            "balance": balance,
-            "detail": bridge_resp,
+            "status": "deposit_failed",
+            "requested": body.amount,
+            "detail": deposit_resp,
         }
 
-    tx_hash = bridge_resp.get("txHash")
+    job_id = deposit_resp.get("jobId")
+    deliverable = deposit_resp.get("deliverable")
     logger.info(
-        f"arena_v2 check-deposit: bridged ${bridge_amount:.2f} agent={wallet[:10]} tx={tx_hash}"
+        f"arena_v2 check-deposit: perp_deposit job {job_id} complete — "
+        f"deliverable={deliverable}"
     )
 
-    # First-time leaderboard registration (only if not yet joined).
-    # Deliberately fire-and-forget so a slow ACP job doesn't block the user —
-    # the status endpoint will surface leaderboard_joined once complete.
+    # Best-effort forum thread id extraction from the deposit deliverable.
+    forum_thread_id = _extract_forum_thread_id(deliverable)
+    if forum_thread_id:
+        await store_arena_v2_forum_thread_id(creds["agent_record_id"], forum_thread_id)
+        logger.info(
+            f"arena_v2 check-deposit: captured forum thread {forum_thread_id} from perp_deposit"
+        )
+
+    # ------------------------------------------------------------------
+    # 3. First-time only: run HL setup actions that require a funded HL account.
+    #    HL rejects userSetAbstraction / approveAgent on empty accounts, so we
+    #    had to wait for the perp_deposit bridge to credit the HL unified account.
+    # ------------------------------------------------------------------
+    hl_setup_result: Dict[str, Any] = {}
+    if not creds.get("hl_api_wallet_key"):
+        # Short pause so HL indexes the bridge deposit before we sign.
+        import asyncio as _asyncio
+        await _asyncio.sleep(10)
+
+        logger.info(
+            f"arena_v2 check-deposit: activating HL unified account "
+            f"agent={creds['virtuals_agent_id']}"
+        )
+        unified = await acp_node_post(
+            "/setup-hl-unified-account", sidecar_base, timeout_seconds=60
+        )
+        if unified.get("_httpStatus") != 200 or not unified.get("success"):
+            logger.warning(f"arena_v2 check-deposit: unified-account failed {unified}")
+            return {
+                "status": "deposited_but_hl_setup_failed",
+                "stage": "unified_account",
+                "requested": body.amount,
+                "detail": unified,
+                "hint": "HL may not have indexed the deposit yet — retry in ~30s.",
+            }
+
+        logger.info(
+            f"arena_v2 check-deposit: authorizing HL API wallet "
+            f"agent={creds['virtuals_agent_id']}"
+        )
+        authz = await acp_node_post(
+            "/authorize-hl-api-wallet",
+            {**sidecar_base, "agentName": creds["agent_name"][:40]},
+            timeout_seconds=60,
+        )
+        if authz.get("_httpStatus") != 200 or not authz.get("success"):
+            logger.warning(f"arena_v2 check-deposit: authorize-api-wallet failed {authz}")
+            return {
+                "status": "deposited_but_hl_setup_failed",
+                "stage": "authorize_api_wallet",
+                "requested": body.amount,
+                "detail": authz,
+            }
+
+        api_wallet_key = authz.get("apiWalletPrivateKey")
+        if not api_wallet_key:
+            return {
+                "status": "deposited_but_hl_setup_failed",
+                "stage": "authorize_api_wallet",
+                "reason": "sidecar returned success but no apiWalletPrivateKey",
+            }
+        hl_vault_id = await store_arena_v2_hl_api_wallet(
+            creds["agent_record_id"], api_wallet_key
+        )
+        if not hl_vault_id:
+            return {
+                "status": "deposited_but_hl_setup_failed",
+                "stage": "authorize_api_wallet",
+                "reason": "vault write failed for HL API wallet key",
+            }
+
+        await db_execute(
+            """
+            UPDATE arena_agents_v2
+            SET status = 'active', updated_at = NOW()
+            WHERE id = %s AND status = 'provisioning'
+            """,
+            (creds["agent_record_id"],),
+        )
+        hl_setup_result = {
+            "unified_activated": True,
+            "api_wallet_address": authz.get("apiWalletAddress"),
+        }
+        logger.info(
+            f"arena_v2 check-deposit: HL setup complete, agent ACTIVE "
+            f"record={creds['agent_record_id'][:8]}"
+        )
+
+    # ------------------------------------------------------------------
+    # 4. First-time leaderboard join (only if not yet joined).
+    #    Awaited (not fire-forget) so we can also extract a forum thread id
+    #    from its deliverable as a fallback — AI Council forum-post hook
+    #    depends on having the thread id persisted somewhere.
+    # ------------------------------------------------------------------
     leaderboard_result: Optional[Dict[str, Any]] = None
     if not creds.get("dgclaw_api_key"):
         leaderboard_resp = await acp_node_post(
-            "/join-leaderboard", sidecar_base, timeout_seconds=180
+            "/join-leaderboard", sidecar_base, timeout_seconds=240
         )
         if leaderboard_resp.get("_httpStatus") == 200 and leaderboard_resp.get("success"):
             api_key = leaderboard_resp.get("dgclawApiKey")
@@ -759,17 +862,37 @@ async def check_deposit(
                     f"arena_v2 check-deposit: leaderboard joined agent={creds['virtuals_agent_id']}"
                 )
             leaderboard_result = {"joined": bool(api_key)}
+
+            # Fallback forum thread id extraction if perp_deposit didn't carry it.
+            if not forum_thread_id:
+                # join-leaderboard route returns parsed deliverable at a few possible keys
+                candidate = (
+                    leaderboard_resp.get("deliverable")
+                    or leaderboard_resp.get("deliverableParsed")
+                )
+                fallback_thread_id = _extract_forum_thread_id(candidate)
+                if fallback_thread_id:
+                    await store_arena_v2_forum_thread_id(
+                        creds["agent_record_id"], fallback_thread_id
+                    )
+                    forum_thread_id = fallback_thread_id
+                    logger.info(
+                        f"arena_v2 check-deposit: captured forum thread {forum_thread_id} "
+                        f"from join_leaderboard"
+                    )
         else:
             leaderboard_result = {"joined": False, "detail": leaderboard_resp}
             logger.warning(f"arena_v2 check-deposit: leaderboard join failed {leaderboard_resp}")
 
     return {
-        "status": "bridged",
+        "status": "deposited",
+        "amount": body.amount,
         "balance_before": balance,
-        "bridge_amount": bridge_amount,
-        "reserve_kept": reserve,
-        "tx_hash": tx_hash,
+        "reserve_kept": ACP_FEE_RESERVE,
+        "deposit_job_id": job_id,
+        "hl_setup": hl_setup_result,
         "leaderboard": leaderboard_result,
+        "forum_thread_id": forum_thread_id,
     }
 
 

@@ -2,6 +2,8 @@
 
 Thin TypeScript PM2 sidecar for ACP v2 operations that can't run from Python: Privy-wallet EIP-712 signing for Hyperliquid setup actions.
 
+> ⚠️ **2026-04-24**: this sidecar is **mid-pivot**. Some routes here are dead architecture (see "Dead routes" below). Read [DOCS/todo/ACP_V2_SESSION_HANDOFF.md](../DOCS/todo/ACP_V2_SESSION_HANDOFF.md) before making changes.
+
 ## Why this exists
 
 Virtuals v2 provisions agents with Privy-backed smart wallets. To trade on Hyperliquid the agent must:
@@ -35,7 +37,7 @@ Signs `userSetAbstraction` typed data via Privy, POSTs to HL. Ports `dgclaw-skil
 {
   "agentWalletAddress": "0x…",
   "agentWalletId": "privy-wallet-id-from-acp-agents-response",
-  "signerPrivateKey": "base64-PEM-encoded P-256 private key"
+  "signerPrivateKey": "base64(PKCS8-DER) P-256 private key — NOT base64(PEM)! Privy rejects PEM-with-headers. TS fallback will strip legacy PEM frames."
 }
 ```
 
@@ -63,13 +65,23 @@ Signs `withdraw3` typed data via Privy, POSTs to HL. Destination defaults to the
 ### `GET /health`
 Returns `{ status, service, version }`. No auth required.
 
-## Not yet implemented (roadmap)
+## Dead routes (remove in next pivot)
 
-These are required for complete DGClaw parity per `dgclaw-skill/SKILL.md`, but not blockers for MVP Deploy Live Version:
+### `POST /bridge-usdc-to-hl` — DO NOT USE
+**Architecture was wrong.** Attempted to push USDC from the agent's Privy smart wallet on Arbitrum to HL's bridge contract via `adapter.sendCalls(42161, ...)`. Virtuals' Alchemy paymaster policy is **Base-only** — the call returns HTTP 400 from `api.acp.virtuals.io/wallets/alchemy-rpc` for any non-Base chainId.
 
-- `POST /bridge-usdc-to-hl` — Arbitrum USDC → HL deposit. For MVP, users deposit USDC directly to their agent's wallet **on Arbitrum** (not Base) and then send to HL's bridge contract `0x2df1c51e09aecf9cacb7bc98cb1742757f163df7`. Full automation (signing an `adapter.sendTransaction()` with the USDC transfer calldata) comes in a follow-up.
-- `POST /join-leaderboard` — ACP v2 buyer-side job flow against DegenClaw agent (wallet `0xd478a8B40372db16cA8045F28C6FE07228F3781A`, offering `join_leaderboard`, $0.01 fee). Requires `AcpAgent` class setup, not just the provider adapter. **May be optional** — the AI Council reads all HL trades; need to verify whether explicit leaderboard registration is required.
-- `POST /forum-post` — `degen.virtuals.io` forum posts for AI Council visibility. Deferred.
+Correct architecture (per `dgclaw-skill/SKILL.md` Step 2): deposits are **ACP buyer jobs** against the DGClaw provider agent with offering `perp_deposit`. DGClaw's backend bridges Base → Arbitrum → HL internally. User sends USDC to agent wallet on **Base**, then backend creates + funds an ACP job.
+
+Next session should:
+1. Delete `src/routes/bridge-usdc-to-hl.ts`
+2. Replace with `src/routes/deposit-to-dgclaw.ts` using `AcpAgent.createJobByOfferingName` with `perp_deposit` (possibly needs v1 SDK since DGClaw is still ACP v1 — see handoff doc)
+3. Remove the `crypto` polyfill from `src/index.ts` (only needed for `sendCalls`)
+4. Remove `chains: [arbitrum]` handling in `src/lib/privy-sign.ts` `getEvmAdapter`
+
+## Untested routes (may also need v1 SDK)
+
+- `POST /join-leaderboard` — ACP buyer-side job flow against DegenClaw agent with offering `join_leaderboard`, $0.01 fee. **Built but not end-to-end tested**; DGClaw is a v1 provider agent and our SDK is v2 — interop unverified.
+- `POST /forum-post` — `degen.virtuals.io` forum posts for AI Council visibility. Auth scheme (JWT vs ACP-signed) not verified against live endpoint.
 
 ## Dev
 

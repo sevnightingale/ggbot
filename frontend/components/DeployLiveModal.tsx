@@ -27,7 +27,8 @@ interface DeployLiveModalProps {
 type Stage = 'connect' | 'setup' | 'deploying' | 'funding' | 'manage'
 
 const POLL_MS = 3000
-const MIN_HL_BRIDGE = 5
+const MIN_DEPOSIT = 10
+const DEFAULT_DEPOSIT = '25'
 
 export function DeployLiveModal({
   open,
@@ -48,6 +49,7 @@ export function DeployLiveModal({
     Awaited<ReturnType<typeof apiClient.arenaV2Status>> | null
   >(null)
   const [depositBusy, setDepositBusy] = useState(false)
+  const [depositAmount, setDepositAmount] = useState(DEFAULT_DEPOSIT)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawDest, setWithdrawDest] = useState('')
   const [withdrawBusy, setWithdrawBusy] = useState(false)
@@ -201,20 +203,35 @@ export function DeployLiveModal({
 
   const checkDeposit = async () => {
     if (!activeConfigId) return
+    const amt = parseFloat(depositAmount)
+    if (!isFinite(amt) || amt < MIN_DEPOSIT) {
+      setError(`Enter a deposit amount of at least $${MIN_DEPOSIT}.`)
+      return
+    }
     setDepositBusy(true)
     setError(null)
     try {
-      const result = await apiClient.arenaV2CheckDeposit(activeConfigId)
-      if (result.status === 'bridged') {
+      const result = await apiClient.arenaV2CheckDeposit(activeConfigId, amt)
+      if (result.status === 'deposited') {
         // Force an immediate status refresh
         const s = await apiClient.arenaV2Status(activeConfigId)
         setStatus(s)
+      } else if (result.status === 'amount_too_low') {
+        setError(result.message ?? `Minimum deposit is $${MIN_DEPOSIT}`)
       } else if (result.status === 'insufficient') {
-        setError(result.message ?? `Need at least $${MIN_HL_BRIDGE} USDC on Arbitrum`)
-      } else if (result.status === 'bridge_failed') {
-        setError(`Bridge failed: ${JSON.stringify(result.detail)}`)
+        setError(result.message ?? 'Not enough USDC on Base. Send more to the agent wallet.')
+      } else if (result.status === 'deposit_failed') {
+        setError(`Deposit failed: ${JSON.stringify(result.detail ?? {})}`)
+      } else if (result.status === 'deposited_but_hl_setup_failed') {
+        setError(
+          `Deposit went through, but HL setup at stage=${result.stage} failed. ${
+            result.hint ?? 'Retry in ~30s.'
+          }`,
+        )
+      } else if (result.status === 'rpc_error') {
+        setError(result.message ?? 'Could not read Base USDC balance — try again shortly.')
       } else {
-        setError('Could not read Arbitrum balance — try again shortly.')
+        setError(`Unknown status: ${result.status}`)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'check-deposit failed')
@@ -313,14 +330,21 @@ export function DeployLiveModal({
 
   const renderFundingStage = () => {
     const wallet = status?.agent_wallet_address
-    const arbBal = status?.arbitrum_usdc_balance ?? null
+    const baseBal = status?.base_usdc_balance ?? null
     const hlBal = status?.hl_account_value ?? null
+    const parsedAmount = parseFloat(depositAmount)
+    const amountValid = isFinite(parsedAmount) && parsedAmount >= MIN_DEPOSIT
+    const maxDepositable = baseBal === null ? null : Math.max(0, baseBal - 1)
+    const amountFitsBalance =
+      amountValid && maxDepositable !== null && parsedAmount <= maxDepositable
+    const canDeposit =
+      !depositBusy && baseBal !== null && baseBal >= MIN_DEPOSIT + 1 && amountFitsBalance
     return (
       <div className="space-y-4">
         <div className="p-3 rounded border border-[var(--border)] bg-[var(--bg-secondary)]">
           <div className="flex items-center gap-2 mb-2">
             <Wallet className="h-4 w-4 text-[var(--accent)]" />
-            <span className="text-sm font-medium">Agent Wallet (Arbitrum)</span>
+            <span className="text-sm font-medium">Agent Wallet (Base)</span>
           </div>
           <div className="flex items-center gap-2">
             <code className="text-xs break-all px-2 py-1 rounded bg-[var(--bg-primary)] flex-1">
@@ -331,16 +355,17 @@ export function DeployLiveModal({
             </button>
           </div>
           <p className="mt-2 text-xs text-[var(--text-muted)]">
-            Send <strong>USDC on Arbitrum</strong> (native USDC, not USDC.e). Minimum
-            ${MIN_HL_BRIDGE} — we keep $1 in the wallet for ACP fees.
+            Send <strong>USDC on Base</strong> (native Base USDC). Minimum ${MIN_DEPOSIT}
+            — we keep $1 in the wallet for ACP fees.{' '}
+            <strong>Do NOT send from Arbitrum or Ethereum mainnet — funds will be lost.</strong>
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="p-3 rounded border border-[var(--border)] bg-[var(--bg-secondary)]">
-            <div className="text-xs text-[var(--text-muted)]">Arbitrum USDC</div>
+            <div className="text-xs text-[var(--text-muted)]">Base USDC</div>
             <div className="text-lg font-mono mt-1">
-              {arbBal === null ? '—' : `$${arbBal.toFixed(2)}`}
+              {baseBal === null ? '—' : `$${baseBal.toFixed(2)}`}
             </div>
           </div>
           <div className="p-3 rounded border border-[var(--border)] bg-[var(--bg-secondary)]">
@@ -351,12 +376,42 @@ export function DeployLiveModal({
           </div>
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+            Deposit Amount (USDC)
+          </label>
+          <input
+            type="number"
+            min={MIN_DEPOSIT}
+            step={1}
+            placeholder={`Min $${MIN_DEPOSIT}`}
+            value={depositAmount}
+            onChange={(e) => setDepositAmount(e.target.value)}
+            className="px-3 py-2 rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-sm"
+          />
+          {maxDepositable !== null && (
+            <p className="text-xs text-[var(--text-muted)]">
+              Max depositable (after $1 ACP-fee reserve): ${maxDepositable.toFixed(2)}
+            </p>
+          )}
+        </div>
+
         <button
           onClick={checkDeposit}
-          disabled={depositBusy || !arbBal || arbBal < MIN_HL_BRIDGE}
+          disabled={!canDeposit}
           className="w-full px-4 py-2 rounded bg-[var(--accent)] text-white font-medium disabled:opacity-50"
         >
-          {depositBusy ? 'Bridging…' : arbBal && arbBal >= MIN_HL_BRIDGE ? 'Bridge to Hyperliquid' : 'Awaiting deposit…'}
+          {depositBusy
+            ? 'Depositing… (~2–5 min via DGClaw)'
+            : baseBal === null
+            ? 'Awaiting balance…'
+            : baseBal < MIN_DEPOSIT + 1
+            ? 'Awaiting deposit…'
+            : !amountValid
+            ? `Enter at least $${MIN_DEPOSIT}`
+            : !amountFitsBalance
+            ? 'Amount exceeds available balance'
+            : 'Deposit to Hyperliquid'}
         </button>
 
         {status?.leaderboard_joined && (

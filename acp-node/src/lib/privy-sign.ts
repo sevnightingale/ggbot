@@ -34,9 +34,21 @@ export interface SignTypedDataRequest {
 }
 
 function decodeSignerKey(b64: string): string {
-  // Our Python backend stores the private key as base64(PEM). Decode to raw PEM
-  // string since that's what @privy-io/node's generateAuthorizationSignature expects.
-  return Buffer.from(b64, 'base64').toString('utf-8')
+  // Privy's generateAuthorizationSignature expects base64(PKCS8-DER) with no
+  // PEM headers (see @privy-io/node/src/lib/cryptography.ts::importPKCS8PrivateKey).
+  //
+  // Modern Python code (post-bugfix) stores exactly that — pass through.
+  // Legacy rows may have base64(PEM) stored (the value decodes to "-----BEGIN
+  // PRIVATE KEY-----..."). In that case, strip the PEM frame to recover the
+  // inner base64(DER) body.
+  const decoded = Buffer.from(b64, 'base64').toString('utf-8')
+  if (decoded.includes('-----BEGIN')) {
+    return decoded
+      .replace(/-----BEGIN [^-]+-----/g, '')
+      .replace(/-----END [^-]+-----/g, '')
+      .replace(/\s+/g, '')
+  }
+  return b64
 }
 
 export async function signTypedDataWithPrivy(req: SignTypedDataRequest): Promise<string> {

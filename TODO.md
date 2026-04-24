@@ -4,11 +4,30 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 ---
 
-## 🚀 **ACP v2 Migration + Live Trading Unification** [ACP_V2_MIGRATION.md]
+## 🚀 **ACP v2 Migration + Live Trading Unification**
 
-**Status**: 🟡 IN PROGRESS — Phase 0 scaffolding shipped (2026-04-22). Gate run pending.
-**Planning Doc**: [DOCS/todo/ACP_V2_MIGRATION.md](DOCS/todo/ACP_V2_MIGRATION.md)
+**Status**: 🔴 **MID-PIVOT — DO NOT CONTINUE BUILDING WITHOUT READING HANDOFF DOC**
+**Primary Handoff Doc (READ FIRST)**: [DOCS/todo/ACP_V2_SESSION_HANDOFF.md](DOCS/todo/ACP_V2_SESSION_HANDOFF.md)
+**Original Plan**: [DOCS/todo/ACP_V2_MIGRATION.md](DOCS/todo/ACP_V2_MIGRATION.md) (partially superseded)
 **Execution Plan**: `/home/sev/.claude/plans/acp-v2-migration-foamy-bunny.md`
+
+### 2026-04-24 Critical findings from ~11hr session
+1. **Deposits are ACP `perp_deposit` buyer jobs**, not on-chain bridges. DGClaw handles Base→Arbitrum→HL internally.
+2. **DGClaw provider agent is ACP v1** (`--legacy` flag). v2 SDK ↔ v1 provider interop unverified.
+3. **User USDC must land on Base chain**, not Arbitrum. Agent wallets are Base-native; Virtuals' paymaster is Base-only.
+4. **`/bridge-usdc-to-hl` sidecar route = dead architecture.** The whole Arbitrum `sendCalls` path should be deleted.
+5. **Phase 2 lite-agent-pool path already works** (arena_agents table, claw_api.py, api/virtuals_arena.py). Was shipped before this migration — proven alternative.
+6. **Three forks in the road** (A/B/C in handoff doc) — no code until user picks.
+
+### Uncommitted local mid-pivot edits on main — do not commit as-is
+- `api/arena_v2.py`, `api/acp_v2_test.py`, `core/auth/vault_utils.py`, `acp-node/src/index.ts`, `acp-node/src/lib/privy-sign.ts`
+- Contains: diagnostic wrappers, Node 18 crypto polyfill, dead bridge route, step logging, status-agnostic credential fetch
+- New migration file (applied to DB): `database/migrations/extend_valid_trading_mode_virtuals.sql`
+- Orphan stuck `arena_agents_v2` row (status=provisioning) and its duplicated config — cleanup required before retest
+- Small amount of USDC stranded on Arbitrum at the agent's counterfactual wallet — Virtuals paymaster is Base-only so it can't be moved from there
+- Primary Virtuals account has 10 hidden-but-undeleted agents (Virtuals DELETE API missing — needs their manual intervention)
+
+---
 
 Introduce `trading_mode='virtuals'` as the canonical live-trading path (replaces the v1 "mirror" architecture entirely — no ACP job queue, no parallel execution). Virtuals agents trade directly on Hyperliquid via their Privy-provisioned wallet; DGClaw is a leaderboard overlay reading HL state by wallet address. "Deploy Live Version" reuses the existing arena button/modal (no new nav). Legacy `trading_mode='hyperliquid'` kept as non-custodial fallback (1 bot/user, unchanged). Custodial-but-revocable signer — users revoke via Virtuals dashboard anytime.
 
@@ -42,26 +61,36 @@ Introduce `trading_mode='virtuals'` as the canonical live-trading path (replaces
 - [x] `frontend/lib/api.ts:104` — `trading_mode` union adds `'virtuals'`
 - [x] `frontend/components/RiskAcknowledgmentModal.tsx:17` — prop type widened (caught by tsc)
 
-### Phase 1: Backend Foundations + acp-node Sidecar (IN PROGRESS)
+### Phase 1: Backend Foundations + acp-node Sidecar (MID-PIVOT)
 
-**Python backend** (not started):
-- [ ] `database/migrations/add_arena_agents_v2.sql` — new table (3 Vault IDs, unique partial index on `config_id WHERE status='active'`)
-- [ ] `api/arena_v2.py` — NEW: connect-start, connect-poll, deploy-live, deploy-poll; `deploy-live` orchestrates: agent create → signer popup → [await approve] → `acp-node /setup-hl-unified-account` → `acp-node /authorize-hl-api-wallet` → Vault stores all creds → returns agent_wallet_address for funding step
-- [ ] `api/virtuals_arena.py` — MODIFIED: rewire status/check-deposit/withdraw to read `arena_agents_v2`; deprecate `/join`
-- [ ] `core/auth/vault_utils.py` — `store_arena_v2_credential` / `get_arena_v2_credential` / `resolve_hl_credentials` helper
+**Python backend** (built but uncommitted + mid-pivot):
+- [x] `database/migrations/add_arena_agents_v2.sql` — shipped, applied
+- [x] `database/migrations/extend_valid_trading_mode_virtuals.sql` — NEW, APPLIED, **not yet committed to git**
+- [~] `api/arena_v2.py` — built, has uncommitted mid-pivot edits (config_service refactor, step logging, traceback wrapper, deploy-poll minimized, check-deposit has HL setup block that needs rework because bridge approach is dead)
+- [x] `core/auth/vault_utils.py` — `create_vault_secret` / `get_vault_secret` / `store_arena_v2_*` / `get_arena_v2_credential` (now status-agnostic) / `resolve_hl_credentials` helper (now status-aware)
 
-**acp-node sidecar** (scaffolding + 3 routes shipped, commit `011dbee`):
-- [x] `acp-node/package.json` — deps: `@privy-io/node`, `@virtuals-protocol/acp-node-v2`, `viem`, `fastify`, `tsx`
-- [x] `acp-node/src/index.ts` — Fastify server, shared-secret `X-Service-Auth` guard, `/health` endpoint
-- [x] `acp-node/src/lib/privy-sign.ts` — wraps `PrivyAlchemyEvmProviderAdapter.create({walletAddress, walletId, signerPrivateKey, privyAppId})` + `adapter.signTypedData(chainId, typedData)`. Base64-PEM signer key decoded before use.
-- [x] `acp-node/src/routes/setup-hl-unified.ts` — port of `dgclaw-skill/scripts/activate-unified.ts`
-- [x] `acp-node/src/routes/authorize-hl-api-wallet.ts` — port of `add-api-wallet.ts`
-- [x] `acp-node/src/routes/withdraw-from-hl.ts` — HL `withdraw3` action (for Manage Live Bot modal)
-- [x] `ecosystem.config.js` — `acp-node` PM2 entry alongside existing services
-- [ ] `acp-node/src/routes/bridge-usdc-to-hl.ts` — NEW: `adapter.sendTransaction(chainId, USDC.transfer(HL_BRIDGE, amount))`. Arbitrum-direct path; avoids DGClaw's `perp_deposit` ACP job for MVP.
-- [ ] `acp-node/src/routes/forum-post.ts` — NEW: `POST https://degen.virtuals.io/api/forums/:agentId/threads/:threadId/posts` with markdown body. Auth mechanism (JWT vs ACP-signed) needs verification.
-- [ ] `acp-node/src/routes/join-leaderboard.ts` — NEW: ACP v2 buyer-side job flow targeting DegenClaw agent (`0xd478a8B40372db16cA8045F28C6FE07228F3781A`, offering `join_leaderboard`, $0.01 USDC fee). Uses `AcpAgent` class from SDK, not just the provider adapter. **Verify whether actually required** — AI Council reads on-chain HL fills regardless.
-- [ ] Python backend env keys: `ACP_NODE_URL`, `ACP_NODE_SHARED_SECRET`, `PRIVY_APP_SECRET` (sidecar already has PRIVY_APP_ID baked into SDK)
+**acp-node sidecar** (6 routes built, 1 is dead):
+- [x] `acp-node/package.json` — deps + node_modules installed + `crypto` polyfill in `src/index.ts` (Node 18 compat; DELETE after Node 22 upgrade)
+- [x] `acp-node/src/lib/privy-sign.ts` — Privy EIP-712 wrapper. **P-256 key format fix**: must be base64(DER), not base64(PEM). Includes PEM→DER TS fallback for legacy rows.
+- [x] `acp-node/src/routes/setup-hl-unified.ts` — solid, works
+- [x] `acp-node/src/routes/authorize-hl-api-wallet.ts` — solid, works
+- [x] `acp-node/src/routes/withdraw-from-hl.ts` — untested but correct port
+- [❌] `acp-node/src/routes/bridge-usdc-to-hl.ts` — **DEAD ARCHITECTURE.** Virtuals' paymaster is Base-only; cannot sendCalls on Arbitrum. **Delete this file.** Replace with ACP `perp_deposit` job via SDK if continuing Option A.
+- [?] `acp-node/src/routes/join-leaderboard.ts` — built but untested; DGClaw is v1 provider so v2 SDK compat unclear
+- [?] `acp-node/src/routes/forum-post.ts` — built but untested; auth scheme unverified
+
+**Frontend** (Phase 3 UX shipped earlier, now in awkward state):
+- [x] `DeployLiveModal.tsx` — 4-stage UX (connect, setup, deploying, funding, manage). Funding state still references Arbitrum (wrong).
+- [x] `VirtualsConnectButton.tsx` — popup 1 handler, works
+- [x] `SettingsModal` — "Connect Virtuals" subsection above Hyperliquid, works
+- [x] `ActivationBar` — tri-state button, works
+- [x] `BotRail` — "Hyperliquid ggbot" label + LIVE badge for virtuals rows in paper list
+- [x] `BotManagementMenu` — "Deploy Live Version" replaces "Promote to Live"
+- [x] `api.ts` — 10 new arenaV2* methods
+
+**Env config** (done):
+- [x] `ACP_NODE_URL=http://127.0.0.1:3101`, `ACP_NODE_SHARED_SECRET` (both .envs)
+- [x] `PRIVY_APP_ID` default from SDK
 
 ### Phase 2 + Phase 3: Atomic Release (service refactor + UX cutover)
 Backend (Phase 2):

@@ -277,6 +277,11 @@ module.exports = {
       max_memory_restart: '300M',
       env: {
         NODE_ENV: 'production',
+        // Pin Node 22 bin at the front of PATH so tsx's `#!/usr/bin/env node`
+        // shebang always resolves to Node 22 (not the system /usr/bin/node which
+        // may still be Node 18). Defensive against PM2 resurrect using a stale
+        // dump.pm2 env, or systemd-launched daemon missing nvm init.
+        PATH: '/home/sev/.nvm/versions/node/v22.22.2/bin:' + (process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'),
         ACP_NODE_PORT: process.env.ACP_NODE_PORT || '3101',
         ACP_NODE_SHARED_SECRET: process.env.ACP_NODE_SHARED_SECRET,
         PRIVY_APP_ID: process.env.PRIVY_APP_ID || 'cltsev9j90f67yhyw4sngtrpv',
