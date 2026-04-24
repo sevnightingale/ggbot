@@ -565,6 +565,18 @@ export class ApiClient {
     }>
     hl_api_wallet_authorized?: boolean
     leaderboard_joined?: boolean
+    dgclaw_balance?: number | null
+    deposit_progress?: {
+      stage: 'starting' | 'depositing' | 'hl_setup' | 'leaderboard' | 'complete' | 'failed'
+      message: string
+      updated_at: number
+      amount?: number
+      stage_failed?: string
+      sub_stage?: string
+      hint?: string
+      detail?: unknown
+      error?: string
+    } | null
   }> {
     const res = await this.authenticatedFetch(
       `${this.baseUrl}/api/v2/arena/status?config_id=${encodeURIComponent(configId)}`,
@@ -575,28 +587,23 @@ export class ApiClient {
 
   async arenaV2CheckDeposit(configId: string, amount: number): Promise<{
     status:
-      | 'deposited'
+      | 'in_progress'
+      | 'already_in_progress'
+      | 'already_complete'
       | 'amount_too_low'
       | 'insufficient'
-      | 'deposit_failed'
-      | 'deposited_but_hl_setup_failed'
       | 'rpc_error'
+    stage?: string
+    current_stage?: string
+    current_message?: string
     balance?: number
-    balance_before?: number
     requested?: number
-    amount?: number
     minimum?: number
     reserve?: number
     max_depositable?: number
-    reserve_kept?: number
-    deposit_job_id?: string
+    dgclaw_balance?: number
+    skipping_deposit?: boolean
     message?: string
-    hl_setup?: { unified_activated?: boolean; api_wallet_address?: string } | null
-    leaderboard?: { joined: boolean; detail?: unknown } | null
-    forum_thread_id?: string | null
-    stage?: string
-    hint?: string
-    detail?: unknown
   }> {
     const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/check-deposit`, {
       method: 'POST',

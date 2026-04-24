@@ -1,37 +1,60 @@
-// Deposit USDC into the agent's Hyperliquid account via ACP `perp_deposit`
-// buyer job against DGClaw's v1 provider agent.
+// Deposit USDC into the agent's Hyperliquid account via ACP `perp_deposit`.
+//
+// DGClaw is an ACP v1 provider, so we use the official v2-to-v1 compat layer
+// (LegacyBuyerAdapter) — same pattern @Virtual-Protocol/acp-cli uses when
+// invoked with `--legacy`. Our v2 Privy provider adapter is reused for signing;
+// the legacy bridge routes the signed calls to the v1 contract that DGClaw
+// watches.
 //
 // Flow:
-//   1. User has already sent USDC (Base chain) to their agent wallet.
-//   2. AcpAgent.createJobByOfferingName → on-chain job against DGClaw provider.
-//   3. Provider sets budget ($0.01 fee) → we auto-fund.
-//   4. Provider performs the Base→Arbitrum→HL bridge internally.
-//   5. Provider submits deliverable (JSON with bridge tx hash, possibly forumThreadId).
-//   6. We call session.complete() so provider gets paid.
+//   1. LegacyBuyerAdapter.getAgent(DGCLAW) → resolve v1 offering metadata
+//   2. adapter.createJob(perp_deposit, {amount}) → on-chain v1 job, phase=REQUEST
+//   3. Poll until phase=NEGOTIATION (DGClaw set the budget)
+//   4. adapter.fundJob(jobId) → transfers USDC escrow to v1 contract
+//   5. Poll until phase=EVALUATION (DGClaw submitted deliverable)
+//   6. adapter.completeJob(jobId) → release escrow, return deliverable
 //
-// DGClaw provider agent: 0xd478a8B40372db16cA8045F28C6FE07228F3781A (ACP v1)
-// Offering: "perp_deposit" — $0.01 USDC fee, 30-min SLA, requiredFunds=true
-// Minimum deposit: $6 per DGClaw docs (enforced by caller at $10 for headroom).
+// DGClaw's SLA is 30 min end-to-end; typical is 2-5 min.
 
 import type { FastifyInstance } from 'fastify'
-import {
-  AcpAgent,
-  AcpApiClient,
-  SseTransport,
-} from '@virtuals-protocol/acp-node-v2'
 import { base } from 'viem/chains'
+import { AcpJobPhases } from '@virtuals-protocol/acp-node'
 import { getEvmAdapter } from '../lib/privy-sign.js'
+import { LegacyBuyerAdapter } from '../lib/compat/legacyBuyerAdapter.js'
 
-const DGCLAW_PROVIDER_ADDRESS = '0xd478a8B40372db16cA8045F28C6FE07228F3781A' as const
+const DGCLAW_PROVIDER_ADDRESS = '0xd478a8B40372db16cA8045F28C6FE07228F3781A'
 const CHAIN_ID = base.id
-// DGClaw publishes a 30-min SLA on perp_deposit; give a buffer for block finality.
-const DELIVERABLE_TIMEOUT_MS = 30 * 60 * 1000
+const POLL_INTERVAL_MS = 5_000
+const OVERALL_TIMEOUT_MS = 30 * 60 * 1000   // 30 min matching DGClaw SLA
 
 interface Body {
   agentWalletAddress: `0x${string}`
   agentWalletId: string
   signerPrivateKey: string
-  amountUsdc: string    // stringified decimal, e.g. "10.00"
+  amountUsdc: string
+}
+
+type Phase =
+  | 'REQUEST'
+  | 'NEGOTIATION'
+  | 'TRANSACTION'
+  | 'EVALUATION'
+  | 'COMPLETED'
+  | 'REJECTED'
+  | 'EXPIRED'
+  | 'unknown'
+
+function phaseName(phase: AcpJobPhases): Phase {
+  switch (phase) {
+    case AcpJobPhases.REQUEST: return 'REQUEST'
+    case AcpJobPhases.NEGOTIATION: return 'NEGOTIATION'
+    case AcpJobPhases.TRANSACTION: return 'TRANSACTION'
+    case AcpJobPhases.EVALUATION: return 'EVALUATION'
+    case AcpJobPhases.COMPLETED: return 'COMPLETED'
+    case AcpJobPhases.REJECTED: return 'REJECTED'
+    case AcpJobPhases.EXPIRED: return 'EXPIRED'
+    default: return 'unknown'
+  }
 }
 
 export function registerDeposit(app: FastifyInstance) {
@@ -42,123 +65,165 @@ export function registerDeposit(app: FastifyInstance) {
       return
     }
 
-    let adapter
+    let provider
     try {
-      adapter = await getEvmAdapter({
-        agentWalletAddress,
-        agentWalletId,
-        signerPrivateKey,
-      })
+      provider = await getEvmAdapter({ agentWalletAddress, agentWalletId, signerPrivateKey })
     } catch (err) {
       req.log.error({ err }, 'deposit: adapter init failed')
       reply.code(502).send({ error: 'privy adapter init failed', detail: String(err) })
       return
     }
 
-    const transport = new SseTransport()
-    const api = new AcpApiClient()
-    const agent = await AcpAgent.create({ provider: adapter, transport, api })
-
-    let jobId: bigint | null = null
-
-    const deliverablePromise = new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`timeout waiting for deliverable after ${DELIVERABLE_TIMEOUT_MS / 1000}s`)),
-        DELIVERABLE_TIMEOUT_MS,
-      )
-
-      agent.on('entry', async (session, entry) => {
-        if (jobId === null || session.jobId !== jobId.toString()) return
-        if (entry.kind !== 'system') return
-
-        const eventType = entry.event.type
-        req.log.info({ jobId: jobId.toString(), eventType }, 'deposit: session event')
-
-        if (eventType === 'budget.set') {
-          // Client role per ACP v2 tool matrix: once provider sets the budget, we fund.
-          try {
-            const job = await session.fetchJob()
-            await session.fund(job.budget)
-            req.log.info({ jobId: jobId.toString() }, 'deposit: funded')
-          } catch (err) {
-            clearTimeout(timer)
-            reject(err instanceof Error ? err : new Error(String(err)))
-          }
-        } else if (eventType === 'job.submitted') {
-          clearTimeout(timer)
-          resolve(entry.event.deliverable)
-        } else if (eventType === 'job.rejected' || eventType === 'job.expired') {
-          clearTimeout(timer)
-          const reason = 'reason' in entry.event ? entry.event.reason : 'no reason'
-          reject(new Error(`job ${eventType}: ${reason}`))
-        }
-      })
-    })
-
-    let deliverable: string
+    let adapter: LegacyBuyerAdapter
     try {
-      await agent.start()
-
-      jobId = await agent.createJobByOfferingName(
-        CHAIN_ID,
-        'perp_deposit',
-        DGCLAW_PROVIDER_ADDRESS,
-        {
-          amount: amountUsdc,
-        },
-      )
-
-      req.log.info(
-        { jobId: jobId.toString(), agentWalletAddress, amountUsdc },
-        'deposit: job created',
-      )
-
-      deliverable = await deliverablePromise
-
-      const session = agent.getSession(CHAIN_ID, jobId.toString())
-      if (session) {
-        try {
-          await session.complete('deposit confirmed')
-          req.log.info({ jobId: jobId.toString() }, 'deposit: completed')
-        } catch (completeErr) {
-          req.log.warn({ completeErr }, 'deposit: complete failed (non-fatal)')
-        }
-      }
+      adapter = await LegacyBuyerAdapter.create(provider, CHAIN_ID)
     } catch (err) {
-      req.log.error({ err }, 'deposit: flow failed')
-      await agent.stop().catch(() => {})
-      reply.code(502).send({ error: 'deposit failed', detail: String(err) })
+      req.log.error({ err }, 'deposit: legacy adapter init failed')
+      reply.code(502).send({ error: 'legacy adapter init failed', detail: String(err) })
       return
     }
 
-    await agent.stop().catch(() => {})
-
-    // Parse the deliverable (schema undocumented — log raw once for discovery).
-    let parsed: Record<string, unknown> | null = null
-    let parseError: string | null = null
+    // 1. Resolve v1 offering metadata from DGClaw
+    let legacyAgent
     try {
-      parsed = JSON.parse(deliverable)
+      legacyAgent = await adapter.getAgent(DGCLAW_PROVIDER_ADDRESS)
     } catch (err) {
-      parseError = String(err)
-      req.log.warn({ err, deliverable }, 'deposit: deliverable not JSON')
+      req.log.error({ err }, 'deposit: getAgent failed')
+      reply.code(502).send({ error: 'failed to resolve DGClaw agent', detail: String(err) })
+      return
+    }
+    if (!legacyAgent) {
+      reply.code(502).send({ error: 'DGClaw agent not found in v1 registry' })
+      return
+    }
+
+    const offering = legacyAgent.jobOfferings.find((o: any) => o.name === 'perp_deposit')
+    if (!offering) {
+      const available = legacyAgent.jobOfferings.map((o: any) => o.name).join(', ')
+      reply.code(502).send({
+        error: 'perp_deposit offering not found on DGClaw',
+        available,
+      })
+      return
+    }
+
+    // 2. Create the v1 job (phase=REQUEST)
+    let jobId: number
+    try {
+      jobId = await adapter.createJob({
+        providerAddress: DGCLAW_PROVIDER_ADDRESS,
+        requirement: { amount: amountUsdc },
+        priceType: offering.priceType,
+        priceValue: Number(offering.price),
+        expiredAt: new Date(Date.now() + (offering.slaMinutes || 30) * 60 * 1000),
+        offeringName: 'perp_deposit',
+      })
+    } catch (err) {
+      req.log.error({ err }, 'deposit: createJob failed')
+      reply.code(502).send({ error: 'createJob failed', detail: String(err) })
+      return
     }
 
     req.log.info(
-      {
-        agentWalletAddress,
-        jobId: jobId.toString(),
-        deliverableRaw: deliverable,
-        deliverableParsed: parsed,
-      },
-      'deposit: complete — logging deliverable shape for schema discovery',
+      { jobId, agentWalletAddress, amountUsdc, priceType: offering.priceType, price: offering.price },
+      'deposit: v1 job created',
     )
 
-    reply.send({
-      success: true,
-      jobId: jobId.toString(),
-      deliverable: parsed,
-      deliverableRaw: deliverable,
-      parseError,
+    // 3/4/5/6. Poll phase transitions, fund on NEGOTIATION, complete on EVALUATION
+    const started = Date.now()
+    let lastPhase: Phase | null = null
+    let funded = false
+    let completed = false
+    let deliverable: any = null
+
+    while (Date.now() - started < OVERALL_TIMEOUT_MS) {
+      let job
+      try {
+        job = await adapter.getJob(jobId)
+      } catch (err) {
+        req.log.warn({ err, jobId }, 'deposit: getJob poll failed, retrying')
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+        continue
+      }
+
+      if (!job) {
+        req.log.warn({ jobId }, 'deposit: job not found on poll, retrying')
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+        continue
+      }
+
+      const phase = phaseName(job.phase as AcpJobPhases)
+      if (phase !== lastPhase) {
+        req.log.info({ jobId, phase }, 'deposit: phase transition')
+        lastPhase = phase
+      }
+
+      if (phase === 'NEGOTIATION' && !funded) {
+        try {
+          req.log.info({ jobId }, 'deposit: funding job')
+          await adapter.fundJob(jobId, 'ggbots deposit')
+          funded = true
+          req.log.info({ jobId }, 'deposit: fund call submitted')
+        } catch (err) {
+          req.log.error({ err, jobId }, 'deposit: fundJob failed')
+          reply.code(502).send({ error: 'fundJob failed', detail: String(err), jobId })
+          return
+        }
+      } else if (phase === 'EVALUATION' && !completed) {
+        deliverable = (job as any).deliverable ?? null
+        try {
+          req.log.info({ jobId }, 'deposit: completing job')
+          await adapter.completeJob(jobId, 'ggbots approved')
+          completed = true
+          req.log.info({ jobId }, 'deposit: complete call submitted')
+        } catch (err) {
+          req.log.error({ err, jobId }, 'deposit: completeJob failed')
+          reply.code(502).send({ error: 'completeJob failed', detail: String(err), jobId })
+          return
+        }
+      } else if (phase === 'COMPLETED') {
+        deliverable = (job as any).deliverable ?? deliverable
+        req.log.info(
+          { jobId, agentWalletAddress, deliverable },
+          'deposit: COMPLETED — logging deliverable for schema discovery',
+        )
+
+        // Parse deliverable if it's a JSON string
+        let parsed: Record<string, unknown> | null = null
+        let parseError: string | null = null
+        if (typeof deliverable === 'string') {
+          try { parsed = JSON.parse(deliverable) }
+          catch (err) { parseError = String(err) }
+        } else if (deliverable && typeof deliverable === 'object') {
+          parsed = deliverable
+        }
+
+        reply.send({
+          success: true,
+          jobId: String(jobId),
+          phase: 'COMPLETED',
+          deliverable: parsed,
+          deliverableRaw: deliverable,
+          parseError,
+        })
+        return
+      } else if (phase === 'REJECTED' || phase === 'EXPIRED') {
+        req.log.warn({ jobId, phase }, 'deposit: terminal failure')
+        reply.code(502).send({
+          error: `job terminated with phase=${phase}`,
+          jobId,
+        })
+        return
+      }
+
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+    }
+
+    req.log.error({ jobId, lastPhase }, 'deposit: overall timeout')
+    reply.code(504).send({
+      error: `timeout after ${OVERALL_TIMEOUT_MS / 60_000}min`,
+      jobId,
+      lastPhase,
     })
   })
 }

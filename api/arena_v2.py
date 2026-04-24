@@ -24,6 +24,7 @@ holds the P-256 signer key in Vault and passes it to the sidecar per request.
 import base64
 import json
 import os
+import time
 import uuid
 from typing import Any, Dict, Optional
 
@@ -78,6 +79,47 @@ def _req_key(request_id: str) -> str:
 def _deploy_key(signer_request_id: str) -> str:
     """Maps signer requestId → agent_record_id for deploy-poll."""
     return f"arena_v2:deploy:{signer_request_id}"
+
+def _deposit_progress_key(config_id: str) -> str:
+    """Redis key for async deposit stage tracking."""
+    return f"arena_v2:deposit_progress:{config_id}"
+
+
+# ============================================================================
+# Deposit stages — string constants shared with frontend
+# ============================================================================
+# Frontend reads these via /status.deposit_progress.stage to render the
+# progress UI. Order in the UI progression: starting → depositing → hl_setup
+# → leaderboard → complete (or failed at any stage).
+STAGE_STARTING = "starting"
+STAGE_DEPOSITING = "depositing"               # ACP perp_deposit job in flight
+STAGE_HL_SETUP = "hl_setup"                   # userSetAbstraction + approveAgent
+STAGE_LEADERBOARD = "leaderboard"             # join_leaderboard ACP job
+STAGE_COMPLETE = "complete"
+STAGE_FAILED = "failed"
+
+DEPOSIT_PROGRESS_TTL_SEC = 2 * 60 * 60        # 2h — retry window
+
+
+def _write_progress(config_id: str, stage: str, message: str, **extra: Any) -> None:
+    """Persist deposit stage/status to Redis so /status can surface it."""
+    payload = {
+        "stage": stage,
+        "message": message,
+        "updated_at": int(time.time()),
+        **extra,
+    }
+    _redis.setex(_deposit_progress_key(config_id), DEPOSIT_PROGRESS_TTL_SEC, json.dumps(payload))
+
+
+def _read_progress(config_id: str) -> Optional[Dict[str, Any]]:
+    raw = _redis.get(_deposit_progress_key(config_id))
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
 
 
 # ============================================================================
@@ -628,6 +670,21 @@ async def arena_v2_status(
     is_authorized = bool(creds.get("hl_api_wallet_key"))
     is_leaderboard_joined = bool(creds.get("dgclaw_api_key"))
 
+    # Include DGClaw-side pooled balance if the agent has joined the leaderboard
+    # (hlBalance lives on DGClaw's backend, not on HL directly — DGClaw pools funds).
+    dgclaw_balance: Optional[float] = None
+    if is_leaderboard_joined:
+        try:
+            dgclaw_resp = requests.get(
+                f"https://dgclaw-app-production.up.railway.app/users/{wallet}/account",
+                timeout=5,
+            )
+            if dgclaw_resp.status_code == 200:
+                dgclaw_data = (dgclaw_resp.json() or {}).get("data", {}) or {}
+                dgclaw_balance = float(dgclaw_data.get("hlBalance", 0) or 0)
+        except Exception as e:
+            logger.debug(f"arena_v2 status: DGClaw balance fetch failed for {wallet[:10]}: {e}")
+
     return {
         "status": "active" if is_authorized else "provisioning",
         "agent_name": creds["agent_name"],
@@ -639,6 +696,8 @@ async def arena_v2_status(
         "hl_positions": hl_positions,
         "hl_api_wallet_authorized": is_authorized,
         "leaderboard_joined": is_leaderboard_joined,
+        "dgclaw_balance": dgclaw_balance,
+        "deposit_progress": _read_progress(config_id),
     }
 
 
@@ -668,17 +727,212 @@ def _extract_forum_thread_id(deliverable: Any) -> Optional[str]:
     return None
 
 
+async def _get_dgclaw_hl_balance(wallet: str) -> Optional[float]:
+    """Query DGClaw's Railway backend for the agent's pooled hlBalance.
+    Returns None on error; 0 if account doesn't exist yet."""
+    try:
+        import asyncio as _a
+        def _sync() -> Optional[float]:
+            resp = requests.get(
+                f"https://dgclaw-app-production.up.railway.app/users/{wallet}/account",
+                timeout=5,
+            )
+            if resp.status_code == 404:
+                return 0.0
+            if resp.status_code != 200:
+                return None
+            data = (resp.json() or {}).get("data", {}) or {}
+            return float(data.get("hlBalance", 0) or 0)
+        return await _a.to_thread(_sync)
+    except Exception as e:
+        logger.debug(f"arena_v2 _get_dgclaw_hl_balance failed for {wallet[:10]}: {e}")
+        return None
+
+
+async def _run_deposit_flow(
+    config_id: str,
+    agent_record_id: str,
+    creds: Dict[str, Any],
+    amount: float,
+) -> None:
+    """
+    Background task: perp_deposit → HL setup → leaderboard, with idempotent
+    skip-if-already-done logic at every step. Writes progress to Redis so the
+    frontend can poll /status.deposit_progress for stage + message.
+
+    Never raises — any exception is captured into a STAGE_FAILED progress row.
+    """
+    wallet = creds["agent_wallet_address"]
+    sidecar_base = {
+        "agentWalletAddress": wallet,
+        "agentWalletId": creds["wallet_id"],
+        "signerPrivateKey": creds["signer_private_key"],
+    }
+
+    try:
+        # ---- 1. perp_deposit (skip if DGClaw already has this agent's funds) ----
+        existing_dgclaw = await _get_dgclaw_hl_balance(wallet)
+        if existing_dgclaw and existing_dgclaw > 0:
+            logger.info(
+                f"arena_v2 deposit_flow: skipping perp_deposit — DGClaw already shows "
+                f"${existing_dgclaw:.2f} for {wallet[:10]}"
+            )
+        else:
+            _write_progress(
+                config_id, STAGE_DEPOSITING,
+                f"Depositing ${amount:.2f} via DGClaw (bridge Base → Arbitrum → Hyperliquid, ~2–5 min)…",
+                amount=amount,
+            )
+            logger.info(
+                f"arena_v2 deposit_flow: firing perp_deposit ${amount:.2f} "
+                f"agent={creds['virtuals_agent_id']}"
+            )
+            deposit_resp = await acp_node_post(
+                "/deposit",
+                {**sidecar_base, "amountUsdc": f"{amount:.2f}"},
+                timeout_seconds=1850,
+            )
+            if deposit_resp.get("_httpStatus") != 200 or not deposit_resp.get("success"):
+                _write_progress(
+                    config_id, STAGE_FAILED,
+                    "Deposit failed during DGClaw bridge. Your USDC is still on Base — you can retry.",
+                    stage_failed=STAGE_DEPOSITING,
+                    detail=deposit_resp,
+                )
+                return
+
+            # Best-effort forum thread id extraction from deposit deliverable
+            thread_id = _extract_forum_thread_id(deposit_resp.get("deliverable"))
+            if thread_id:
+                await store_arena_v2_forum_thread_id(agent_record_id, thread_id)
+
+        # ---- 2. HL setup (skip if HL API wallet key already in vault) ----
+        if creds.get("hl_api_wallet_key"):
+            logger.info(
+                f"arena_v2 deposit_flow: skipping HL setup — api_wallet_key already stored "
+                f"for {agent_record_id[:8]}"
+            )
+        else:
+            _write_progress(
+                config_id, STAGE_HL_SETUP,
+                "Activating your Hyperliquid account and authorizing the trading API wallet…",
+            )
+            # Short pause for HL to index the deposit (if we just did one)
+            import asyncio as _a
+            await _a.sleep(10)
+
+            unified = await acp_node_post("/setup-hl-unified-account", sidecar_base, timeout_seconds=60)
+            if unified.get("_httpStatus") != 200 or not unified.get("success"):
+                _write_progress(
+                    config_id, STAGE_FAILED,
+                    "Hyperliquid account activation failed. The deposit succeeded — you can retry to finish setup.",
+                    stage_failed=STAGE_HL_SETUP, sub_stage="unified_account",
+                    detail=unified, hint="HL may not have indexed the deposit yet — wait 30s and retry.",
+                )
+                return
+
+            hl_agent_name = (creds["agent_name"] or "ggbots")[:16]
+            authz = await acp_node_post(
+                "/authorize-hl-api-wallet",
+                {**sidecar_base, "agentName": hl_agent_name},
+                timeout_seconds=60,
+            )
+            if authz.get("_httpStatus") != 200 or not authz.get("success"):
+                _write_progress(
+                    config_id, STAGE_FAILED,
+                    "Hyperliquid API wallet authorization failed. Retry to finish setup.",
+                    stage_failed=STAGE_HL_SETUP, sub_stage="authorize_api_wallet",
+                    detail=authz,
+                )
+                return
+
+            api_wallet_key = authz.get("apiWalletPrivateKey")
+            if not api_wallet_key:
+                _write_progress(
+                    config_id, STAGE_FAILED,
+                    "Setup partially complete — missing API wallet key. Contact support.",
+                    stage_failed=STAGE_HL_SETUP, sub_stage="authorize_api_wallet",
+                )
+                return
+
+            hl_vault_id = await store_arena_v2_hl_api_wallet(agent_record_id, api_wallet_key)
+            if not hl_vault_id:
+                _write_progress(
+                    config_id, STAGE_FAILED,
+                    "Setup partially complete — key storage failed. Retry to complete.",
+                    stage_failed=STAGE_HL_SETUP, sub_stage="vault_write",
+                )
+                return
+
+            await db_execute(
+                "UPDATE arena_agents_v2 SET status='active', updated_at=NOW() WHERE id = %s AND status='provisioning'",
+                (agent_record_id,),
+            )
+
+        # ---- 3. leaderboard join (skip if dgclaw_api_key already in vault) ----
+        if creds.get("dgclaw_api_key"):
+            logger.info(
+                f"arena_v2 deposit_flow: skipping leaderboard — already joined "
+                f"for {agent_record_id[:8]}"
+            )
+        else:
+            _write_progress(
+                config_id, STAGE_LEADERBOARD,
+                "Registering your agent on the DegenClaw leaderboard…",
+            )
+            leaderboard_resp = await acp_node_post(
+                "/join-leaderboard", sidecar_base, timeout_seconds=620,
+            )
+            if leaderboard_resp.get("_httpStatus") == 200 and leaderboard_resp.get("success"):
+                api_key = leaderboard_resp.get("dgclawApiKey")
+                if api_key:
+                    await store_arena_v2_dgclaw_key(agent_record_id, api_key)
+                # Extract forum thread id from leaderboard deliverable as fallback
+                if not creds.get("dgclaw_forum_thread_id"):
+                    fallback_thread = (
+                        leaderboard_resp.get("forumThreadId")
+                        or _extract_forum_thread_id(leaderboard_resp.get("deliverable"))
+                    )
+                    if fallback_thread:
+                        await store_arena_v2_forum_thread_id(agent_record_id, fallback_thread)
+            else:
+                # Leaderboard is nice-to-have — log but don't fail the whole flow.
+                logger.warning(
+                    f"arena_v2 deposit_flow: leaderboard join failed (non-fatal) {leaderboard_resp}"
+                )
+
+        _write_progress(
+            config_id, STAGE_COMPLETE,
+            "Your bot is live and trading on Hyperliquid. You're on the DegenClaw leaderboard.",
+        )
+        logger.info(f"arena_v2 deposit_flow: COMPLETE for {agent_record_id[:8]}")
+
+    except Exception as e:
+        logger.exception(f"arena_v2 deposit_flow: unhandled exception for {agent_record_id[:8]}")
+        _write_progress(
+            config_id, STAGE_FAILED,
+            f"Unexpected error: {type(e).__name__}. Retry to continue.",
+            error=str(e),
+        )
+
+
 @router.post("/check-deposit")
 async def check_deposit(
     body: CheckDepositRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2),
 ) -> Dict[str, Any]:
     """
-    Deposit USDC from the agent's Base wallet into its Hyperliquid account via
-    an ACP `perp_deposit` buyer job against DGClaw. On first deposit also runs
-    the HL setup actions (unified account + API wallet auth) and fire-forgets
-    the leaderboard-join ACP job. Persists any returned forum thread id for
-    the orchestrator forum-post hook.
+    Kick off the deposit-and-setup flow asynchronously. Fast validation runs
+    synchronously (amount, balance, idempotency detection). The long-running
+    pieces (perp_deposit ACP job ~2-5min, HL setup, leaderboard) run in a
+    background task that writes progress to Redis. Frontend polls /status to
+    read `deposit_progress.stage` and render appropriate UI.
+
+    Safely idempotent:
+      - Skips perp_deposit if DGClaw already has funds for this agent
+      - Skips HL setup if api_wallet_key is already stored
+      - Skips leaderboard if dgclaw_api_key is already stored
+      - Rejects with `already_in_progress` if another flow is mid-way
     """
     if not await _verify_ownership(body.config_id, current_user.user_id):
         raise HTTPException(404, "Bot not found")
@@ -687,212 +941,85 @@ async def check_deposit(
     if not creds:
         raise HTTPException(404, "No virtuals agent deployed for this config")
 
-    # ------------------------------------------------------------------
-    # 1. Validate the requested deposit amount against minimum + balance
-    # ------------------------------------------------------------------
-    if body.amount < DEPOSIT_MIN_USDC:
+    # -----------------------------------------------------------------
+    # Check if a flow is already in progress — prevent double-click / retry race.
+    # Allow retry only if previous progress is STAGE_COMPLETE or STAGE_FAILED.
+    # -----------------------------------------------------------------
+    existing_progress = _read_progress(body.config_id)
+    if existing_progress and existing_progress.get("stage") not in (STAGE_COMPLETE, STAGE_FAILED, None):
         return {
-            "status": "amount_too_low",
-            "minimum": DEPOSIT_MIN_USDC,
-            "requested": body.amount,
-            "message": f"Minimum deposit is ${DEPOSIT_MIN_USDC:.0f} USDC.",
+            "status": "already_in_progress",
+            "current_stage": existing_progress.get("stage"),
+            "current_message": existing_progress.get("message"),
+            "message": "A deposit is already in flight. Check /status to watch progress.",
         }
 
-    wallet = creds["agent_wallet_address"]
-    balance = await get_base_usdc_balance(wallet)
-    if balance is None:
-        return {
-            "status": "rpc_error",
-            "message": "Could not read Base USDC balance — try again shortly.",
-        }
-
-    max_depositable = round(balance - ACP_FEE_RESERVE, 2)
-    if body.amount > max_depositable:
-        return {
-            "status": "insufficient",
-            "balance": balance,
-            "requested": body.amount,
-            "reserve": ACP_FEE_RESERVE,
-            "max_depositable": max_depositable,
-            "message": (
-                f"Balance ${balance:.2f} — after ${ACP_FEE_RESERVE:.2f} ACP-fee reserve, "
-                f"max depositable is ${max_depositable:.2f}. Send more USDC to {wallet} on Base."
-            ),
-        }
-
-    sidecar_base = {
-        "agentWalletAddress": wallet,
-        "agentWalletId": creds["wallet_id"],
-        "signerPrivateKey": creds["signer_private_key"],
-    }
-
-    # ------------------------------------------------------------------
-    # 2. Fire the ACP `perp_deposit` job against DGClaw (AWAITED — critical path).
-    #    DGClaw's provider internally bridges Base → Arbitrum → HL.
-    #    SLA is ~30min; we give the sidecar 1850s (30min + ~50s slack).
-    # ------------------------------------------------------------------
-    logger.info(
-        f"arena_v2 check-deposit: firing perp_deposit ${body.amount:.2f} "
-        f"agent={creds['virtuals_agent_id']} wallet={wallet[:10]}"
-    )
-    deposit_resp = await acp_node_post(
-        "/deposit",
-        {**sidecar_base, "amountUsdc": f"{body.amount:.2f}"},
-        timeout_seconds=1850,
-    )
-    if deposit_resp.get("_httpStatus") != 200 or not deposit_resp.get("success"):
-        logger.warning(f"arena_v2 check-deposit: deposit failed {deposit_resp}")
-        return {
-            "status": "deposit_failed",
-            "requested": body.amount,
-            "detail": deposit_resp,
-        }
-
-    job_id = deposit_resp.get("jobId")
-    deliverable = deposit_resp.get("deliverable")
-    logger.info(
-        f"arena_v2 check-deposit: perp_deposit job {job_id} complete — "
-        f"deliverable={deliverable}"
-    )
-
-    # Best-effort forum thread id extraction from the deposit deliverable.
-    forum_thread_id = _extract_forum_thread_id(deliverable)
-    if forum_thread_id:
-        await store_arena_v2_forum_thread_id(creds["agent_record_id"], forum_thread_id)
-        logger.info(
-            f"arena_v2 check-deposit: captured forum thread {forum_thread_id} from perp_deposit"
-        )
-
-    # ------------------------------------------------------------------
-    # 3. First-time only: run HL setup actions that require a funded HL account.
-    #    HL rejects userSetAbstraction / approveAgent on empty accounts, so we
-    #    had to wait for the perp_deposit bridge to credit the HL unified account.
-    # ------------------------------------------------------------------
-    hl_setup_result: Dict[str, Any] = {}
-    if not creds.get("hl_api_wallet_key"):
-        # Short pause so HL indexes the bridge deposit before we sign.
-        import asyncio as _asyncio
-        await _asyncio.sleep(10)
-
-        logger.info(
-            f"arena_v2 check-deposit: activating HL unified account "
-            f"agent={creds['virtuals_agent_id']}"
-        )
-        unified = await acp_node_post(
-            "/setup-hl-unified-account", sidecar_base, timeout_seconds=60
-        )
-        if unified.get("_httpStatus") != 200 or not unified.get("success"):
-            logger.warning(f"arena_v2 check-deposit: unified-account failed {unified}")
+    # -----------------------------------------------------------------
+    # Idempotency: if already fully active + leaderboard joined, nothing to do.
+    # -----------------------------------------------------------------
+    if creds.get("hl_api_wallet_key") and creds.get("dgclaw_api_key"):
+        existing_dgclaw_balance = await _get_dgclaw_hl_balance(creds["agent_wallet_address"])
+        # Only short-circuit if we don't actually need to deposit more funds
+        if existing_dgclaw_balance and existing_dgclaw_balance > 0:
+            _write_progress(body.config_id, STAGE_COMPLETE, "Already fully set up and funded.")
             return {
-                "status": "deposited_but_hl_setup_failed",
-                "stage": "unified_account",
+                "status": "already_complete",
+                "message": "Your bot is already live and funded.",
+                "dgclaw_balance": existing_dgclaw_balance,
+            }
+
+    # -----------------------------------------------------------------
+    # Fast validation — amount floor + Base balance (only if we actually need to deposit).
+    # If HL is already funded via DGClaw, we skip perp_deposit entirely and
+    # still let the user retry to finish HL setup + leaderboard without
+    # re-funding. In that case amount + balance checks don't apply.
+    # -----------------------------------------------------------------
+    dgclaw_balance = await _get_dgclaw_hl_balance(creds["agent_wallet_address"])
+    skipping_deposit = dgclaw_balance is not None and dgclaw_balance > 0
+
+    if not skipping_deposit:
+        if body.amount < DEPOSIT_MIN_USDC:
+            return {
+                "status": "amount_too_low",
+                "minimum": DEPOSIT_MIN_USDC,
                 "requested": body.amount,
-                "detail": unified,
-                "hint": "HL may not have indexed the deposit yet — retry in ~30s.",
+                "message": f"Minimum deposit is ${DEPOSIT_MIN_USDC:.0f} USDC.",
             }
-
-        logger.info(
-            f"arena_v2 check-deposit: authorizing HL API wallet "
-            f"agent={creds['virtuals_agent_id']}"
-        )
-        authz = await acp_node_post(
-            "/authorize-hl-api-wallet",
-            {**sidecar_base, "agentName": creds["agent_name"][:40]},
-            timeout_seconds=60,
-        )
-        if authz.get("_httpStatus") != 200 or not authz.get("success"):
-            logger.warning(f"arena_v2 check-deposit: authorize-api-wallet failed {authz}")
+        base_balance = await get_base_usdc_balance(creds["agent_wallet_address"])
+        if base_balance is None:
+            return {"status": "rpc_error", "message": "Could not read Base USDC balance — try again shortly."}
+        max_depositable = round(base_balance - ACP_FEE_RESERVE, 2)
+        if body.amount > max_depositable:
             return {
-                "status": "deposited_but_hl_setup_failed",
-                "stage": "authorize_api_wallet",
-                "requested": body.amount,
-                "detail": authz,
+                "status": "insufficient",
+                "balance": base_balance, "requested": body.amount,
+                "reserve": ACP_FEE_RESERVE, "max_depositable": max_depositable,
+                "message": (
+                    f"Balance ${base_balance:.2f} — after ${ACP_FEE_RESERVE:.2f} ACP-fee reserve, "
+                    f"max depositable is ${max_depositable:.2f}. Send more USDC to "
+                    f"{creds['agent_wallet_address']} on Base."
+                ),
             }
 
-        api_wallet_key = authz.get("apiWalletPrivateKey")
-        if not api_wallet_key:
-            return {
-                "status": "deposited_but_hl_setup_failed",
-                "stage": "authorize_api_wallet",
-                "reason": "sidecar returned success but no apiWalletPrivateKey",
-            }
-        hl_vault_id = await store_arena_v2_hl_api_wallet(
-            creds["agent_record_id"], api_wallet_key
-        )
-        if not hl_vault_id:
-            return {
-                "status": "deposited_but_hl_setup_failed",
-                "stage": "authorize_api_wallet",
-                "reason": "vault write failed for HL API wallet key",
-            }
+    # -----------------------------------------------------------------
+    # Kick off background task. Initial progress row so the UI can show
+    # "Starting..." immediately on the next /status poll.
+    # -----------------------------------------------------------------
+    initial_message = (
+        "Finishing Hyperliquid setup (deposit already made)…"
+        if skipping_deposit
+        else f"Starting deposit of ${body.amount:.2f}…"
+    )
+    _write_progress(body.config_id, STAGE_STARTING, initial_message, amount=body.amount)
 
-        await db_execute(
-            """
-            UPDATE arena_agents_v2
-            SET status = 'active', updated_at = NOW()
-            WHERE id = %s AND status = 'provisioning'
-            """,
-            (creds["agent_record_id"],),
-        )
-        hl_setup_result = {
-            "unified_activated": True,
-            "api_wallet_address": authz.get("apiWalletAddress"),
-        }
-        logger.info(
-            f"arena_v2 check-deposit: HL setup complete, agent ACTIVE "
-            f"record={creds['agent_record_id'][:8]}"
-        )
-
-    # ------------------------------------------------------------------
-    # 4. First-time leaderboard join (only if not yet joined).
-    #    Awaited (not fire-forget) so we can also extract a forum thread id
-    #    from its deliverable as a fallback — AI Council forum-post hook
-    #    depends on having the thread id persisted somewhere.
-    # ------------------------------------------------------------------
-    leaderboard_result: Optional[Dict[str, Any]] = None
-    if not creds.get("dgclaw_api_key"):
-        leaderboard_resp = await acp_node_post(
-            "/join-leaderboard", sidecar_base, timeout_seconds=240
-        )
-        if leaderboard_resp.get("_httpStatus") == 200 and leaderboard_resp.get("success"):
-            api_key = leaderboard_resp.get("dgclawApiKey")
-            if api_key:
-                await store_arena_v2_dgclaw_key(creds["agent_record_id"], api_key)
-                logger.info(
-                    f"arena_v2 check-deposit: leaderboard joined agent={creds['virtuals_agent_id']}"
-                )
-            leaderboard_result = {"joined": bool(api_key)}
-
-            # Fallback forum thread id extraction if perp_deposit didn't carry it.
-            if not forum_thread_id:
-                # join-leaderboard route returns parsed deliverable at a few possible keys
-                candidate = (
-                    leaderboard_resp.get("deliverable")
-                    or leaderboard_resp.get("deliverableParsed")
-                )
-                fallback_thread_id = _extract_forum_thread_id(candidate)
-                if fallback_thread_id:
-                    await store_arena_v2_forum_thread_id(
-                        creds["agent_record_id"], fallback_thread_id
-                    )
-                    forum_thread_id = fallback_thread_id
-                    logger.info(
-                        f"arena_v2 check-deposit: captured forum thread {forum_thread_id} "
-                        f"from join_leaderboard"
-                    )
-        else:
-            leaderboard_result = {"joined": False, "detail": leaderboard_resp}
-            logger.warning(f"arena_v2 check-deposit: leaderboard join failed {leaderboard_resp}")
+    import asyncio as _a
+    _a.create_task(_run_deposit_flow(body.config_id, creds["agent_record_id"], creds, body.amount))
 
     return {
-        "status": "deposited",
-        "amount": body.amount,
-        "balance_before": balance,
-        "reserve_kept": ACP_FEE_RESERVE,
-        "deposit_job_id": job_id,
-        "hl_setup": hl_setup_result,
-        "leaderboard": leaderboard_result,
-        "forum_thread_id": forum_thread_id,
+        "status": "in_progress",
+        "stage": STAGE_STARTING,
+        "skipping_deposit": skipping_deposit,
+        "message": initial_message,
     }
 
 
