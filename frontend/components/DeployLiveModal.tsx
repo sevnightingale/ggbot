@@ -320,7 +320,14 @@ export function DeployLiveModal({
     const amountFitsBalance =
       amountValid && maxDepositable !== null && parsedAmount <= maxDepositable
     const hasEnoughBalance = baseBal !== null && baseBal >= MIN_DEPOSIT + 1
-    const canDeposit = !depositBusy && hasEnoughBalance && amountFitsBalance
+    // Tokenization is required for DegenClaw leaderboard delivery. Undefined =
+    // probe hasn't landed yet → treat as unknown (soft); false = hard block.
+    const tokenizationKnown = status?.is_tokenized !== undefined
+    const isTokenized = status?.is_tokenized === true
+    const tokenizeBlocked = tokenizationKnown && !isTokenized
+    const tokenizeUrl = status?.tokenize_url || 'https://app.virtuals.io'
+    const canDeposit =
+      !depositBusy && hasEnoughBalance && amountFitsBalance && !tokenizeBlocked
 
     return (
       <div className="space-y-4">
@@ -365,6 +372,33 @@ export function DeployLiveModal({
           </div>
         </div>
 
+        {/* Tokenization gate — DegenClaw silently expires leaderboard jobs
+            when the agent hasn't launched a token yet. Warn early. */}
+        {tokenizeBlocked && (
+          <div className="p-3 rounded border border-amber-500/40 bg-amber-500/5">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-500">
+                  Tokenize your agent first
+                </p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  DegenClaw only accepts deposits for tokenized agents. Launch a
+                  token on the Virtuals dashboard, then come back to deposit.
+                </p>
+                <a
+                  href={tokenizeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[var(--accent)] hover:underline"
+                >
+                  Open Virtuals dashboard <ArrowRight className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Amount input only appears when balance is sufficient */}
         {hasEnoughBalance ? (
           <>
@@ -394,6 +428,8 @@ export function DeployLiveModal({
             >
               {depositBusy ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />Starting…</>
+              ) : tokenizeBlocked ? (
+                'Tokenize your agent first'
               ) : !amountValid ? (
                 `Enter at least $${MIN_DEPOSIT}`
               ) : !amountFitsBalance ? (

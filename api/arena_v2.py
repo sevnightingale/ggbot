@@ -43,6 +43,8 @@ from core.auth.vault_utils import (
     store_arena_v2_dgclaw_key,
     store_arena_v2_forum_thread_id,
     store_arena_v2_hl_api_wallet,
+    store_arena_v2_hl_subaccount,
+    store_arena_v2_token_address,
 )
 from core.common.db import db_execute, db_fetch_all, db_fetch_one
 from core.common.logger import logger
@@ -674,6 +676,7 @@ async def arena_v2_status(
     # not on HL directly. Always query (it's a public endpoint); balance can
     # exist BEFORE leaderboard registration (deposit lands on DGClaw first).
     dgclaw_balance: Optional[float] = None
+    dgclaw_hl_subaccount: Optional[str] = None
     try:
         dgclaw_resp = requests.get(
             f"https://dgclaw-app-production.up.railway.app/users/{wallet}/account",
@@ -682,10 +685,54 @@ async def arena_v2_status(
         if dgclaw_resp.status_code == 200:
             dgclaw_data = (dgclaw_resp.json() or {}).get("data", {}) or {}
             dgclaw_balance = float(dgclaw_data.get("hlBalance", 0) or 0)
+            # Subaccount only exposed while a position is active — capture
+            # opportunistically, never overwrite once stored.
+            dgclaw_hl_subaccount = dgclaw_data.get("hlSubaccountAddress")
         elif dgclaw_resp.status_code == 404:
             dgclaw_balance = 0.0   # agent hasn't deposited yet
     except Exception as e:
         logger.debug(f"arena_v2 status: DGClaw balance fetch failed for {wallet[:10]}: {e}")
+
+    # Opportunistic HL subaccount capture — one-shot, never overwrite.
+    hl_subaccount = creds.get("hl_subaccount_address")
+    if dgclaw_hl_subaccount and not hl_subaccount:
+        if await store_arena_v2_hl_subaccount(
+            creds["agent_record_id"], dgclaw_hl_subaccount
+        ):
+            hl_subaccount = dgclaw_hl_subaccount
+            logger.info(
+                f"arena_v2 status: captured HL subaccount {dgclaw_hl_subaccount[:10]}… "
+                f"for {creds['agent_record_id'][:8]}"
+            )
+
+    # Tokenization state — cache once tokenized; probe ACP registry otherwise.
+    # Redis gate coalesces probe attempts to once per 60s per wallet.
+    token_address = creds.get("token_address")
+    if not token_address:
+        probe_key = f"arena_v2:token_probe:{wallet}"
+        try:
+            probe_gate = _redis.set(probe_key, "1", ex=60, nx=True)
+        except Exception:
+            probe_gate = True
+        if probe_gate:
+            fetched = await _fetch_virtuals_token_address(wallet)
+            if fetched:
+                if await store_arena_v2_token_address(
+                    creds["agent_record_id"], fetched
+                ):
+                    token_address = fetched
+                    logger.info(
+                        f"arena_v2 status: captured token_address {fetched[:10]}… "
+                        f"for {creds['agent_record_id'][:8]}"
+                    )
+
+    is_tokenized = bool(token_address)
+    # Deep link to the agent's Virtuals dashboard page (where launching a token
+    # actually happens). The ACP agent dashboard uses the UUID.
+    tokenize_url = (
+        f"https://app.virtuals.io/agents/{creds['virtuals_agent_id']}"
+        if creds.get("virtuals_agent_id") else "https://app.virtuals.io"
+    )
 
     return {
         "status": "active" if is_authorized else "provisioning",
@@ -699,6 +746,10 @@ async def arena_v2_status(
         "hl_api_wallet_authorized": is_authorized,
         "leaderboard_joined": is_leaderboard_joined,
         "dgclaw_balance": dgclaw_balance,
+        "hl_subaccount_address": hl_subaccount,
+        "is_tokenized": is_tokenized,
+        "token_address": token_address,
+        "tokenize_url": tokenize_url,
         "deposit_progress": _read_progress(config_id),
     }
 
@@ -727,6 +778,83 @@ def _extract_forum_thread_id(deliverable: Any) -> Optional[str]:
             if nested:
                 return nested
     return None
+
+
+async def _fetch_virtuals_token_address(wallet: str) -> Optional[str]:
+    """Fetch the agent's on-chain token address from the ACP registry.
+    Returns the 0x token contract if tokenized, else None. 404 → agent not
+    registered yet (pre-deposit). The endpoint is public despite the SDK
+    using authedFetch — server doesn't actually enforce auth on this route.
+    """
+    if not wallet:
+        return None
+    try:
+        import asyncio as _a
+        def _sync() -> Optional[str]:
+            resp = requests.get(
+                f"https://api.acp.virtuals.io/agents/wallet/{wallet}",
+                timeout=6,
+            )
+            if resp.status_code == 404:
+                return None
+            if resp.status_code != 200:
+                return None
+            data = (resp.json() or {}).get("data") or {}
+            chains = data.get("chains") or []
+            if not chains:
+                return None
+            # Prefer the Base chain entry (chainId 8453) if present.
+            base_chain = next(
+                (c for c in chains if c.get("chainId") == 8453), None
+            )
+            chain = base_chain or chains[0]
+            token = chain.get("tokenAddress")
+            return token if token else None
+        return await _a.to_thread(_sync)
+    except Exception as e:
+        logger.debug(f"arena_v2 _fetch_virtuals_token_address: {e}")
+        return None
+
+
+async def _fetch_forum_thread_from_public_api(agent_name: str) -> Optional[str]:
+    """Resolve the DISCUSSION thread id via DegenClaw's public forums index.
+
+    DGClaw does not expose the thread id in ACP deliverables and there is no
+    direct agent lookup. The public index is sorted newest-first, so our
+    freshly-joined agent lands near the top — we walk the first page and
+    take the most recently created entry whose name matches.
+    """
+    if not agent_name:
+        return None
+    try:
+        import asyncio as _a
+        def _sync() -> Optional[str]:
+            resp = requests.get(
+                "https://degen.virtuals.io/api/forums",
+                params={"limit": 50},
+                timeout=8,
+            )
+            if resp.status_code != 200:
+                return None
+            entries = (resp.json() or {}).get("data") or []
+            matches = [
+                e for e in entries
+                if ((e.get("agent") or {}).get("name") or "").strip() == agent_name.strip()
+            ]
+            if not matches:
+                return None
+            # Most recently created match wins — collision-safe.
+            matches.sort(key=lambda e: e.get("createdAt") or "", reverse=True)
+            threads = matches[0].get("threads") or []
+            discussion = next(
+                (t for t in threads if t.get("type") == "DISCUSSION"), None
+            )
+            chosen = discussion or (threads[0] if threads else None)
+            return str(chosen["id"]) if chosen and chosen.get("id") else None
+        return await _a.to_thread(_sync)
+    except Exception as e:
+        logger.debug(f"arena_v2 _fetch_forum_thread_from_public_api: {e}")
+        return None
 
 
 async def _get_dgclaw_hl_balance(wallet: str) -> Optional[float]:
@@ -889,14 +1017,19 @@ async def _run_deposit_flow(
                 api_key = leaderboard_resp.get("dgclawApiKey")
                 if api_key:
                     await store_arena_v2_dgclaw_key(agent_record_id, api_key)
-                # Extract forum thread id from leaderboard deliverable as fallback
+                # Forum thread id: try deliverable, then public forums API.
                 if not creds.get("dgclaw_forum_thread_id"):
                     fallback_thread = (
                         leaderboard_resp.get("forumThreadId")
                         or _extract_forum_thread_id(leaderboard_resp.get("deliverable"))
+                        or await _fetch_forum_thread_from_public_api(creds.get("agent_name"))
                     )
                     if fallback_thread:
                         await store_arena_v2_forum_thread_id(agent_record_id, fallback_thread)
+                        logger.info(
+                            f"arena_v2 deposit_flow: forum_thread_id stored "
+                            f"{fallback_thread} for {agent_record_id[:8]}"
+                        )
             else:
                 # Leaderboard is nice-to-have — log but don't fail the whole flow.
                 logger.warning(

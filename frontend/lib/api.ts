@@ -566,6 +566,10 @@ export class ApiClient {
     hl_api_wallet_authorized?: boolean
     leaderboard_joined?: boolean
     dgclaw_balance?: number | null
+    hl_subaccount_address?: string | null
+    is_tokenized?: boolean
+    token_address?: string | null
+    tokenize_url?: string
     deposit_progress?: {
       stage: 'starting' | 'depositing' | 'hl_setup' | 'leaderboard' | 'complete' | 'failed'
       message: string

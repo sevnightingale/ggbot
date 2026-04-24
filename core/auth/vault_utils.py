@@ -1226,6 +1226,60 @@ async def store_arena_v2_forum_thread_id(
         return False
 
 
+async def store_arena_v2_token_address(
+    agent_record_id: str,
+    token_address: str,
+) -> bool:
+    """Persist the agent's on-chain ERC20 token address once tokenized on
+    Virtuals. Source: https://api.acp.virtuals.io/agents/wallet/{wallet}
+    → chains[0].tokenAddress. Presence acts as the `is_tokenized` flag."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE arena_agents_v2
+                    SET token_address = %s, updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (token_address, agent_record_id),
+                )
+                conn.commit()
+                return True
+    except Exception as e:
+        logger.error(
+            f"arena_v2: store_arena_v2_token_address failed for {agent_record_id}: {e}"
+        )
+        return False
+
+
+async def store_arena_v2_hl_subaccount(
+    agent_record_id: str,
+    subaccount_address: str,
+) -> bool:
+    """Persist the DGClaw-assigned HL subaccount address. Populated
+    opportunistically from /users/{wallet}/account when DGClaw exposes it
+    during active trading. Powers v2 close-sync from HL fills."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE arena_agents_v2
+                    SET hl_subaccount_address = %s, updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (subaccount_address, agent_record_id),
+                )
+                conn.commit()
+                return True
+    except Exception as e:
+        logger.error(
+            f"arena_v2: store_arena_v2_hl_subaccount failed for {agent_record_id}: {e}"
+        )
+        return False
+
+
 async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
     """
     Load the arena_agents_v2 row for a config, with all vault secrets
@@ -1249,6 +1303,8 @@ async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
                            hl_api_wallet_key_vault_id,
                            dgclaw_api_key_vault_id,
                            dgclaw_forum_thread_id,
+                           token_address,
+                           hl_subaccount_address,
                            status
                     FROM arena_agents_v2
                     WHERE config_id = %s AND status <> 'retired'
@@ -1265,7 +1321,7 @@ async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
                     agent_record_id, user_id, virtuals_agent_id, agent_name,
                     agent_wallet_address, wallet_id,
                     signer_vault_id, hl_vault_id, dgclaw_vault_id,
-                    forum_thread_id, status,
+                    forum_thread_id, token_address, hl_subaccount_address, status,
                 ) = row
 
                 def _decrypt(vault_id: Any) -> Optional[str]:
@@ -1299,6 +1355,8 @@ async def get_arena_v2_credential(config_id: str) -> Optional[Dict[str, Any]]:
                     'hl_api_wallet_key': hl_api_wallet_key,    # 0x-hex or None
                     'dgclaw_api_key': dgclaw_api_key,          # plaintext or None
                     'dgclaw_forum_thread_id': forum_thread_id,
+                    'token_address': token_address,
+                    'hl_subaccount_address': hl_subaccount_address,
                     'status': status,
                 }
     except Exception as e:
