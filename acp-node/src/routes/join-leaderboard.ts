@@ -104,7 +104,9 @@ export function registerJoinLeaderboard(app: FastifyInstance) {
         requirement: { agentAddress: agentWalletAddress, publicKey },
         priceType: offering.priceType,
         priceValue: Number(offering.price),
-        expiredAt: new Date(Date.now() + (offering.slaMinutes || 10) * 60 * 1000),
+        // DGClaw's offering advertises 5min but actual delivery is slower.
+        // Override to 30min to prevent on-chain job expiry before seller delivers.
+        expiredAt: new Date(Date.now() + 30 * 60 * 1000),
         offeringName: 'join_leaderboard',
       })
     } catch (err) {
@@ -118,6 +120,7 @@ export function registerJoinLeaderboard(app: FastifyInstance) {
     const started = Date.now()
     let lastPhase: Phase | null = null
     let funded = false
+    let fundAttempts = 0
     let completed = false
     let deliverable: any = null
 
@@ -142,15 +145,27 @@ export function registerJoinLeaderboard(app: FastifyInstance) {
       }
 
       if (phase === 'NEGOTIATION' && !funded) {
+        // DGClaw's requirement memo takes a few seconds to propagate after
+        // the NEGOTIATION phase transition. payAndAcceptRequirement throws
+        // "No notification memo found" if we call too early — retry with
+        // increasing backoff up to 6 attempts (~60s).
+        fundAttempts += 1
         try {
           await adapter.fundJob(jobId, 'ggbots leaderboard fee')
           funded = true
+          req.log.info({ jobId, fundAttempts }, 'join-leaderboard: fund call submitted')
         } catch (err) {
-          reply.code(502).send({ error: 'fundJob failed', detail: String(err), jobId })
+          const msg = String(err)
+          if (msg.includes('No notification memo') && fundAttempts < 6) {
+            req.log.info({ jobId, fundAttempts }, 'join-leaderboard: memo not ready, will retry')
+            await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS * 2))
+            continue
+          }
+          reply.code(502).send({ error: 'fundJob failed', detail: msg, jobId, fundAttempts })
           return
         }
       } else if (phase === 'EVALUATION' && !completed) {
-        deliverable = (job as any).deliverable ?? null
+        try { deliverable = (job as any).getDeliverable?.() ?? null } catch { deliverable = null }
         try {
           await adapter.completeJob(jobId, 'ggbots approved leaderboard')
           completed = true
@@ -159,7 +174,7 @@ export function registerJoinLeaderboard(app: FastifyInstance) {
           return
         }
       } else if (phase === 'COMPLETED') {
-        deliverable = (job as any).deliverable ?? deliverable
+        try { deliverable = (job as any).getDeliverable?.() ?? deliverable } catch { /* keep existing */ }
         req.log.info({ jobId, deliverable }, 'join-leaderboard: COMPLETED — deliverable for schema discovery')
 
         // Decrypt the DGClaw API key from the deliverable (if present).

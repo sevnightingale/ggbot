@@ -170,7 +170,8 @@ export function registerDeposit(app: FastifyInstance) {
           return
         }
       } else if (phase === 'EVALUATION' && !completed) {
-        deliverable = (job as any).deliverable ?? null
+        // v1 SDK: getDeliverable() returns DeliverablePayload | null (string | object)
+        try { deliverable = (job as any).getDeliverable?.() ?? null } catch { deliverable = null }
         try {
           req.log.info({ jobId }, 'deposit: completing job')
           await adapter.completeJob(jobId, 'ggbots approved')
@@ -182,7 +183,7 @@ export function registerDeposit(app: FastifyInstance) {
           return
         }
       } else if (phase === 'COMPLETED') {
-        deliverable = (job as any).deliverable ?? deliverable
+        try { deliverable = (job as any).getDeliverable?.() ?? deliverable } catch { /* keep existing */ }
         req.log.info(
           { jobId, agentWalletAddress, deliverable },
           'deposit: COMPLETED — logging deliverable for schema discovery',
