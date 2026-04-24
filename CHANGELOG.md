@@ -56,10 +56,13 @@ End-to-end verified on `Contrarian test 2` (config `784abb6e...`, agent `0x0b3af
 
 **Commits**: `34bfbca` → `a9ac981` → `e003324` → `f721db0` over ~16 hours.
 
-**Still open** (not blocking trading):
-- forum_thread_id capture — leaderboard deliverable doesn't include it, need separate `https://degen.virtuals.io/api/forums/{agentId}` query
-- HL subaccount address opportunistic capture on `/status` polls (for close-sync from HL fills)
-- ~$0.05 burned in expired leaderboard jobs during debugging (acceptable tuition)
+**Polish pass** (later same day, commit `6a56748`):
+- **forum_thread_id capture** (`api/arena_v2.py:_fetch_forum_thread_from_public_api`): walks `https://degen.virtuals.io/api/forums` newest-first, matches by agent name, prefers DISCUSSION thread (SIGNALS gated). Third fallback after deliverable parse. Backfilled live agent to thread `923`; unblocks `_post_virtuals_forum_entry` hook for AI Council posts.
+- **Tokenization gate** (`arena_v2.py:_fetch_virtuals_token_address`): probes `https://api.acp.virtuals.io/agents/wallet/{wallet}` → `chains[0].tokenAddress` (public endpoint despite SDK `authedFetch`). `/status` does Redis-gated probe (60s) when `token_address IS NULL`, persists once tokenized. `DeployLiveModal` hard-blocks deposit with amber banner + deep link to `app.virtuals.io/agents/{uuid}` when `is_tokenized === false`.
+- **HL subaccount opportunistic capture**: `/status` reads `hlSubaccountAddress` from DGClaw Railway response when exposed (only during active positions), one-shot persist via `store_arena_v2_hl_subaccount`. Mirrors v1 pattern in `api/virtuals_arena.py:299`. Powers future v2 close-sync from HL fills.
+- **Schema**: `database/migrations/arena_v2_add_token_and_subaccount.sql` adds `token_address` + `hl_subaccount_address` to `arena_agents_v2` with partial indexes.
+- **Cleanup**: orphan test config `c1bc37da...` + its `arena_agents_v2` row + vault signer secret deleted.
+- **Tuition**: ~$0.05 burned in expired leaderboard jobs during debugging (acceptable).
 
 ---
 

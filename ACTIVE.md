@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-04-24 06:17:00 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-04-24 15:27:40 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,9 +12,9 @@
 - **Users with Bots**: 347 (96.4%)
 
 ### Bot Statistics
-- **Total Bots**: 563
-- **Active Bots**: 29 (5.2%)
-  - Paper: 27
+- **Total Bots**: 564
+- **Active Bots**: 30 (5.3%)
+  - Paper: 28
   - Symphony (Live): 0
   - Aster (DEX): 0
   - Hyperliquid (Live): 2
@@ -22,49 +22,49 @@
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 8,404
-  - Wins: 2,873
-  - Losses: 5,531
-  - Platform Win Rate: 34.19%
-  - Total P&L: $114,654.26
+- **Total Trades (All Time)**: 8,411
+  - Wins: 2,874
+  - Losses: 5,537
+  - Platform Win Rate: 34.17%
+  - Total P&L: $114,549.70
 - **Recent Activity**:
-  - Last 24 hours: 18 trades
-  - Last 7 days: 130 trades
-  - Last 30 days: 873 trades
+  - Last 24 hours: 21 trades
+  - Last 7 days: 128 trades
+  - Last 30 days: 883 trades
 
 ### Open Positions
-- **Open Positions**: 6
+- **Open Positions**: 10
 - **Unique Symbols**: 3
-- **Total Exposure**: $106,803.92
+- **Total Exposure**: $141,121.14
 - **Unrealized P&L**: $690.93
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $10,186.20
+- **Average Balance**: $10,185.68
 - **Lowest Balance**: $304.09
 - **Highest Balance**: $126,965.26
 
 ### Top Trading Symbols (Active Bots)
 
-- **ETH/USDT**: 15 bots
+- **ETH/USDT**: 16 bots
 - **BTC/USDT**: 14 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 804 decisions (avg confidence: 23.0%)
-- **enter**: 18 decisions (avg confidence: 72.4%)
-- **exit**: 14 decisions (avg confidence: 71.8%)
+- **wait**: 787 decisions (avg confidence: 25.2%)
+- **enter**: 22 decisions (avg confidence: 72.4%)
+- **exit**: 9 decisions (avg confidence: 73.9%)
 
 ### System Health
-- **Decisions (last hour)**: 35
+- **Decisions (last hour)**: 36
 - **Status**: 🟢 HEALTHY
 
 ## 💰 Business Metrics
 
 ### Revenue
-- **All-Time Revenue**: $751.25 (margin: $309.33, 41.2%)
-- **Last 30d Revenue**: $123.28 from 20 users
-- **Month-to-Date**: $106.74 (projected: ~$133.42)
-- **Avg LTV (paid)**: $23.35
+- **All-Time Revenue**: $752.76 (margin: $309.95, 41.2%)
+- **Last 30d Revenue**: $124.73 from 20 users
+- **Month-to-Date**: $108.25 (projected: ~$135.31)
+- **Avg LTV (paid)**: $23.40
 
 ### Conversion Funnel
 - **Signup → Created Bot**: 95.8%
@@ -80,7 +80,7 @@
 ### Live Trading (Hyperliquid)
 - **Connected Wallets**: 5
 - **Active Bots**: 2
-- **Total Volume**: $70,973.23
+- **Total Volume**: $71,153.17
 
 ## 🖥️ System Resources
 
@@ -88,26 +88,26 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 33MB | 10m | 0 |
-| account-monitor | 🟢 online | 1.1% | 192MB | 10m | 0 |
-| market-data-ws | 🟢 online | 0.6% | 217MB | 10m | 0 |
-| ggbot-scheduler | 🟢 online | 0% | 223MB | 10m | 0 |
-| sebastian-virtuals | 🟢 online | 0% | 91MB | 10m | 0 |
-| sebastian-chrome | 🟢 online | 0.2% | 223MB | 10m | 0 |
-| sebastian-telegram | 🟢 online | 0% | 40MB | 10m | 0 |
-| sebastian-bot | 🟢 online | 0.2% | 71MB | 10m | 0 |
-| ggbot | 🟢 online | 1.5% | 253MB | 10m | 0 |
-| acp-node | 🟢 online | 0% | 63MB | 7m | 1 |
+| error-alerts | 🟢 online | 0% | 18MB | 9h 20m | 0 |
+| account-monitor | 🟢 online | 0.5% | 33MB | 9h 20m | 0 |
+| market-data-ws | 🟢 online | 1.4% | 14MB | 9h 20m | 0 |
+| ggbot-scheduler | 🟢 online | 0.1% | 218MB | 12m | 2 |
+| sebastian-virtuals | 🟢 online | 0.6% | 38MB | 9h 20m | 0 |
+| sebastian-chrome | 🟢 online | 0.1% | 40MB | 9h 20m | 0 |
+| sebastian-telegram | 🟢 online | 0% | 14MB | 9h 20m | 0 |
+| sebastian-bot | 🟢 online | 0.2% | 47MB | 8h 1m | 1 |
+| ggbot | 🟢 online | 3.2% | 252MB | 12m | 5 |
+| acp-node | 🟢 online | 0% | 53MB | 1h 17m | 11 |
 
 ### VM Resources
 
-- **Disk**: 53G / 78G (69%)
+- **Disk**: 54G / 78G (69%)
 - **Memory**: 2.5Gi / 3.8Gi
-- **CPU Load**: 0.37 / 0.52 / 0.40 (1m/5m/15m)
+- **CPU Load**: 0.46 / 0.25 / 0.21 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 24.31M)
+- **Redis**: 🟢 connected (Memory: 24.35M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -593,7 +593,7 @@ When adding any table that references `configurations.config_id`, apply this dec
 
 ## 📊 Database Schema
 
-**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-04-24 06:17:02 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
+**Auto-generated** by `scripts/status_check.py` | **Updated**: 2026-04-24 15:27:42 UTC | **Design decisions**: [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)
 
 **Conventions**: `?` = nullable, `=value` = non-obvious default, standard defaults (uuid, now(), 0, false) omitted
 
@@ -627,11 +627,12 @@ dgclaw_api_key_vault_id uuid?, token_address varchar?, token_symbol varchar?, as
 assigned_at timestamptz?, status varchar?=available' varying, created_at timestamptz?, user_wallet_address varchar?
 assigned_config_id uuid?, hl_subaccount_address varchar(42)?
 
-### arena_agents_v2 (14 cols) | PK: id | FK: config_id→configurations | UQ: virtuals_agent_id
-Idx: arena_agents_v2_virtuals_agent_id_key(virtuals_agent_id), idx_arena_v2_config(config_id), idx_arena_v2_config_active(config_id), idx_arena_v2_user(user_id), idx_arena_v2_wallet(agent_wallet_ad...
+### arena_agents_v2 (16 cols) | PK: id | FK: config_id→configurations | UQ: virtuals_agent_id
+Idx: arena_agents_v2_virtuals_agent_id_key(virtuals_agent_id), idx_arena_agents_v2_hl_subaccount(hl_subaccount_address), idx_arena_agents_v2_token_address(token_address), idx_arena_v2_config(config...
 id uuid, user_id uuid, config_id uuid?, virtuals_agent_id text, agent_name text, agent_wallet_address varchar(42)
 wallet_id text, signer_private_key_vault_id uuid, hl_api_wallet_key_vault_id uuid?, dgclaw_api_key_vault_id uuid?
 dgclaw_forum_thread_id text?, status text=provisioning, created_at timestamptz, updated_at timestamptz
+token_address text?, hl_subaccount_address text?
 
 ### arena_pledges (12 cols) | PK: id | FK: config_id→configurations | UQ: tx_hash
 Idx: arena_pledges_tx_hash_key(tx_hash), idx_arena_pledges_config(config_id), idx_arena_pledges_pledged_at(pledged_at), idx_arena_pledges_user(user_id), idx_arena_pledges_wallet(wallet_address)
@@ -822,7 +823,7 @@ Fields: source: DataSource, data_points: list[DataPoint]
 
 ## ⚙️ Configuration Structure (config_data JSONB)
 
-Source: `core/config/models.py` | Auto-generated 2026-04-24 06:17:02 UTC
+Source: `core/config/models.py` | Auto-generated 2026-04-24 15:27:42 UTC
 
 - `schema_version`: str=1.0 — Configuration schema version
 - `selected_pair`: Optional[str] — Trading pair to analyze

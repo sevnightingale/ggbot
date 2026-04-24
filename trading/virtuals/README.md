@@ -15,6 +15,12 @@
 
 **v2 lifecycle (verified end-to-end)**: deploy (2 popups) → tokenize → deposit via DGClaw (Base USDC → HL spot, ~$1 bridge fee) → HL setup (unified margin + API wallet auth) → leaderboard join (RSA-encrypted API key) → direct HL trade → close. 2-5 min for deposit, seconds for trades.
 
+**v2 schema + opportunistic capture (2026-04-24)**:
+- `arena_agents_v2.token_address` — populated from `https://api.acp.virtuals.io/agents/wallet/{wallet}` → `chains[0].tokenAddress` (public endpoint despite SDK `authedFetch`). Presence = "tokenized". `/status` probes on demand, 60s Redis coalescing, one-shot persist.
+- `arena_agents_v2.hl_subaccount_address` — DGClaw's Railway `/users/{wallet}/account` only exposes `hlSubaccountAddress` while a position is active. `/status` grabs it opportunistically, never overwrites. Powers future v2 close-sync (mirror of `sync_closes_from_hl` in v1).
+- `arena_agents_v2.dgclaw_forum_thread_id` — not exposed in ACP deliverables. Final fallback: walk `https://degen.virtuals.io/api/forums` newest-first, match by agent name, prefer DISCUSSION thread (SIGNALS is gated). Unblocks orchestrator's `_post_virtuals_forum_entry` hook for AI Council visibility.
+- Modal gates deposit button on `is_tokenized`: amber banner with deep link to `https://app.virtuals.io/agents/{uuid}` when `token_address IS NULL`. Prevents silent leaderboard-job expiry.
+
 **v1 content below** still describes the shared-pool mirror architecture for the existing Phase 2 pool agents. Both paths coexist.
 
 Trade perpetuals on the Virtuals DGClaw arena via ACP (Agent Commerce Protocol). All trades are on-chain ACP transactions executed on Hyperliquid through the DGClaw agent. Every trade generates ACP volume for $GG token graduation.

@@ -6,14 +6,15 @@ Active tasks and planned work, ordered by priority. See CHANGELOG.md for complet
 
 ## 🚀 **ACP v2 Migration — SHIPPED** ✅
 
-**Status**: 🟢 **FULLY OPERATIONAL** — deposit, HL setup, leaderboard, direct HL trading all verified end-to-end 2026-04-24.
+**Status**: 🟢 **FULLY OPERATIONAL** — deposit, HL setup, leaderboard, direct HL trading all verified end-to-end 2026-04-24. Polish pass shipped same day.
 **See**: CHANGELOG 2026-04-24 entry for full details.
 
-### Polish remaining (not blocking trading)
-- [ ] **forum_thread_id capture** — leaderboard deliverable doesn't include it. Need separate query: `GET https://degen.virtuals.io/api/forums/{agentId}` → parse threads[0].id → store in `arena_agents_v2.dgclaw_forum_thread_id`. Unblocks orchestrator's forum-post hook (already wired at `orchestrator.py:1441` and `:1443` entry + exit).
-- [ ] **HL subaccount opportunistic capture** — on `/status` polls when DGClaw backend exposes `hlSubaccountAddress` (only during active trades). Adds to `arena_agents_v2` schema (column missing — needs migration). Powers v2 close-sync from HL fills, mirroring `trading/virtuals/arena_sync.py:sync_closes_from_hl` for v1.
-- [ ] **Tokenization status in `/status` + modal gating** — show "Tokenize your agent on Virtuals dashboard → [link]" when `chains[0].tokenAddress` is null on Virtuals API. Currently users hit leaderboard-job-silent-expiry without understanding why.
-- [ ] **Delete empty "Sebastian's Contrarian" pool bot** (config `c1bc37da-b1d4-4fc7-98af-1e5a0e3c39b9`) — duplicate created during testing, never funded. Safe to delete (no funds, provisioning status).
+### Polish shipped (2026-04-24)
+- [x] **forum_thread_id capture** via public `degen.virtuals.io/api/forums` index, third fallback after deliverable parse. Backfilled live agent (thread `923`).
+- [x] **HL subaccount opportunistic capture** on `/status`, one-shot persist when DGClaw exposes `hlSubaccountAddress` during active trades.
+- [x] **Tokenization status in `/status` + modal gating** — probes `api.acp.virtuals.io/agents/wallet/{wallet}`, Redis-gated, DeployLiveModal hard-blocks with deep link when not tokenized.
+- [x] **Orphan test bot cleanup** — config `c1bc37da...` + arena_agents_v2 row + vault secret deleted.
+- [x] **Schema migration**: `database/migrations/arena_v2_add_token_and_subaccount.sql` applied.
 
 ### Original decisions locked in
 Introduce `trading_mode='virtuals'` as the canonical live-trading path. Virtuals agents trade directly on Hyperliquid via their Privy-provisioned API wallet; DGClaw pools USDC centrally on HL spot account, unified margin activates it for perp trading. DGClaw leaderboard reads HL state by wallet. "Deploy Live Version" reuses the existing arena button/modal. Legacy `trading_mode='hyperliquid'` kept as non-custodial fallback (1 bot/user, unchanged). Custodial-but-revocable signer — users revoke via Virtuals dashboard anytime.
