@@ -133,7 +133,11 @@ export function ActivationBar({
       }
       try {
         const s = await apiClient.arenaV2Status(selectedBot.config_id)
-        setV2Funded((s.hl_account_value ?? 0) > 0)
+        // DGClaw pools funds centrally — dgclaw_balance is the source of truth.
+        // hl_account_value is $0 unless there's an active position with margin.
+        const dgclaw = s.dgclaw_balance ?? 0
+        const hl = s.hl_account_value ?? 0
+        setV2Funded(dgclaw > 0 || hl > 0)
       } catch {
         // Non-critical — default to not funded; user can retry via the button
       }
@@ -141,10 +145,11 @@ export function ActivationBar({
 
     fetchConfigUsage()
     fetchV2Status()
-    // Refresh every 5 minutes while component is mounted (v2 status refreshed
-    // more often from inside DeployLiveModal when it's open).
-    const interval = setInterval(() => { fetchConfigUsage(); fetchV2Status() }, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    // v2 status refreshes every 30s so the button state (needs_funds → manage)
+    // flips quickly once DGClaw shows balance. Usage can refresh slower.
+    const v2Interval = setInterval(fetchV2Status, 30 * 1000)
+    const usageInterval = setInterval(fetchConfigUsage, 5 * 60 * 1000)
+    return () => { clearInterval(v2Interval); clearInterval(usageInterval) }
   }, [selectedBot.config_id, selectedBot.trading_mode])
 
   const deployButtonState: 'deploy' | 'needs_funds' | 'manage' | null =

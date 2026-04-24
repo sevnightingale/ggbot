@@ -670,20 +670,22 @@ async def arena_v2_status(
     is_authorized = bool(creds.get("hl_api_wallet_key"))
     is_leaderboard_joined = bool(creds.get("dgclaw_api_key"))
 
-    # Include DGClaw-side pooled balance if the agent has joined the leaderboard
-    # (hlBalance lives on DGClaw's backend, not on HL directly — DGClaw pools funds).
+    # DGClaw pools funds centrally — hlBalance lives on their Railway backend,
+    # not on HL directly. Always query (it's a public endpoint); balance can
+    # exist BEFORE leaderboard registration (deposit lands on DGClaw first).
     dgclaw_balance: Optional[float] = None
-    if is_leaderboard_joined:
-        try:
-            dgclaw_resp = requests.get(
-                f"https://dgclaw-app-production.up.railway.app/users/{wallet}/account",
-                timeout=5,
-            )
-            if dgclaw_resp.status_code == 200:
-                dgclaw_data = (dgclaw_resp.json() or {}).get("data", {}) or {}
-                dgclaw_balance = float(dgclaw_data.get("hlBalance", 0) or 0)
-        except Exception as e:
-            logger.debug(f"arena_v2 status: DGClaw balance fetch failed for {wallet[:10]}: {e}")
+    try:
+        dgclaw_resp = requests.get(
+            f"https://dgclaw-app-production.up.railway.app/users/{wallet}/account",
+            timeout=5,
+        )
+        if dgclaw_resp.status_code == 200:
+            dgclaw_data = (dgclaw_resp.json() or {}).get("data", {}) or {}
+            dgclaw_balance = float(dgclaw_data.get("hlBalance", 0) or 0)
+        elif dgclaw_resp.status_code == 404:
+            dgclaw_balance = 0.0   # agent hasn't deposited yet
+    except Exception as e:
+        logger.debug(f"arena_v2 status: DGClaw balance fetch failed for {wallet[:10]}: {e}")
 
     return {
         "status": "active" if is_authorized else "provisioning",
