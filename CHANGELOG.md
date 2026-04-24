@@ -6,6 +6,63 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-04-24 - ACP v2 Migration: Full Lifecycle Operational (deposit → trade → close)
+
+End-to-end verified on `Contrarian test 2` (config `784abb6e...`, agent `0x0b3af4d7...`): deploy → tokenize → deposit → HL setup → leaderboard join → direct HL trade (0.0048 ETH @ $2310.20 → closed @ $2309.50) → spot balance preserved.
+
+**LegacyBuyerAdapter compat layer** (`acp-node/src/lib/compat/`):
+- Ports `@Virtual-Protocol/acp-cli`'s v1/v2 bridge — v2 Privy adapter signs, v1 contract target. Official supported pattern, same code path acp-cli uses with `--legacy` flag.
+- `legacyContractBridge.ts` (187 lines): `BaseAcpContractClient` impl routing v2 `PrivyAlchemyEvmProviderAdapter.sendCalls` to the v1 ACP contract. Includes JobCreated event decoder for jobId retrieval.
+- `legacyBuyerAdapter.ts` (146 lines): high-level buyer API — `getAgent`, `createJob`, `fundJob`, `completeJob`. Wraps v1 `AcpClient` internally.
+- Deps: adds `@virtuals-protocol/acp-node@^0.3.0-beta.40` alongside existing `-v2@^0.0.5`.
+
+**Deposit flow** (`acp-node/src/routes/deposit.ts` rewrite, 230 lines):
+- v2 SDK → v1 DGClaw interop via `LegacyBuyerAdapter.createJob({offeringName:'perp_deposit'})` instead of `AcpAgent.createJobFromOffering` (which fails silently against v1 providers — jobs land on v2 contract that DGClaw's indexer doesn't watch).
+- 5-phase poll: REQUEST → NEGOTIATION (auto-fund on memo) → TRANSACTION → EVALUATION (auto-complete) → COMPLETED. Reads `job.getDeliverable()` (method, not property — v1 SDK gotcha).
+- Verified: $10 Base USDC → $8.99 HL spot in 1:37 total (~$0.01 DGClaw bridge fee + ~$1 wallet reserve).
+
+**Leaderboard flow** (`acp-node/src/routes/join-leaderboard.ts` rewrite):
+- Same LegacyBuyerAdapter pattern, RSA keypair preserved for DGClaw's encrypted API key deliverable. 30-min `expiredAt` override (DGClaw's advertised 5min SLA insufficient).
+- Memo-propagation race fix: on NEGOTIATION phase, `payAndAcceptRequirement` throws "No notification memo found" if called before DGClaw's requirement memo lands — retry 10s backoff up to 6x.
+- **Tokenization gate discovered**: `dgclaw-skill/scripts/dgclaw.sh` requires agent tokenized before `join_leaderboard` delivers. Untokenized agents paid $0.01 → stuck at TRANSACTION forever (DGClaw takes fee, never delivers). Three expired jobs burned $0.03 before discovery.
+
+**Async + idempotent `/check-deposit`** (`api/arena_v2.py` rewrite):
+- Returns `{status:"in_progress"}` immediately after fast validation, spawns `asyncio.create_task(_run_deposit_flow)` background task. Solves nginx 5min `proxy_read_timeout` silently killing frontend HTTP during 2-30min deposit flows.
+- Redis progress tracking: `arena_v2:deposit_progress:{config_id}` JSON with stage/message, 2h TTL. Stages: `starting` → `depositing` → `hl_setup` → `leaderboard` → `complete | failed`.
+- Idempotent retry: skips `perp_deposit` if DGClaw already shows balance, skips HL setup if `hl_api_wallet_key` vaulted, skips leaderboard if `dgclaw_api_key` vaulted. Safe to hit Deposit again at any failure point.
+- Rejects `already_in_progress` if a flow is mid-way (prevents double-click race).
+
+**v2 architecture clarification** (the key insight):
+- DGClaw's `perp_deposit` lands USDC on the agent's HL **spot** account (not perp).
+- Unified margin account activated via `setup-hl-unified-account` auto-uses spot USDC as perp collateral — no manual `usdClassTransfer` needed.
+- v2 agents trade DIRECTLY on Hyperliquid via their authorized API wallet (not through DGClaw's ACP `perp_trade` — that 403s for v2 "leaderboard" API keys which are read-only).
+- Existing `hyperliquid_service` already routes virtuals-mode bots correctly via `resolve_hl_credentials(trading_mode='virtuals')` — no orchestrator refactor needed.
+
+**Frontend** (`DeployLiveModal.tsx` + `api.ts` + `ActivationBar.tsx`):
+- New `processing` stage with animated 4-step stepper + "ok to close" messaging + retry-from-last-stage button on failure.
+- Fund stage splits: wallet address first (Step 1/2), amount input appears only after Base balance ≥ minimum (Step 2/2).
+- `ActivationBar.v2Funded = dgclaw_balance > 0 || hl_account_value > 0` (was only checking HL main which is $0 while funds pool on DGClaw). Poll every 30s.
+- `/status` always fetches `dgclaw_balance` from DGClaw Railway backend (was gated on leaderboard_joined — hid balance exactly when users needed it).
+
+**Bug fixes shipped this session**:
+- HL `approveAgent` rejects >16-char "extra agent name" — truncate `creds["agent_name"][:16]`
+- Orphan `arena_agents_v2` stuck-in-provisioning cleanup via atomic SQL (DB + vault secret + config row deletion)
+- 2-bot frontend confusion: same `agent_name` across two different `config_name` rows surfaces as duplicate rail entries
+
+**Files**:
+- NEW: `acp-node/src/lib/compat/legacyContractBridge.ts`, `acp-node/src/lib/compat/legacyBuyerAdapter.ts`, `acp-node/src/routes/deposit.ts` (rewritten), `acp-node/src/routes/join-leaderboard.ts` (rewritten), `core/services/base_rpc.py`, `database/migrations/extend_valid_trading_mode_virtuals.sql`
+- EDIT: `api/arena_v2.py`, `core/auth/vault_utils.py` (+`store_arena_v2_forum_thread_id`), `core/orchestrator/orchestrator.py` (exit forum-post hook), `frontend/components/DeployLiveModal.tsx`, `frontend/lib/api.ts`, `frontend/app/forge/components/monitor/ActivationBar.tsx`, `acp-node/package.json`, `acp-node/src/index.ts`
+- DELETE: `acp-node/src/routes/bridge-usdc-to-hl.ts` (dead Arbitrum bridge path)
+
+**Commits**: `34bfbca` → `a9ac981` → `e003324` → `f721db0` over ~16 hours.
+
+**Still open** (not blocking trading):
+- forum_thread_id capture — leaderboard deliverable doesn't include it, need separate `https://degen.virtuals.io/api/forums/{agentId}` query
+- HL subaccount address opportunistic capture on `/status` polls (for close-sync from HL fills)
+- ~$0.05 burned in expired leaderboard jobs during debugging (acceptable tuition)
+
+---
+
 ## 2026-04-22 - ACP v2 Migration: Phase 0 GATE PASSED + Phase 1 Scaffolding
 
 **Phase 0 gate harness** (`api/acp_v2_test.py` 8 admin-only routes + `frontend/app/test/acp-v2/`):

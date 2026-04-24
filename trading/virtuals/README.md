@@ -1,17 +1,21 @@
 # Virtuals DGClaw Trading
 
-**Status**: Phase 1 + Phase 2 COMPLETE (2026-04-07). PROVEN WORKING IN PRODUCTION.
-**Parallel work**: A separate ACP v2 migration track is mid-pivot — see [DOCS/todo/ACP_V2_SESSION_HANDOFF.md](../../DOCS/todo/ACP_V2_SESSION_HANDOFF.md).
+**Two live production paths as of 2026-04-24:**
 
-> ⚠️ **Read this before touching anything in this directory.**
->
-> Two orthogonal tracks exist:
->
-> 1. **This file documents the v1 arena mirror architecture** — `arena_agents` table, lite-agent pool, `claw_api.py`, `api/virtuals_arena.py`. Ships the "Enter Degen Arena" button on ActivationBar. Proven, working, mirrors trades from paper/HL bots to DGClaw via ACP v1 jobs.
->
-> 2. **A parallel ACP v2 migration attempt** lives in `api/arena_v2.py`, `database/migrations/add_arena_agents_v2.sql`, `acp-node/` sidecar. Intent: replace the mirror architecture with "each user gets their own Virtuals agent that IS the HL trader." As of 2026-04-24, this work is **mid-pivot** after discovering deposits must go through `perp_deposit` ACP jobs, not on-chain bridges. See the session handoff doc.
->
-> **Neither track is actively dying — the v1 lite-agent-pool path (this doc) is the shipped, working option users use today.** The v2 migration is a possible upgrade, not a replacement in progress.
+| Path | Architecture | Who uses it | Key files |
+|---|---|---|---|
+| **v1 mirror** (Phase 1+2, shipped 2026-03-26 to 2026-04-07) | Paper/HL bot runs normally → ACP `perp_trade` job mirrors trade to shared lite-agent pool → DGClaw executes on HL. Content below describes this path. | Existing users with the "Enter Degen Arena" button on their paper bots. Admin manages pool agents. | `claw_api.py`, `arena_sync.py`, `api/virtuals_arena.py`, `dgclaw_service.py` |
+| **v2 direct** (shipped 2026-04-24, full lifecycle verified) | User deploys their own v2 Virtuals agent → deposit via ACP `perp_deposit` → USDC lands on agent's HL spot → unified margin auto-collateralizes perp → bot trades DIRECTLY on HL via authorized API wallet. `arena_agents_v2` table. | New "Deploy Live Version" flow on paper bots. Per-user agent, tokenized, on DGClaw leaderboard. | `api/arena_v2.py`, `acp-node/` sidecar (+ `lib/compat/` for v1 DGClaw interop), `core/auth/vault_utils.py:resolve_hl_credentials`, `hyperliquid_service` (shared with `trading_mode='hyperliquid'`) |
+
+**v2 architecture insights**:
+- DGClaw's `perp_deposit` provider is still on ACP v1. v2-provisioned agents reach it via `LegacyBuyerAdapter` in `acp-node/src/lib/compat/` — an officially-shipped v1/v2 bridge pattern from `@Virtual-Protocol/acp-cli`, same code path the CLI uses with `--legacy`.
+- Trading itself bypasses DGClaw entirely — v2 agents trade direct on HL via their authorized API wallet. The claw API key from `join_leaderboard` is read-only (forums + leaderboard queries).
+- **Tokenization is required** for `join_leaderboard` — untokenized agents silently fail delivery (DGClaw takes $0.01 fee, never delivers encrypted API key). Tokenize via Virtuals dashboard (gas only).
+- DGClaw pools USDC centrally; the per-agent HL subaccount is created dynamically when a trade opens. `info.user_state(wallet)` shows $0 until a position is active; balance visible via `spot_user_state` (spot account) + DGClaw Railway `/users/{wallet}/account.hlBalance`.
+
+**v2 lifecycle (verified end-to-end)**: deploy (2 popups) → tokenize → deposit via DGClaw (Base USDC → HL spot, ~$1 bridge fee) → HL setup (unified margin + API wallet auth) → leaderboard join (RSA-encrypted API key) → direct HL trade → close. 2-5 min for deposit, seconds for trades.
+
+**v1 content below** still describes the shared-pool mirror architecture for the existing Phase 2 pool agents. Both paths coexist.
 
 Trade perpetuals on the Virtuals DGClaw arena via ACP (Agent Commerce Protocol). All trades are on-chain ACP transactions executed on Hyperliquid through the DGClaw agent. Every trade generates ACP volume for $GG token graduation.
 
