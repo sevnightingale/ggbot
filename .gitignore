@@ -23,45 +23,16 @@ logs/
 .DS_Store
 Thumbs.db
 
-
-# Telegram session files
-*.session
-*.session-journal
-
-# ggShot service directory (contains sensitive configs and session data)
-ggshot/
-
-# Hummingbot Integration
-# hummingbot-api is the official cloned repository - now organized under hummingbot/
-hummingbot/api/
-
-# hummingbot_client is auto-generated API client code - now organized under hummingbot/
-hummingbot/client/
-
-# OpenAPI generation config
-openapitools.json
-
-# Note: hummingbot/ directory has its own .gitignore for data/logs/configs
-
-# Docker volumes (if created locally)
-hummingbot_postgres_data/
-**/postgres_data/
-
 # Credentials and sensitive data
 **/*credentials*
 **/*.key
 **/*.pem
 **/*.secret
 **/certs/
-**/conf/strategies/
-**/conf/connectors/
 
 # Browser session cookies
 **/cookies.json
 **/temp_cookies.json
-
-# Bot instance data
-ggshot-*-*-*/
 
 # Temporary paper trading data
 **/paper_trade_data/
@@ -69,16 +40,26 @@ ggshot-*-*-*/
 # Activity export files (contain user trading data)
 *_activities_*.json
 
-# Node.js dependencies (for hackathon demos)
+# Node.js (root-level only; frontend/ manages its own)
 node_modules/
 package-lock.json
 package.json
+
+# OpenAPI generation config
+openapitools.json
 
 # MCP configuration (contains database credentials)
 .mcp.json
 
 # Development files
 installed_packages.txt
-requirements.txt
-CLAUDE.md
 .vercel
+
+# Local-only dev working notes (kept on disk, not published)
+/GO.md
+/OK.md
+/ACTIVE.md
+/TODO.md
+/DOCS/GO_TEMPLATE.md
+DOCS/completed/2026-06-04_*.md
+sessions/

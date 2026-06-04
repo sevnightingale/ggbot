@@ -36,10 +36,10 @@ client = AsyncOpenAI(
 # Models to test - Provider + Tier architecture
 # Format: (provider, tier, model_id, description)
 MODELS_TO_TEST = [
-    # Grok (xAI)
-    ("grok", "economy", "x-ai/grok-3-mini", "Grok 3 Mini"),
-    ("grok", "standard", "x-ai/grok-4-fast", "Grok 4 Fast"),
-    ("grok", "premium", "x-ai/grok-4", "Grok 4"),
+    # Grok (xAI) - Updated 2026-06-04 (old tier models delisted from OpenRouter)
+    ("grok", "economy", "x-ai/grok-4.3", "Grok 4.3 (no reasoning effort)"),
+    ("grok", "standard", "x-ai/grok-4.3", "Grok 4.3"),
+    ("grok", "premium", "x-ai/grok-4.20", "Grok 4.20"),
 
     # DeepSeek
     ("deepseek", "economy", "deepseek/deepseek-chat", "DeepSeek V3"),

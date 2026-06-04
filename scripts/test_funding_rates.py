@@ -109,12 +109,10 @@ async def test_funding_rates_integration():
     decision_engine = DecisionEngineV2(CONFIG_ID, USER_ID)
     await decision_engine.initialize()
 
-    ggshot_signals = extraction_result.get('ggshot_signals', {})
     market_intelligence = extraction_result.get('market_intelligence', {})
 
     decision_result = await decision_engine.make_decision(
         symbol=config.selected_pair,
-        ggshot_signals=ggshot_signals,
         market_intelligence=market_intelligence
     )
 
