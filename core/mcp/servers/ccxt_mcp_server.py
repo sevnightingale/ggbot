@@ -69,10 +69,14 @@ async def get_exchange_instance(exchange_id, user_id=None):
 
         exchange_class = getattr(ccxt, exchange_id)
 
-        # Simplified credential handling - use environment variables with hardcoded fallbacks
-        # Hardcoded fallback values for testing BitMEX testnet
-        api_key = env_api or "REDACTED_EXCHANGE_API_KEY"
-        secret = env_secret or "REDACTED_EXCHANGE_SECRET"
+        # Environment-only credentials — fail loudly if absent (no hardcoded fallbacks)
+        api_key = env_api
+        secret = env_secret
+        if not api_key or not secret:
+            raise ValueError(
+                "EXCHANGE_API and EXCHANGE_SECRET must be set in the environment; "
+                "no credential fallback is provided."
+            )
 
         # Create direct credentials dictionary
         credentials = {
