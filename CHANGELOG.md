@@ -8,7 +8,7 @@ Complete history of features, fixes, and improvements. For upcoming work see ROA
 
 ## 2026-06-04 - PM2 Namespace `gg` for Project-Scoped Service Operations
 
-All 5 services assigned `namespace: 'gg'` in `ecosystem.config.js` — enables `pm2 stop/start/restart gg` scoped to ggbot only. VM's PM2 daemon shared with unrelated projects → `pm2 restart all` unsafe. Namespace fixed at registration: stale stopped entries deleted from daemon, re-registered via eco-file cold start (`pm2 start ecosystem.config.js && pm2 save`). Namespace start/stop/delete verified on PM2 6.0.14. CLAUDE.md documents scoped ops + `pm2 save` snapshot discipline. Services resumed post OpenRouter top-up: all 5 online 0 restarts, `/health` 200, scheduler re-registered 6 bots at correct cadences, 0 errors.
+All 5 services assigned `namespace: 'gg'` in `ecosystem.config.js` — enables `pm2 stop/start/restart gg` scoped to ggbot only. VM's PM2 daemon shared with unrelated projects → `pm2 restart all` unsafe. Namespace fixed at registration: stale stopped entries deleted from daemon, re-registered via eco-file cold start (`pm2 start ecosystem.config.js && pm2 save`). Namespace start/stop/delete verified on PM2 6.0.14. CLAUDE.md documents scoped ops + `pm2 save` snapshot discipline. Services resumed post OpenRouter top-up: all 5 online 0 restarts, `/health` 200, scheduler re-registered 6 bots at correct cadences, 0 errors. First post-resume cycle (17:00 UTC) verified end-to-end: 3 decisions on grok-4.3, paper long BTC/USDT @ $63,538 executed — first completed decision→trade chain since ~May 17 outage.
 
 ---
 
