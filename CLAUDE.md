@@ -1,9 +1,8 @@
 # ggbot Development Guide
 
 **For architecture**: See `README.md`
-**For onboarding**: Read `GO.md` first for complete project context *(local working notes, not published)*.
-**For documentation updates**: Use `@OK.md` mid-session to update docs properly *(local working notes, not published)*.
 **For current status**: See `ACTIVE.md` *(local working notes, not published)*.
+**For session orientation**: `CLAUDE.local.md` *(gitignored)* carries the project-system manifest; tasks and plans live in the project tracker.
 
 This guide covers development workflow, code patterns, and critical rules specific to this codebase.
 
@@ -65,7 +64,7 @@ pm2 restart ggbot-scheduler # Orchestrator/scheduler/decision/extraction changes
 2. **Autonomous Bug Fixing** — When given a bug report: check `pm2 logs`, trace the error, find root cause, fix it. Don't ask Sev to read logs for you. Zero hand-holding.
 3. **Verification Before Done** — Never mark complete without proving it works. Run `npx tsc --noEmit` for frontend, run relevant tests, check `pm2 logs` after restart. Demonstrate correctness.
 4. **Minimal Impact** — Make every change as simple as possible. Touch only what's necessary. Find root causes — no temporary fixes or workarounds.
-5. **Self-Improvement Loop** — After corrections from Sev, update docs via `@OK.md` to prevent the same mistake.
+5. **Self-Improvement Loop** — After corrections from Sev, update the relevant docs (CLAUDE.md conventions, module READMEs, CLAUDE.local.md pitfalls) to prevent the same mistake.
 
 ---
 
@@ -85,7 +84,7 @@ pm2 restart ggbot-scheduler # Orchestrator/scheduler/decision/extraction changes
 - Maintain specificity: include file references, error details, technical accuracy
 - Target 3-8 lines per entry for recent work, 1-3 lines for older entries
 - Example: "WebSocket cache 3 candles, bots need 100 → RSI failed" NOT "The WebSocket cache had 3 candles but the bots requested 100 which caused RSI to fail"
-- See CHANGELOG.md header (and GO.md "When Work is Completed" section, local working notes) for complete guidelines
+- See CHANGELOG.md header for complete guidelines
 
 ### Logging Pattern
 
@@ -284,10 +283,10 @@ Published docs:
 - **CLAUDE.md** - This file - development workflow and code patterns
 
 Local working notes (on-disk only, not published):
-- **GO.md** - Start here for onboarding procedure
-- **OK.md** - Mid-session documentation update workflow (invoke with `@OK.md`)
-- **ACTIVE.md** - Current production status, services, ports, commands
-- **TODO.md** - Current development tasks and roadmap
+- **CLAUDE.local.md** - Project-system manifest (session orientation, pitfalls)
+- **ACTIVE.md** - Current production status, services, ports, commands (regenerate via `scripts/status_check.py --update`)
+
+Tasks and planning docs live in the project tracker (see CLAUDE.local.md), not in repo files.
 
 ## Documentation Quick Reference by Topic
 

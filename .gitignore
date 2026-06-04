@@ -56,10 +56,7 @@ installed_packages.txt
 .vercel
 
 # Local-only dev working notes (kept on disk, not published)
-/GO.md
-/OK.md
+/CLAUDE.local.md
 /ACTIVE.md
-/TODO.md
-/DOCS/GO_TEMPLATE.md
 DOCS/completed/2026-06-04_*.md
 sessions/
