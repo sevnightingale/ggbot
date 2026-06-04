@@ -54,6 +54,18 @@ pm2 logs market-data-ws     # WebSocket market data cache
 # Restart after code changes
 pm2 restart ggbot           # API changes
 pm2 restart ggbot-scheduler # Orchestrator/scheduler/decision/extraction changes
+
+# Project-scoped operations — all 5 ggbot services live in PM2 namespace 'gg'
+# (other projects on this VM share the PM2 daemon; never use `pm2 restart all`)
+pm2 stop gg                 # Stop all ggbot services
+pm2 restart gg              # Restart all ggbot services
+pm2 start gg                # Start all ggbot services (if registered)
+
+# Cold start — registers processes from the eco file (after pm2 delete / fresh daemon)
+pm2 start ecosystem.config.js && pm2 save
+
+# After any deliberate change to what-should-be-running, persist the boot snapshot
+pm2 save
 ```
 
 ---

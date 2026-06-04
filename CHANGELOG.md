@@ -6,6 +6,12 @@ Complete history of features, fixes, and improvements. For upcoming work see ROA
 
 ---
 
+## 2026-06-04 - PM2 Namespace `gg` for Project-Scoped Service Operations
+
+All 5 services assigned `namespace: 'gg'` in `ecosystem.config.js` — enables `pm2 stop/start/restart gg` scoped to ggbot only. VM's PM2 daemon shared with unrelated projects → `pm2 restart all` unsafe. Namespace fixed at registration: stale stopped entries deleted from daemon, re-registered via eco-file cold start (`pm2 start ecosystem.config.js && pm2 save`). Namespace start/stop/delete verified on PM2 6.0.14. CLAUDE.md documents scoped ops + `pm2 save` snapshot discipline. Services resumed post OpenRouter top-up: all 5 online 0 restarts, `/health` 200, scheduler re-registered 6 bots at correct cadences, 0 errors.
+
+---
+
 ## 2026-06-04 - Platform Streamlining: Consolidated Around Core Trading Paths
 
 Platform consolidated around its two production trading modes — paper + Hyperliquid-direct live. Retired exploratory subsystems not part of core product: contest/leaderboard system, third-party agent-marketplace bridge, alternate-DEX adapter, standalone research agent, social-signal publisher. ~36K lines removed across backend, frontend, DB, env, docs. Config types 3→1 (`scheduled_trading`); trading modes → `paper|hyperliquid`.

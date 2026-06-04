@@ -2,6 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'ggbot',
+      namespace: 'gg',
       script: '/home/sev/ggbot/ggbot.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
@@ -33,6 +34,7 @@ module.exports = {
     // Error monitoring service
     {
       name: 'error-alerts',
+      namespace: 'gg',
       script: '/home/sev/ggbot/core/monitoring/error_alert_service.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
@@ -61,6 +63,7 @@ module.exports = {
     // WebSocket Market Data Service - Real-time candle streaming
     {
       name: 'market-data-ws',
+      namespace: 'gg',
       script: '/home/sev/ggbot/core/services/websocket_market_data_service.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
@@ -86,6 +89,7 @@ module.exports = {
     // Universal Account Monitor - Unified monitoring for paper + hyperliquid
     {
       name: 'account-monitor',
+      namespace: 'gg',
       script: '/home/sev/ggbot/core/monitoring/universal_account_monitor.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
@@ -113,6 +117,7 @@ module.exports = {
     // Scheduler process — runs bot cycles independently of API
     {
       name: 'ggbot-scheduler',
+      namespace: 'gg',
       script: '/home/sev/ggbot/ggbot_scheduler.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
