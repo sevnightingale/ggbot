@@ -1,9 +1,9 @@
 # ggbot Development Guide
 
-**For onboarding**: Read `GO.md` first for complete project context.
-**For documentation updates**: Use `@OK.md` mid-session to update docs properly.
 **For architecture**: See `README.md`
-**For current status**: See `ACTIVE.md`
+**For onboarding**: Read `GO.md` first for complete project context *(local working notes, not published)*.
+**For documentation updates**: Use `@OK.md` mid-session to update docs properly *(local working notes, not published)*.
+**For current status**: See `ACTIVE.md` *(local working notes, not published)*.
 
 This guide covers development workflow, code patterns, and critical rules specific to this codebase.
 
@@ -85,7 +85,7 @@ pm2 restart ggbot-scheduler # Orchestrator/scheduler/decision/extraction changes
 - Maintain specificity: include file references, error details, technical accuracy
 - Target 3-8 lines per entry for recent work, 1-3 lines for older entries
 - Example: "WebSocket cache 3 candles, bots need 100 → RSI failed" NOT "The WebSocket cache had 3 candles but the bots requested 100 which caused RSI to fail"
-- See CHANGELOG.md header and GO.md "When Work is Completed" section for complete guidelines
+- See CHANGELOG.md header (and GO.md "When Work is Completed" section, local working notes) for complete guidelines
 
 ### Logging Pattern
 
@@ -277,13 +277,17 @@ if (!userProfile.can_activate_bots) return <UpgradePrompt />
 
 ## Documentation Structure
 
-- **GO.md** - Start here for onboarding procedure
-- **OK.md** - Mid-session documentation update workflow (invoke with `@OK.md`)
+Published docs:
 - **README.md** - Architecture overview and platform capabilities
-- **ACTIVE.md** - Current production status, services, ports, commands
-- **TODO.md** - Current development tasks and roadmap
+- **ROADMAP.md** - Forward-looking platform direction
 - **CHANGELOG.md** - Complete history of features, fixes, and improvements
 - **CLAUDE.md** - This file - development workflow and code patterns
+
+Local working notes (on-disk only, not published):
+- **GO.md** - Start here for onboarding procedure
+- **OK.md** - Mid-session documentation update workflow (invoke with `@OK.md`)
+- **ACTIVE.md** - Current production status, services, ports, commands
+- **TODO.md** - Current development tasks and roadmap
 
 ## Documentation Quick Reference by Topic
 
@@ -292,19 +296,17 @@ if (!userProfile.can_activate_bots) return <UpgradePrompt />
 | Issue Type | Primary Documentation |
 |------------|----------------------|
 | Trading mode behavior (paper/hyperliquid) | `trading/README.md` |
-| Virtuals DGClaw arena, ACP, claw API | `trading/virtuals/README.md` |
 | Position sizing, P&L calculations | `trading/README.md` |
 | Data extraction, indicators, preprocessors | `extraction/v2/README.md` |
 | Market intelligence, Grok sources | `market_intelligence/README.md` |
-| Decision engine, LLM prompts, awareness_level | `decision/README.md` |
-| The Dojo, Elo, House Bots, 1v1 matches | `DOCS/todo/DOJO.md` |
+| Decision engine, LLM prompts | `decision/README.md` |
 | Updating LLM models/tiers | `decision/llm_providers/MODEL_UPDATE.md` |
-| Agent behavior, MCP tools, strategy | `agent/README.md` |
 | Frontend components, SSE, bot rail | `frontend/README.md` |
 | SEO, blog, OG images, content strategy | `frontend/SEO.md` |
 | Nansen API, smart money data, MCP setup | `DOCS/NANSEN.md` |
-| Database schema questions | `ACTIVE.md` (Database Schema section) |
-| API endpoint behavior | `ACTIVE.md` (Core API Endpoints section) |
+| Database design rationale | `DOCS/DATABASE_CONTEXT.md` |
+| Database schema questions | `ACTIVE.md` (Database Schema section; local working notes) |
+| API endpoint behavior | `ACTIVE.md` (Core API Endpoints section; local working notes) |
 
 **Rule of Thumb**: If you're about to make an assumption about how a module works, read its README first.
 

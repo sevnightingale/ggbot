@@ -1,8 +1,59 @@
 # CHANGELOG - ggbots Platform
 
-Complete history of features, fixes, and improvements. For current status see ACTIVE.md, upcoming work see TODO.md.
+Complete history of features, fixes, and improvements. For upcoming work see ROADMAP.md.
 
 **WRITING STYLE**: Telegraphic style. Omit articles (a, an, the). Include file references, technical accuracy. Target 3-8 lines recent entries, 1-3 lines older entries.
+
+---
+
+## 2026-06-04 - Platform Streamlining: Consolidated Around Core Trading Paths
+
+Platform consolidated around its two production trading modes — paper + Hyperliquid-direct live. Retired exploratory subsystems not part of core product: contest/leaderboard system, third-party agent-marketplace bridge, alternate-DEX adapter, standalone research agent, social-signal publisher. ~36K lines removed across backend, frontend, DB, env, docs. Config types 3→1 (`scheduled_trading`); trading modes → `paper|hyperliquid`.
+
+**Removed (code)**: marketplace sidecar, `trading/virtuals/`, `core/arena/`, `agent/`, `signals/`, `x_bot/`, rei engine, symphony/aster services + adapters, related API modules + endpoints in `ggbot.py`, signal_validation routing in orchestrator + engine_v2. `resolve_hl_credentials()` reduced to hyperliquid-only.
+
+**Removed (frontend)**: retired app routes + components (arena/dojo surfaces, deploy modals, staking libs), related hooks/methods in queries.ts + api.ts, retired subdomain routing in middleware, stale landing banners. Also excised two orphaned components calling nonexistent `/api/v2/trades/live` — pre-existing dead path. `npx tsc --noEmit` clean.
+
+**DB migration** (applied): retired-feature tables dropped (7), 6 configurations cols + 5 user_profiles cols dropped, CHECKs narrowed to `('paper','hyperliquid')`, `live_trades.provider` default → hyperliquid, orphaned vault secrets + stale data_sources rows deleted (audit-exported first). 8 obsolete migration files removed.
+
+**Process/env/deps**: `ecosystem.config.js` → exactly 5 services (ggbot, ggbot-scheduler, market-data-ws, account-monitor, error-alerts). `.env`: 45 dead keys removed (backed up first). requirements.txt: removed virtuals-acp, web3, Telethon, tweepy (eth-account/eth-utils kept — HL SDK deps).
+
+**🔴 Pre-existing break fixed**: `hyperliquid-python-sdk==0.22.0` IndexError in `Info()` spot-meta parsing vs HL's current API — API couldn't boot on ANY branch. Upgraded → 0.23.0, all 9 used SDK methods verified present.
+
+**🔴 Second pre-existing break fixed**: ALL active bots use `model=grok`; OpenRouter delisted `grok-3-mini`/`grok-4-fast`/`grok-4.20-beta` → every decision 404'd since ~May 17. Per MODEL_UPDATE.md: economy+standard → `x-ai/grok-4.3` ($1.25/$2.50, 1M ctx), premium → `x-ai/grok-4.20` (2M ctx); `llm_models` DB row updated.
+
+**Post-drop SQL audit critical catch**: `config_service.py` INSERT/SELECT×2/UPDATE still named dropped `symphony_agent_id` column — every config create/load/update would crash (invisible to import checks). Excised 21 refs; proven via live list_configs/get_config smoke test.
+
+**Docs**: README + module READMEs (trading, decision, MI, extraction, frontend, SEO) updated; 15 dead planning/feature docs deleted. Verified: `import ggbot` + `import ggbot_scheduler` exit 0; residual greps clean.
+
+**Boot verification (all 5 services)**: online 0 restarts, `/health` 200, market-data-ws storing candles, scheduler re-registered 6 bots at correct cadences, account-monitor writing paper+hyperliquid snapshots (HL SDK 0.23.0 live against mainnet), error-alerts delivering. Live 15m cycle verified end-to-end through extraction → MI (5 points, 4 categories) → decision routing → model resolution.
+
+---
+
+## 2026-04-30 - DGClaw v2 Bridge SLA Pitfall + ggbots.ai V2 Live
+
+**Root cause of $81 stranded** (jobs `1003504368` $75, `1003504898` $6):
+- DGClaw `perp_deposit` offering returns `slaMinutes: 30`. On-chain `expiredAt` defaults to that. When DGClaw bridge relayer is backlogged, job hits TRANSACTION (funds already moved to v2 aggregator), then auto-EXPIRES at 30min before deliverable memo — DGClaw's reconciliation skips expired jobs, funds strand in `0x09aea4b2...` aggregator. `claimBudget` reverts (funds left ACP escrow within seconds; recovery requires DGClaw manual credit).
+- v2 fund flow on Base traced on-chain: buyer → ACP v2 contract `0xa6c9ba86...` → DGClaw v2 intake EOA `0x9bda49389b29fa4e204ed9de8f3d7d06f84da171` → v2 aggregator smart-contract `0x09aea4b2242abc8bb4bb78d537a67a245a7bec64`. NOT `0xd478a8B4...` (v1 provider, drained and idle). Watching v1 was misleading.
+- **Fix**: `acp-node/src/routes/deposit.ts:28` overrides `expiredAt` to `Date.now() + 4*60*60*1000`. Verified — $6 deposit during the same DGClaw slowdown bridged + credited in 40min instead of stranding.
+
+**ggbots.ai V2 migration complete + activated**:
+- New V2 wallet `0xREDACTED_AGENT_WALLET` (agent UUID `019da9f3-9dd8-7d0e-b2ce-8f4febb75a15`), $GG token preserved.
+- Vault stores user-provided migration P-256 PKCS8 PEM key (sha `a8e1b085...`); `.env ACP_V2_SIGNER_PRIVATE_KEY` is stale (different sha) but only `sebastian_virtuals.py` consumes it.
+- Deployed as `ggbots.ai (live)` config `d2cc864a-9efa-4b21-b4fe-7010886e0549` with cloned Arbiter A strategy. `trading_mode='virtuals'`, `state='active'`, HL spot $9.98 (after $6 successful deposit). HL API wallet `0xREDACTED_API_WALLET` authorized + vaulted, unified margin activated. First decision recorded 20:03 UTC (SHORT BTC/USDT conf 0.65).
+
+**Legacy v1 mirror confirmed dead**:
+- `sebastian-virtuals` PM2 process firing `perp_trade` ACP jobs from `0x2E48...` legacy wallet → DGClaw rejects with `"Please upgrade to v2"` (e.g., job `1003510502` at 20:04 UTC). Mirror service should be stopped — it's burning gas on rejected jobs.
+
+**Diagnostic routes added** (`acp-node/src/routes/`):
+- `check-job.ts` — POST `{jobIds[]}` returns phase + memos[] for stranded-job forensics. Reads `getJob()` via `LegacyBuyerAdapter`.
+- `check-offering.ts` — POST `{providerAddress}` dumps DGClaw offering metadata (slaMinutes, priceType, requirementSchema).
+
+**Files**:
+- EDIT: `acp-node/src/routes/deposit.ts` (4h `JOB_EXPIRY_MS` constant + matching `OVERALL_TIMEOUT_MS`)
+- NEW: `acp-node/src/routes/check-job.ts`, `acp-node/src/routes/check-offering.ts`
+- EDIT: `acp-node/src/index.ts` (register new routes)
+- EDIT: `trading/virtuals/README.md`, `CHANGELOG.md`, `TODO.md`
 
 ---
 
