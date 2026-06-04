@@ -180,7 +180,6 @@ OG images are generated programmatically using HTML templates + Playwright:
 ```
 frontend/scripts/
 ├── og-image-template.html      # Main site OG template
-├── og-image-arena.html         # Arena-specific template
 └── generate_og_image.py        # Playwright screenshot generator
 ```
 
@@ -192,9 +191,6 @@ source /home/sev/ggbot/.venv/bin/activate
 
 # Regenerate main OG image
 python generate_og_image.py og-image-template.html ../app/opengraph-image.png
-
-# Regenerate Arena OG image
-python generate_og_image.py og-image-arena.html ../app/arena/opengraph-image.png
 
 # Copy to Twitter (can be same image)
 cp ../app/opengraph-image.png ../app/twitter-image.png
@@ -274,15 +270,11 @@ These topics have LOW competition because they're unique to our approach:
    - Article: "Why Single-LLM Trading Fails (And What Works Instead)"
    - Data point: GPT-5 lost 62% in Alpha Arena with monolithic approach
 
-3. **AI Trading Competitions** - ggArena is unique
-   - Article: "What AI Trading Competitions Teach Us About Bot Performance"
-   - Leverage real data from ggArena Season 1
-
-4. **Strategy Advisor Analysis** - Our pattern correlation + AI synthesis
+3. **Strategy Advisor Analysis** - Our pattern correlation + AI synthesis
    - Article: "How to Analyze Your Trading Bot's Performance"
    - Showcase the feature, provide methodology
 
-5. **Paper Trading → Live Pipeline** - Risk management journey
+4. **Paper Trading → Live Pipeline** - Risk management journey
    - Article: "From Paper Trading to Live: A Safe Migration Guide"
 
 ---
@@ -305,7 +297,7 @@ Our first cornerstone article targets the primary keyword "vibe trading":
 2. **AI Trading Strategy** - Strategy types, confidence scoring, risk management
 3. **Platform Tutorials** - How to use ggbots features
 4. **Case Studies** - Real bot performance, lessons learned
-5. **Industry Analysis** - Market trends, competition results (ggArena)
+5. **Industry Analysis** - Market trends, AI trading competition results
 6. **Comparisons** - ggbots vs competitors, bots vs agents
 
 ### Content Calendar (Q1 2026)
@@ -315,7 +307,6 @@ Our first cornerstone article targets the primary keyword "vibe trading":
 | ✅ Jan 30 | What is Vibe Trading? | what is vibe trading | Education | 3,200 |
 | Feb 7 | Trading Bots vs AI Agents: What's Different in 2026 | trading bot vs ai agent | Comparison | 2,500 |
 | Feb 14 | How AI Confidence Scores Determine Position Size | ai trading confidence score | Strategy | 2,000 |
-| Feb 21 | ggArena Season 1 Results: What the Data Shows | ai trading competition | Analysis | 1,800 |
 | Feb 28 | Mean Reversion Strategy for AI Trading Bots | mean reversion crypto bot | Strategy | 2,200 |
 | Mar 7 | Why Single-LLM Trading Fails (Multi-Agent Architecture) | autonomous trading architecture | Education | 2,500 |
 | Mar 14 | Getting Started with AI Trading in 2026 | how to start ai trading | Tutorial | 2,800 |
@@ -327,7 +318,7 @@ Our first cornerstone article targets the primary keyword "vibe trading":
 - Hook with problem/question
 - Clear definition section (featured snippet target)
 - "How it works" breakdown
-- Real examples (use ggArena data)
+- Real examples (use real bot performance data)
 - Common misconceptions
 - Getting started steps
 - CTA to ggbots

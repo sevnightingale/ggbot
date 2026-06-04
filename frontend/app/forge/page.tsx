@@ -7,7 +7,6 @@ import { useDataSources, useLatestActivity, useBotList } from '@/lib/queries'
 import { ThemeProvider } from '@/lib/theme'
 import { PermissionProvider, usePermissions } from '@/lib/permissions'
 import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
-import { DeployLiveModal } from '@/components/DeployLiveModal'
 import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { useBatchedConfigSave } from '@/lib/hooks/useBatchedConfigSave'
 import { Header } from './components/layout/Header'
@@ -22,7 +21,6 @@ import TVTimeline from '@/components/tv-timeline'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { BotCreationModal } from './components/modals/BotCreationModal'
 import { Wrench } from 'lucide-react'
-import { DojoTab } from './components/dojo/DojoTab'
 import { OnboardingTour } from '@/components/OnboardingTour'
 
 interface Position {
@@ -73,7 +71,7 @@ function ForgeApp() {
   // React Query hooks — replace manual useEffect fetching with cached queries
   const { data: dataSources = [] } = useDataSources(!!user)
   const { data: latestActivity = null } = useLatestActivity(selectedConfigId)
-  const { data: initialBots, refetch: refetchBots } = useBotList(!!user)
+  const { data: initialBots } = useBotList(!!user)
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [isManualTriggering, setIsManualTriggering] = useState(false)
@@ -81,15 +79,8 @@ function ForgeApp() {
   const [isBotAction, setIsBotAction] = useState(false)
   const [isBotSwitching, setIsBotSwitching] = useState(false)  // Show skeleton during bot switch
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
-  // Arena S2 banner removed — Season 2 postponed, DGClaw is active arena
   const [showOnboardingTour, setShowOnboardingTour] = useState(false)
   const [liveTradingSetupOpen, setLiveTradingSetupOpen] = useState(false)
-  const [deployLiveModalState, setDeployLiveModalState] = useState<{
-    open: boolean
-    sourceConfigId?: string
-    virtualsConfigId?: string
-    sourceConfigName?: string
-  }>({ open: false })
 
   // Onboarding tour steps - shown after first bot creation
   // Steps auto-navigate between tabs to show key features
@@ -148,7 +139,7 @@ function ForgeApp() {
   const [countdown, setCountdown] = useState<string>('')
 
   // Tab navigation state
-  const [activeTab, setActiveTab] = useState<'monitor' | 'configure' | 'dojo'>('monitor')
+  const [activeTab, setActiveTab] = useState<'monitor' | 'configure'>('monitor')
 
   // Configuration editing state - simplified for auto-save
   const [editingConfigData, setEditingConfigData] = useState<ConfigData | null>(null)
@@ -963,8 +954,7 @@ function ForgeApp() {
         originalBot.config_data,
         {
           config_type: originalBot.config_type,
-          trading_mode: originalBot.trading_mode,
-          symphony_agent_id: originalBot.symphony_agent_id
+          trading_mode: originalBot.trading_mode
         }
       )
 
@@ -1059,26 +1049,6 @@ function ForgeApp() {
       failSave('reset-account', new Error('Failed to reset account'))
     } finally {
       setIsBotAction(false)
-    }
-  }
-
-  const handleDeployLive = (configId: string) => {
-    // Open DeployLiveModal for this paper bot. The modal itself drives the
-    // Virtuals connect + signer approval + headless HL setup flow.
-    const source = allBots.find(b => b.config_id === configId)
-    if (source?.trading_mode === 'virtuals') {
-      // Already live — open in management state
-      setDeployLiveModalState({
-        open: true,
-        virtualsConfigId: configId,
-        sourceConfigName: source.config_name,
-      })
-    } else {
-      setDeployLiveModalState({
-        open: true,
-        sourceConfigId: configId,
-        sourceConfigName: source?.config_name,
-      })
     }
   }
 
@@ -1200,7 +1170,6 @@ function ForgeApp() {
             onSelect={handleBotSelection}
             onCreateNew={() => setBotCreationModalOpen(true)}
             onOpenHyperliquidSetup={() => setLiveTradingSetupOpen(true)}
-            onDeployLive={handleDeployLive}
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
@@ -1217,12 +1186,9 @@ function ForgeApp() {
             {selectedBot && (() => {
               // Calculate metrics from accounts data for selected bot
               const account = accounts.find(a => a.config_id === selectedConfigId)
-              const isLegacyLive = ['symphony', 'aster'].includes(selectedBot?.trading_mode || '')
               const metrics = account ? {
-                totalEquity: isLegacyLive
-                  ? Number(account.total_pnl || 0)  // Cumulative P&L for legacy live modes
-                  : Number(account.current_balance || 0) + Number(account.unrealized_pnl || 0),
-                availableBalance: isLegacyLive ? 0 : Number(account.available_balance || 0),
+                totalEquity: Number(account.current_balance || 0) + Number(account.unrealized_pnl || 0),
+                availableBalance: Number(account.available_balance || 0),
                 pnl: Number(account.unrealized_pnl || 0),
                 trades: Number(account.total_trades || 0),
                 winRate: account.win_rate ? Number(account.win_rate) * 100 : 0,
@@ -1239,7 +1205,6 @@ function ForgeApp() {
                   onStart={handleStart}
                   onStop={handleStop}
                   onManualTrigger={handleManualTrigger}
-                  onDeployLive={handleDeployLive}
                   metrics={metrics}
                   latestActivity={latestActivity}
                 />
@@ -1250,7 +1215,6 @@ function ForgeApp() {
               <TabNavigation
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
-                showDojoTab={!selectedBot?.trading_mode || selectedBot?.trading_mode === 'paper'}
               />
             </div>
 
@@ -1282,7 +1246,6 @@ function ForgeApp() {
                       <PositionsTable
                         positions={positions}
                         selectedConfigId={selectedConfigId ?? undefined}
-                        dojoLocked={selectedBot?.dojo_locked}
                         onPositionClosed={() => {
                           // SSE will automatically refresh positions, but log the event
                           console.log('Position closed, waiting for SSE update...')
@@ -1290,15 +1253,6 @@ function ForgeApp() {
                       />
                     </div>
                   )
-                ) : activeTab === 'dojo' ? (
-                  // Dojo mode: competitive matches and ELO
-                  <DojoTab
-                    selectedBot={selectedBot}
-                    onConfigUpdate={() => {
-                      // Trigger a refresh of the bot list to pick up dojo_visible changes
-                      refetchBots()
-                    }}
-                  />
                 ) : (
                   // Configure mode: ConfigureLayout handles ALL bot types
                   // (agent mode shows simplified UI via conditional rendering in ConfigureLayout)
@@ -1331,7 +1285,6 @@ function ForgeApp() {
         onSelect={handleBotSelection}
         onCreateNew={() => setBotCreationModalOpen(true)}
         onOpenHyperliquidSetup={() => setLiveTradingSetupOpen(true)}
-        onDeployLive={handleDeployLive}
         isCreatingNew={isCreatingNew}
         onRename={handleRenameBot}
         onDuplicate={handleDuplicateBot}
@@ -1340,7 +1293,6 @@ function ForgeApp() {
         isBotAction={isBotAction}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        showDojoTab={!selectedBot?.trading_mode || selectedBot?.trading_mode === 'paper'}
       />
 
       {/* Bot Creation Modal */}
@@ -1356,20 +1308,6 @@ function ForgeApp() {
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
         forceOpen={allBots.length === 0}
-      />
-
-      {/* Deploy Live Version Modal — handles popup 1, popup 2, funding, management */}
-      <DeployLiveModal
-        open={deployLiveModalState.open}
-        onOpenChange={(open) => setDeployLiveModalState(s => ({ ...s, open }))}
-        sourceConfigId={deployLiveModalState.sourceConfigId}
-        virtualsConfigId={deployLiveModalState.virtualsConfigId}
-        sourceConfigName={deployLiveModalState.sourceConfigName}
-        onDeployComplete={async (newConfigId) => {
-          const configs = await apiClient.listConfigs()
-          setAllBots(configs)
-          setSelectedConfigId(newConfigId)
-        }}
       />
 
       {/* Live Trading Setup Modal (opened from BotRail live slot) */}

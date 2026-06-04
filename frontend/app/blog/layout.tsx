@@ -43,12 +43,6 @@ export default function BlogLayout({
               All Posts
             </Link>
             <Link
-              href="/arena"
-              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              Arena
-            </Link>
-            <Link
               href="/signup"
               className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors font-medium"
             >

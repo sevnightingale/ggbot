@@ -17,14 +17,7 @@ from core.domain import UserProfile
 
 # User-friendly messages keyed by FK constraint name. Anything not listed falls
 # back to a generic message that names the blocking table.
-_DELETE_BLOCK_MESSAGES = {
-    "arena_pledges_config_id_fkey":
-        "Cannot delete: this bot has active arena pledges (on-chain USX stakes). "
-        "Unstake first to preserve fund safety.",
-    "arena_registrations_config_id_fkey":
-        "Cannot delete: this bot is registered in an arena competition. "
-        "Unregister first.",
-}
+_DELETE_BLOCK_MESSAGES = {}
 
 
 class ConfigDeletionBlocked(Exception):
@@ -59,14 +52,10 @@ class BotConfigV2:
         agent_strategy: Optional[Dict[str, Any]] = None,
         state: str = "inactive",
         trading_mode: str = "paper",
-        symphony_agent_id: Optional[str] = None,
         profile_image_url: Optional[str] = None,
         is_public_performance: bool = False,
         first_run_used: bool = False,
         free_runs_remaining: int = 3,
-        rei_enabled: bool = False,
-        arena_enabled: bool = False,
-        is_house_bot: bool = False,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -84,14 +73,10 @@ class BotConfigV2:
         self.agent_strategy = agent_strategy
         self.state = state
         self.trading_mode = trading_mode
-        self.symphony_agent_id = symphony_agent_id
         self.profile_image_url = profile_image_url
         self.is_public_performance = is_public_performance
         self.first_run_used = first_run_used
         self.free_runs_remaining = free_runs_remaining
-        self.rei_enabled = rei_enabled
-        self.arena_enabled = arena_enabled
-        self.is_house_bot = is_house_bot
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -104,12 +89,10 @@ class BotConfigV2:
             "config_type": self.config_type,
             "state": self.state,
             "trading_mode": self.trading_mode,
-            "symphony_agent_id": self.symphony_agent_id,
             "profile_image_url": self.profile_image_url,
             "is_public_performance": self.is_public_performance,
             "first_run_used": self.first_run_used,
             "free_runs_remaining": self.free_runs_remaining,
-            "is_house_bot": self.is_house_bot,
             "config_data": {
                 "schema_version": self.schema_version,
                 "selected_pair": self.selected_pair,
@@ -161,14 +144,10 @@ class BotConfigV2:
             agent_strategy=data.get("agent_strategy"),
             state=data.get("state", "inactive"),
             trading_mode=data.get("trading_mode", "paper"),
-            symphony_agent_id=data.get("symphony_agent_id"),
             profile_image_url=data.get("profile_image_url"),
             is_public_performance=data.get("is_public_performance", False),
             first_run_used=data.get("first_run_used", False),
             free_runs_remaining=data.get("free_runs_remaining", 3),
-            rei_enabled=data.get("rei_enabled", False),
-            arena_enabled=data.get("arena_enabled", False),
-            is_house_bot=data.get("is_house_bot", False),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -177,28 +156,20 @@ class BotConfigV2:
         """Validate configuration and return list of errors."""
         errors = []
 
-        # Agent configs have different validation requirements
-        if self.config_type == "agent":
-            # Agent configs can be created WITHOUT agent_strategy initially
-            # Strategy is built during strategy_definition mode, then saved
-            # selected_pair is also optional (agent can trade multiple pairs)
-            # extraction/decision/llm_config are optional for agents
-            return errors
-
         # Hyperliquid live bots start unconfigured (empty slot created during HL setup).
         # Allow incremental saves while being configured — activation is gated separately
         # by ActivationBar (requires selected_pair before activate/run).
         if self.trading_mode == 'hyperliquid' and not self.selected_pair:
             return errors
 
-        # For non-agent configs, selected_pair is required
+        # selected_pair is required
         if not self.selected_pair:
             errors.append("selected_pair is required")
 
-        # Standard bot validation (for autonomous_trading and signal_validation)
+        # Standard bot validation
         # Support both old (indicators) and new (selected_data_sources) structure
         if not self.extraction:
-            errors.append("extraction is required for non-agent configs")
+            errors.append("extraction is required")
         elif "selected_data_sources" in self.extraction:
             # New structure validation
             data_sources = self.extraction.get("selected_data_sources", {})
@@ -218,14 +189,13 @@ class BotConfigV2:
         else:
             errors.append("extraction must contain either 'selected_data_sources' or 'indicators'")
 
-        # Decision validation (only for standard bots, not signal_validation)
-        if self.config_type != "signal_validation":
-            if not self.decision:
-                errors.append("decision is required for autonomous_trading configs")
-            elif not self.decision.get("system_prompt"):
-                errors.append("decision.system_prompt is required")
-            elif not self.decision.get("user_prompt"):
-                errors.append("decision.user_prompt is required")
+        # Decision validation
+        if not self.decision:
+            errors.append("decision is required for scheduled_trading configs")
+        elif not self.decision.get("system_prompt"):
+            errors.append("decision.system_prompt is required")
+        elif not self.decision.get("user_prompt"):
+            errors.append("decision.user_prompt is required")
 
         return errors
 
@@ -241,8 +211,7 @@ class ConfigService:
         user_id: str,
         config_name: str,
         config_data: Dict[str, Any],
-        trading_mode: str = "paper",
-        symphony_agent_id: Optional[str] = None
+        trading_mode: str = "paper"
     ) -> Optional[BotConfigV2]:
         """
         Create a new bot configuration for user.
@@ -251,8 +220,7 @@ class ConfigService:
             user_id: User ID from auth
             config_name: User-friendly name for the configuration
             config_data: Configuration dictionary
-            trading_mode: Trading mode ('paper', 'symphony', 'aster')
-            symphony_agent_id: Symphony agent ID (required for Symphony live trading)
+            trading_mode: Trading mode ('paper', 'hyperliquid')
 
         Returns:
             BotConfigV2 instance if successful, None otherwise
@@ -288,11 +256,11 @@ class ConfigService:
             # Store in database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    initial_equity = 0 if config.trading_mode in ('hyperliquid', 'symphony', 'aster', 'virtuals') else 10000.00
+                    initial_equity = 0 if config.trading_mode == 'hyperliquid' else 10000.00
                     cur.execute("""
                         INSERT INTO configurations
-                        (config_id, user_id, config_type, config_name, config_data, trading_mode, symphony_agent_id, initial_equity, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        (config_id, user_id, config_type, config_name, config_data, trading_mode, initial_equity, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                     """, (
                         config_id,
                         user_id,
@@ -300,7 +268,6 @@ class ConfigService:
                         config_name,
                         json.dumps(config.to_jsonb()),
                         config.trading_mode,
-                        symphony_agent_id,
                         initial_equity
                     ))
                 conn.commit()
@@ -331,7 +298,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used, free_runs_remaining, arena_enabled, is_house_bot
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, profile_image_url, state, first_run_used, free_runs_remaining
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -344,14 +311,11 @@ class ConfigService:
                     config_data = json.loads(result[1]) if isinstance(result[1], str) else result[1]
                     db_config_type = result[4] or "scheduled_trading"  # Use config_type from database
                     trading_mode = result[5] or "paper"
-                    symphony_agent_id = result[6]
-                    profile_image_url = result[7]
-                    state = result[8] or "inactive"
-                    first_run_used = result[9] if result[9] is not None else False
-                    free_runs_remaining = result[10] if result[10] is not None else 3
-                    arena_enabled = result[11] if result[11] is not None else False
-                    is_house_bot = result[12] if result[12] is not None else False
-                    
+                    profile_image_url = result[6]
+                    state = result[7] or "inactive"
+                    first_run_used = result[8] if result[8] is not None else False
+                    free_runs_remaining = result[9] if result[9] is not None else 3
+
                     # Handle nested config_data structure
                     if "config_data" in config_data:
                         # New nested structure - extract the inner config_data
@@ -369,15 +333,11 @@ class ConfigService:
                             "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                             "telegram_integration": inner_config.get("telegram_integration", {}),
                             "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
-                            "rei_enabled": inner_config.get("rei_enabled", False),
                             "trading_mode": trading_mode,
-                            "symphony_agent_id": symphony_agent_id,
                             "profile_image_url": profile_image_url,
                             "state": state,
                             "first_run_used": first_run_used,
                             "free_runs_remaining": free_runs_remaining,
-                            "arena_enabled": arena_enabled,
-                            "is_house_bot": is_house_bot,
                             "created_at": result[2].isoformat() if result[2] else None,
                             "updated_at": result[3].isoformat() if result[3] else None
                         }
@@ -392,13 +352,10 @@ class ConfigService:
                         flattened_config["config_name"] = db_config_name  # ADD THIS - was missing!
                         flattened_config["config_type"] = db_config_type
                         flattened_config["trading_mode"] = trading_mode
-                        flattened_config["symphony_agent_id"] = symphony_agent_id
                         flattened_config["profile_image_url"] = profile_image_url
                         flattened_config["state"] = state
                         flattened_config["first_run_used"] = first_run_used
                         flattened_config["free_runs_remaining"] = free_runs_remaining
-                        flattened_config["arena_enabled"] = arena_enabled
-                        flattened_config["is_house_bot"] = is_house_bot
                         if "created_at" not in flattened_config and result[2]:
                             flattened_config["created_at"] = result[2].isoformat()
                         if "updated_at" not in flattened_config and result[3]:
@@ -427,15 +384,14 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
-                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled, is_house_bot
+                               trading_mode, profile_image_url, is_public_performance, first_run_used, free_runs_remaining
                         FROM configurations
                         WHERE user_id = %s
-                          AND (config_type IS NULL OR config_type != 'dojo_match')
                         ORDER BY created_at DESC
                     """, (user_id,))
 
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining, arena_enabled, is_house_bot_val = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, profile_image_url, is_public_performance, first_run_used, free_runs_remaining = row
 
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -459,13 +415,10 @@ class ConfigService:
                                 "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
                                 "state": state or "inactive",
                                 "trading_mode": trading_mode or "paper",
-                                "symphony_agent_id": symphony_agent_id,
                                 "profile_image_url": profile_image_url,
                                 "is_public_performance": is_public_performance or False,
                                 "first_run_used": first_run_used if first_run_used is not None else False,
                                 "free_runs_remaining": free_runs_remaining if free_runs_remaining is not None else 3,
-                                "arena_enabled": arena_enabled if arena_enabled is not None else False,
-                                "is_house_bot": is_house_bot_val if is_house_bot_val is not None else False,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -480,13 +433,10 @@ class ConfigService:
                             flattened_config["state"] = state or "inactive"
                             flattened_config["config_type"] = db_config_type or "scheduled_trading"
                             flattened_config["trading_mode"] = trading_mode or "paper"
-                            flattened_config["symphony_agent_id"] = symphony_agent_id
                             flattened_config["profile_image_url"] = profile_image_url
                             flattened_config["is_public_performance"] = is_public_performance or False
                             flattened_config["first_run_used"] = first_run_used if first_run_used is not None else False
                             flattened_config["free_runs_remaining"] = free_runs_remaining if free_runs_remaining is not None else 3
-                            flattened_config["is_house_bot"] = is_house_bot_val if is_house_bot_val is not None else False
-                            flattened_config["arena_enabled"] = arena_enabled if arena_enabled is not None else False
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:
@@ -509,7 +459,6 @@ class ConfigService:
         config_name: Optional[str] = None,
         config_type: Optional[str] = None,
         trading_mode: Optional[str] = None,
-        symphony_agent_id: Optional[str] = None,
         profile_image_url: Optional[str] = None
     ) -> Optional[BotConfigV2]:
         """
@@ -521,8 +470,7 @@ class ConfigService:
             config_data: Updated configuration data
             config_name: Optional updated name
             config_type: Optional updated config type
-            trading_mode: Optional updated trading mode ('paper', 'symphony', 'aster')
-            symphony_agent_id: Optional updated Symphony agent ID
+            trading_mode: Optional updated trading mode ('paper', 'hyperliquid')
             profile_image_url: Optional updated bot avatar image URL
 
         Returns:
@@ -559,7 +507,6 @@ class ConfigService:
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
                 agent_strategy=merged_agent_strategy,  # Use deep-merged agent strategy
                 trading_mode=trading_mode if trading_mode is not None else existing_config.trading_mode,
-                symphony_agent_id=symphony_agent_id if symphony_agent_id is not None else existing_config.symphony_agent_id,
                 profile_image_url=profile_image_url if profile_image_url is not None else existing_config.profile_image_url,
                 created_at=existing_config.created_at,
                 updated_at=datetime.now()
@@ -577,14 +524,13 @@ class ConfigService:
                     cur.execute("""
                         UPDATE configurations
                         SET config_name = %s, config_data = %s, config_type = %s,
-                            trading_mode = %s, symphony_agent_id = %s, profile_image_url = %s, updated_at = NOW()
+                            trading_mode = %s, profile_image_url = %s, updated_at = NOW()
                         WHERE config_id = %s AND user_id = %s
                     """, (
                         updated_config.config_name,
                         json.dumps(updated_config.to_jsonb()),
                         updated_config.config_type,
                         updated_config.trading_mode,
-                        updated_config.symphony_agent_id,
                         updated_config.profile_image_url,
                         config_id,
                         user_id

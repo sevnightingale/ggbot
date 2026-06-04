@@ -101,46 +101,14 @@ export interface BotConfiguration {
   config_type: string
   config_data: ConfigData
   state: 'active' | 'inactive'
-  trading_mode?: 'paper' | 'symphony' | 'aster' | 'hyperliquid' | 'virtuals'
-  symphony_agent_id?: string
+  trading_mode?: 'paper' | 'hyperliquid'
   profile_image_url?: string | null
   is_public_performance?: boolean
   first_run_used?: boolean  // Tracks if free first run has been used
   free_runs_remaining?: number  // Number of free manual "Run Once" clicks remaining (default 3)
   pause_reason?: string | null  // Reason bot was paused by system (e.g., 'prepaid_credits_exhausted')
-  elo_rating?: number
-  dojo_visible?: boolean
-  is_house_bot?: boolean
-  dojo_locked?: boolean
-  dojo_matches_active?: Array<{
-    match_id: string
-    format: string
-    ends_at: string | null
-    opponent_name: string | null
-  }>
   created_at: string
   updated_at: string
-}
-
-export interface DojoMatch {
-  match_id: string
-  format: string
-  status: string
-  challenger_config_id: string
-  opponent_config_id: string
-  challenger_name?: string
-  opponent_name?: string
-  opponent_is_house_bot?: boolean
-  winner_config_id?: string | null
-  challenger_score?: number | null
-  opponent_score?: number | null
-  challenger_elo?: { before: number; after: number }
-  opponent_elo?: { before: number; after: number }
-  starts_at?: string | null
-  ends_at?: string | null
-  completed_at?: string | null
-  created_at?: string | null
-  result_details?: Record<string, unknown>
 }
 
 export interface DataSource {
@@ -270,7 +238,7 @@ export class ApiClient {
   async createConfig(
     configName: string,
     configData: Partial<ConfigData>,
-    options?: { config_type?: string; trading_mode?: string; symphony_agent_id?: string }
+    options?: { config_type?: string; trading_mode?: string }
   ): Promise<BotConfiguration> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/config`, {
       method: 'POST',
@@ -278,8 +246,7 @@ export class ApiClient {
         config_name: configName,
         ...configData,
         ...(options?.config_type && { config_type: options.config_type }),
-        ...(options?.trading_mode && { trading_mode: options.trading_mode }),
-        ...(options?.symphony_agent_id && { symphony_agent_id: options.symphony_agent_id })
+        ...(options?.trading_mode && { trading_mode: options.trading_mode })
       })
     })
 
@@ -313,120 +280,6 @@ export class ApiClient {
 
     const result = await response.json()
     return result.config
-  }
-
-  async getEloHistory(configId: string, limit: number = 20, offset: number = 0): Promise<{
-    history: Array<{
-      id: string
-      elo_before: number
-      elo_after: number
-      change: number
-      reason: string
-      match_id: string | null
-      details: Record<string, unknown> | null
-      created_at: string
-    }>
-    total: number
-  }> {
-    const response = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/dojo/elo-history/${configId}?limit=${limit}&offset=${offset}`
-    )
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to fetch Elo history: ${error}`)
-    }
-    return response.json()
-  }
-
-  async getHouseBots(): Promise<{
-    bots: Array<{
-      config_id: string
-      config_name: string
-      elo_rating: number
-      state: string
-      selected_pair: string
-      frequency: string
-      format: 'blitz' | 'rapid' | 'standard'
-      profile_image_url: string | null
-      match_record: { wins: number; losses: number; draws: number }
-    }>
-  }> {
-    const response = await fetch(`${this.baseUrl}/api/v2/public/dojo/house-bots`)
-    if (!response.ok) {
-      throw new Error('Failed to fetch house bots')
-    }
-    return response.json()
-  }
-
-  async toggleDojoVisibility(configId: string, visible: boolean): Promise<{ dojo_visible: boolean }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/config/${configId}/dojo-visibility`, {
-      method: 'PUT',
-      body: JSON.stringify({ dojo_visible: visible })
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to toggle visibility: ${error}`)
-    }
-
-    return response.json()
-  }
-
-  // ─── Dojo Match Methods ─────────────────────────────────────────────────
-
-  async checkDojoEntry(configId: string): Promise<{ eligible: boolean; reason?: string }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/can-enter/${configId}`)
-    if (!response.ok) throw new Error('Failed to check entry eligibility')
-    return response.json()
-  }
-
-  async createDojoChallenge(configId: string, opponentConfigId: string, format: string): Promise<{
-    match_id: string; status: string; auto_started?: boolean
-  }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/challenge`, {
-      method: 'POST',
-      body: JSON.stringify({ config_id: configId, opponent_config_id: opponentConfigId, format })
-    })
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Challenge failed' }))
-      throw new Error(error.detail || 'Challenge failed')
-    }
-    return response.json()
-  }
-
-  async forfeitDojoMatch(matchId: string): Promise<{ match_id: string; status: string }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/match/${matchId}/forfeit`, {
-      method: 'POST'
-    })
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Forfeit failed' }))
-      throw new Error(error.detail || 'Forfeit failed')
-    }
-    return response.json()
-  }
-
-  async getDojoMatchHistory(configId: string, limit: number = 20, offset: number = 0): Promise<{
-    status: string; matches: DojoMatch[]
-  }> {
-    const response = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/dojo/matches/${configId}?limit=${limit}&offset=${offset}`
-    )
-    if (!response.ok) throw new Error('Failed to load match history')
-    return response.json()
-  }
-
-  async getDojoBotStats(configId: string): Promise<{
-    total_matches: number; wins: number; draws: number; losses: number; active_matches: number
-  }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/stats/${configId}`)
-    if (!response.ok) throw new Error('Failed to load Dojo stats')
-    return response.json()
-  }
-
-  async getDojoActiveMatches(configId: string): Promise<{ status: string; matches: DojoMatch[] }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/dojo/active/${configId}`)
-    if (!response.ok) throw new Error('Failed to load active matches')
-    return response.json()
   }
 
   async getConfig(configId: string): Promise<BotConfiguration> {
@@ -475,160 +328,6 @@ export class ApiClient {
     }
 
     return await response.json()
-  }
-
-  // -----------------------------------------------------------------------
-  // ACP v2 / Deploy Live Version — replaces the old "Promote to Live" flow
-  // -----------------------------------------------------------------------
-
-  async arenaV2ConnectStart(): Promise<{ authUrl: string; requestId: string }> {
-    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/connect-start`, {
-      method: 'POST',
-    })
-    if (!res.ok) throw new Error((await res.text()) || 'Failed to start Virtuals connect')
-    return await res.json()
-  }
-
-  async arenaV2ConnectPoll(requestId: string): Promise<{ status: 'pending' | 'completed'; walletAddress?: string }> {
-    const res = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/arena/connect-poll?requestId=${encodeURIComponent(requestId)}`,
-    )
-    if (!res.ok) throw new Error('Failed to poll Virtuals connect')
-    return await res.json()
-  }
-
-  async arenaV2ConnectionStatus(): Promise<{ connected: boolean; ttl_seconds?: number | null }> {
-    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/connection-status`)
-    if (!res.ok) throw new Error('Failed to read Virtuals connection status')
-    return await res.json()
-  }
-
-  async arenaV2Disconnect(): Promise<{ status: string }> {
-    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/disconnect`, {
-      method: 'POST',
-    })
-    if (!res.ok) throw new Error('Failed to disconnect from Virtuals')
-    return await res.json()
-  }
-
-  async arenaV2DeployLive(sourceConfigId: string, agentName?: string): Promise<{
-    new_config_id: string
-    agent_record_id: string
-    virtuals_agent_id: string
-    agent_wallet_address: string
-    signerUrl: string
-    signerRequestId: string
-  }> {
-    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/deploy-live`, {
-      method: 'POST',
-      body: JSON.stringify({ source_config_id: sourceConfigId, agent_name: agentName }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: 'Deploy failed' }))
-      throw new Error(err.detail || 'Deploy failed')
-    }
-    return await res.json()
-  }
-
-  async arenaV2DeployPoll(requestId: string): Promise<{
-    status: 'pending' | 'completed' | 'error'
-    stage?: string
-    signerStatus?: string
-    reason?: string
-    detail?: unknown
-    config_id?: string
-    agent_wallet_address?: string
-    api_wallet_address?: string
-    agent_name?: string
-  }> {
-    const res = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/arena/deploy-poll?requestId=${encodeURIComponent(requestId)}`,
-    )
-    if (!res.ok) throw new Error('Failed to poll deploy')
-    return await res.json()
-  }
-
-  async arenaV2Status(configId: string): Promise<{
-    status: 'not_deployed' | 'provisioning' | 'active'
-    agent_name?: string
-    agent_wallet_address?: string
-    virtuals_agent_id?: string
-    base_usdc_balance?: number | null
-    hl_account_value?: number | null
-    hl_withdrawable?: number | null
-    hl_positions?: Array<{
-      coin: string
-      size: number
-      entry_price: number
-      unrealized_pnl: number
-      margin_used: number
-    }>
-    hl_api_wallet_authorized?: boolean
-    leaderboard_joined?: boolean
-    dgclaw_balance?: number | null
-    hl_subaccount_address?: string | null
-    is_tokenized?: boolean
-    token_address?: string | null
-    tokenize_url?: string
-    deposit_progress?: {
-      stage: 'starting' | 'depositing' | 'hl_setup' | 'leaderboard' | 'complete' | 'failed'
-      message: string
-      updated_at: number
-      amount?: number
-      stage_failed?: string
-      sub_stage?: string
-      hint?: string
-      detail?: unknown
-      error?: string
-    } | null
-  }> {
-    const res = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/arena/status?config_id=${encodeURIComponent(configId)}`,
-    )
-    if (!res.ok) throw new Error('Failed to read arena v2 status')
-    return await res.json()
-  }
-
-  async arenaV2CheckDeposit(configId: string, amount: number): Promise<{
-    status:
-      | 'in_progress'
-      | 'already_in_progress'
-      | 'already_complete'
-      | 'amount_too_low'
-      | 'insufficient'
-      | 'rpc_error'
-    stage?: string
-    current_stage?: string
-    current_message?: string
-    balance?: number
-    requested?: number
-    minimum?: number
-    reserve?: number
-    max_depositable?: number
-    dgclaw_balance?: number
-    skipping_deposit?: boolean
-    message?: string
-  }> {
-    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/check-deposit`, {
-      method: 'POST',
-      body: JSON.stringify({ config_id: configId, amount }),
-    })
-    if (!res.ok) throw new Error('check-deposit failed')
-    return await res.json()
-  }
-
-  async arenaV2Withdraw(configId: string, amount: number, destination?: string): Promise<{
-    status: string
-    amount?: number
-    destination?: string
-    detail?: unknown
-  }> {
-    const res = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/withdraw`, {
-      method: 'POST',
-      body: JSON.stringify({ config_id: configId, amount, destination }),
-    })
-    if (!res.ok) throw new Error('Withdraw failed')
-    return await res.json()
   }
 
   async closePosition(configId: string, tradeId: string): Promise<{ status: string; trade_id: string; close_price: number; realized_pnl: number; message: string }> {
@@ -1068,18 +767,6 @@ export class ApiClient {
     return await response.json()
   }
 
-  // Arena status (DGClaw)
-  async getArenaStatus(configId: string): Promise<{
-    status: 'not_joined' | 'joined'
-    dgclaw_balance?: number
-    wallet_balance_usdc?: number
-    is_registered?: boolean
-  }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/virtuals-arena/status?config_id=${configId}`)
-    if (!response.ok) return { status: 'not_joined' }
-    return await response.json()
-  }
-
   // Purchase Credits via Stripe
   async purchaseCredits(amountCents: number): Promise<{ checkout_url: string }> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/credits/purchase`, {
@@ -1147,34 +834,6 @@ export class ApiClient {
     return await response.json()
   }
 
-  // Live Trade History (from Symphony)
-  async getLiveTradeHistory(configId: string, limit: number = 50): Promise<{
-    trades: Array<{
-      trade_id: string
-      symbol: string
-      side: string
-      entry_price: number
-      size_usd: number
-      leverage: number
-      realized_pnl: number
-      close_reason: string
-      opened_at: string | null
-      closed_at: string | null
-    }>
-    count: number
-  }> {
-    const response = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/trades/live/${configId}?limit=${limit}`
-    )
-
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to get live trade history: ${error}`)
-    }
-
-    return await response.json()
-  }
-
   // Confidence Analysis
   async getConfidenceAnalysis(configId: string): Promise<{
     status: string
@@ -1200,113 +859,6 @@ export class ApiClient {
     if (!response.ok) {
       const error = await response.text()
       throw new Error(`Failed to get confidence analysis: ${error}`)
-    }
-
-    return await response.json()
-  }
-
-  // =============================================================================
-  // Arena Season 2 Registration
-  // =============================================================================
-
-  async registerForArena(seasonId: number, configId: string): Promise<{
-    status: string
-    registration_id?: string
-    config_id: string
-    season_id: number
-    message: string
-  }> {
-    const response = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/arena/season/${seasonId}/register`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config_id: configId })
-      }
-    )
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Failed to register for arena')
-    }
-
-    return await response.json()
-  }
-
-  async unregisterFromArena(seasonId: number, configId: string): Promise<{
-    status: string
-    config_id: string
-    season_id: number
-    message: string
-  }> {
-    const response = await this.authenticatedFetch(
-      `${this.baseUrl}/api/v2/arena/season/${seasonId}/unregister`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config_id: configId })
-      }
-    )
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Failed to unregister from arena')
-    }
-
-    return await response.json()
-  }
-
-  // =============================================================================
-  // Arena Pledges (USX Staking on Bot Competition)
-  // =============================================================================
-
-  async recordArenaPledge(data: {
-    wallet_address: string
-    config_id: string
-    usx_amount: string
-    susx_amount?: string
-    tx_hash: string
-  }): Promise<{
-    status: string
-    pledge_id?: string
-    bot_name?: string
-    usx_amount?: string
-    message: string
-  }> {
-    const response = await fetch(`${this.baseUrl}/api/v2/arena/pledge`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Failed to record pledge')
-    }
-
-    return await response.json()
-  }
-
-  async getArenaPledges(): Promise<{
-    status: string
-    pledges: Array<{
-      id: string
-      config_id: string
-      bot_name: string
-      profile_image_url: string | null
-      usx_amount: number
-      susx_amount: number | null
-      tx_hash: string
-      pledged_at: string | null
-      unstaked: boolean
-    }>
-    total_pledged: number
-  }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/pledges`)
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Failed to get pledges')
     }
 
     return await response.json()

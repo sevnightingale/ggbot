@@ -11,22 +11,9 @@ def build_opportunity_analysis_prompt(
     market_data: str,
     volume_analysis: str,
     user_strategy: str,
-    ggshot_signals: str = None,
     market_intelligence: str = None
 ) -> str:
     """Build opportunity analysis prompt with hardcoded structure."""
-
-    # Build ggshot section if signals are available
-    ggshot_section = ""
-    if ggshot_signals and ggshot_signals.strip():
-        ggshot_section = f"""
-## GGSHOT PREMIUM SIGNALS
-ggShot is a premium signal provider with proven accuracy. Here are the latest ggShot signals for {symbol}:
-
-{ggshot_signals}
-
-NOTE: ggShot signals provide additional context but should be validated against your own technical analysis. Consider directional agreement/disagreement across timeframes and how it aligns with your strategy.
-"""
 
     # Build market intelligence section if available
     market_intel_section = ""
@@ -51,7 +38,7 @@ Here is comprehensive technical analysis across all 7 timeframes (5m, 15m, 30m, 
 Current volume analysis for trade confirmation:
 
 {volume_analysis}
-{ggshot_section}{market_intel_section}
+{market_intel_section}
 ## YOUR TRADING STRATEGY
 {user_strategy}
 

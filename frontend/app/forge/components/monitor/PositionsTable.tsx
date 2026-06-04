@@ -6,22 +6,22 @@ import { apiClient } from '@/lib/api'
 
 interface Position {
   trade_id?: string
-  position_id?: string  // Unified ID field (trade_id for paper, batch_id for live/aster)
+  position_id?: string  // Unified ID field (trade_id for paper, batch_id for hyperliquid)
   symbol: string
   side: string
   size_usd: number
-  collateral?: number  // Actual margin/collateral deployed (from Symphony collateralAmount)
+  collateral?: number  // Actual margin/collateral deployed
   entry_price: number
   current_price: number
   unrealized_pnl: number
-  pnl_percentage?: number  // P&L as percentage (from Symphony pnlPercentage)
+  pnl_percentage?: number  // P&L as percentage
   status: string
   opened_at: string
   stop_loss?: number
   take_profit?: number
-  liquidation_price?: number  // Liquidation price (from Symphony)
+  liquidation_price?: number  // Liquidation price
   leverage: number
-  source?: 'paper' | 'live' | 'symphony' | 'aster' | 'hyperliquid'  // Track position source
+  source?: 'paper' | 'hyperliquid'  // Track position source
 }
 
 interface PositionsTableProps {
@@ -29,10 +29,9 @@ interface PositionsTableProps {
   className?: string
   selectedConfigId?: string
   onPositionClosed?: () => void
-  dojoLocked?: boolean
 }
 
-export function PositionsTable({ positions = [], className = '', selectedConfigId, onPositionClosed, dojoLocked = false }: PositionsTableProps) {
+export function PositionsTable({ positions = [], className = '', selectedConfigId, onPositionClosed }: PositionsTableProps) {
   // Track price changes for slide animations
   const [animatingPrices, setAnimatingPrices] = useState<Record<string, boolean>>({})
   const [displayPrices, setDisplayPrices] = useState<Record<string, { current: string; pnl: string; percentage: string }>>({})
@@ -43,7 +42,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
   // Helper functions
   const formatPrice = (price: number | null | undefined) => {
-    // Handle null/undefined for Symphony positions during settlement
+    // Handle null/undefined for positions during settlement
     if (price == null || isNaN(price)) return '$—'
 
     // Smart crypto price formatting based on price range
@@ -65,7 +64,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
   }
 
   const formatPnL = (pnl: number | null | undefined) => {
-    // Handle null/undefined for Symphony positions during settlement
+    // Handle null/undefined for positions during settlement
     if (pnl == null || isNaN(pnl)) return '$—'
 
     const sign = pnl >= 0 ? '+' : ''
@@ -73,7 +72,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
   }
 
   const formatPercentage = (entry: number | null | undefined, current: number | null | undefined, side?: string) => {
-    // Handle null/undefined for Symphony positions during settlement
+    // Handle null/undefined for positions during settlement
     if (entry == null || current == null || isNaN(entry) || isNaN(current) || entry === 0) return '—%'
 
     let change = ((current - entry) / entry) * 100
@@ -83,8 +82,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     return `${sign}${change.toFixed(2)}%`
   }
 
-  // Handle closing a position (paper, symphony, or aster)
-  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' | 'symphony' | 'aster' | 'hyperliquid' = 'paper') => {
+  // Handle closing a position (paper or hyperliquid)
+  const handleClosePosition = async (positionId: string, source: 'paper' | 'hyperliquid' = 'paper') => {
     if (!selectedConfigId) {
       console.error('No config ID selected')
       return
@@ -100,37 +99,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
       const headers = await apiClient.getAuthHeaders()
       const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
 
-      if (source === 'live' || source === 'symphony') {
-        // Close live position via Symphony
-        const response = await fetch(`${baseUrl}/api/v2/positions/live/${positionId}/close`, {
-          method: 'POST',
-          headers
-        })
-
-        if (!response.ok) {
-          const error = await response.text()
-          throw new Error(`Failed to close Symphony position: ${error}`)
-        }
-
-        const result = await response.json()
-        console.log('Symphony position closed:', result)
-        alert('✅ Symphony position closed successfully!')
-      } else if (source === 'aster') {
-        // Close Aster position via AsterDEX
-        const response = await fetch(`${baseUrl}/api/v2/positions/aster/${positionId}/close`, {
-          method: 'POST',
-          headers
-        })
-
-        if (!response.ok) {
-          const error = await response.text()
-          throw new Error(`Failed to close Aster position: ${error}`)
-        }
-
-        const result = await response.json()
-        console.log('Aster position closed:', result)
-        alert('✅ Aster position closed successfully!')
-      } else if (source === 'hyperliquid') {
+      if (source === 'hyperliquid') {
         // Close Hyperliquid position
         const response = await fetch(`${baseUrl}/api/v2/positions/hyperliquid/${positionId}/close`, {
           method: 'POST',
@@ -361,9 +330,9 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                   <td className="py-3 px-2 text-right">
                     <button
                       onClick={() => handleClosePosition(positionId, positionSource)}
-                      disabled={closingPositions[positionId] || dojoLocked}
+                      disabled={closingPositions[positionId]}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--loss-color)] hover:bg-red-500/10 border border-[var(--loss-color)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={dojoLocked ? 'Locked for Dojo match' : 'Close position'}
+                      title="Close position"
                     >
                       <X className="h-3 w-3" />
                       {closingPositions[positionId] ? 'Closing...' : 'Close'}

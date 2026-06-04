@@ -1,17 +1,14 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle, Coins, AlertTriangle } from 'lucide-react'
+import { Clock, Play, PauseCircle, Zap, Crown, Coins, AlertTriangle } from 'lucide-react'
 import { BotConfiguration, apiClient } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 import { BotImageUpload } from '@/components/BotImageUpload'
-import { ArenaRegistrationModal } from '@/components/arena-registration-modal'
-import { DegenArenaModal } from '@/components/degen-arena-modal'
 import { estimateDailyCost } from '@/lib/cost-estimation'
-import { EloTierBadge } from '../shared/EloTierBadge'
 
 interface AccountMetrics {
   totalEquity: number
@@ -51,7 +48,6 @@ interface ActivationBarProps {
   onStart: () => void
   onStop: () => void
   onManualTrigger: () => void
-  onDeployLive?: (configId: string) => void  // Opens DeployLiveModal
   metrics?: AccountMetrics | null  // KPI metrics from SSE
   latestActivity?: Activity | null  // Latest activity for status display
 }
@@ -65,30 +61,22 @@ export function ActivationBar({
   onStart,
   onStop,
   onManualTrigger,
-  onDeployLive,
   metrics,
   latestActivity
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
-  const dojoLocked = selectedBot.dojo_locked ?? false
   const { canAccess, userProfile } = usePermissions()
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [addCreditsOpen, setAddCreditsOpen] = useState(false)
   const [riskModalOpen, setRiskModalOpen] = useState(false)
-  const [arenaModalOpen, setArenaModalOpen] = useState(false)
-  const [degenArenaOpen, setDegenArenaOpen] = useState(false)
 
   // Check if user is prepaid tier with no credits
   const isPrepaidNoCredits = userProfile?.subscription_tier === 'prepaid' &&
                              userProfile?.can_activate_bots &&
                              !userProfile?.has_available_credits
 
-  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'hyperliquid' || selectedBot.trading_mode === 'virtuals'
-  // Hyperliquid single-bot model uses real account equity (like paper), not cumulative P&L
-  const usePnlOnlyKPIs = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
-  const isRegisteredForArena = selectedBot.is_public_performance === true
-  const isPaperTrading = selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
+  const isLiveTrading = selectedBot.trading_mode === 'hyperliquid'
 
   // Check if bot was paused due to credit exhaustion (set by UsageMonitor)
   const isPausedForCredits = selectedBot.state === 'inactive' &&
@@ -100,13 +88,6 @@ export function ActivationBar({
     today_usage_usd: number
     total_usage_usd: number
   } | null>(null)
-
-  // Derived tri-state for the Deploy Live Version button on virtuals bots.
-  // 'deploy' = paper bot, button deploys a live copy.
-  // 'needs_funds' = virtuals bot but HL account is empty (awaiting bridge).
-  // 'manage' = virtuals bot with HL balance (running).
-  // null = hyperliquid self-custody bot (button hidden, pinned slot handles it).
-  const [v2Funded, setV2Funded] = useState<boolean>(false)
 
   useEffect(() => {
     // Skip optimistic placeholder bots (temp IDs from duplication)
@@ -126,38 +107,10 @@ export function ActivationBar({
       }
     }
 
-    const fetchV2Status = async () => {
-      if (selectedBot.trading_mode !== 'virtuals') {
-        setV2Funded(false)
-        return
-      }
-      try {
-        const s = await apiClient.arenaV2Status(selectedBot.config_id)
-        // DGClaw pools funds centrally — dgclaw_balance is the source of truth.
-        // hl_account_value is $0 unless there's an active position with margin.
-        const dgclaw = s.dgclaw_balance ?? 0
-        const hl = s.hl_account_value ?? 0
-        setV2Funded(dgclaw > 0 || hl > 0)
-      } catch {
-        // Non-critical — default to not funded; user can retry via the button
-      }
-    }
-
     fetchConfigUsage()
-    fetchV2Status()
-    // v2 status refreshes every 30s so the button state (needs_funds → manage)
-    // flips quickly once DGClaw shows balance. Usage can refresh slower.
-    const v2Interval = setInterval(fetchV2Status, 30 * 1000)
     const usageInterval = setInterval(fetchConfigUsage, 5 * 60 * 1000)
-    return () => { clearInterval(v2Interval); clearInterval(usageInterval) }
-  }, [selectedBot.config_id, selectedBot.trading_mode])
-
-  const deployButtonState: 'deploy' | 'needs_funds' | 'manage' | null =
-    selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
-      ? 'deploy'
-      : selectedBot.trading_mode === 'virtuals'
-        ? (v2Funded ? 'manage' : 'needs_funds')
-        : null
+    return () => { clearInterval(usageInterval) }
+  }, [selectedBot.config_id])
 
   // Calculate daily cost display: actual avg when usage exists, estimate when not
   const getDailyCostDisplay = (): { text: string; title: string } | null => {
@@ -202,7 +155,7 @@ export function ActivationBar({
       return
     }
 
-    // Show risk modal for live/aster bots
+    // Show risk modal for live (Hyperliquid) bots
     if (isLiveTrading) {
       setRiskModalOpen(true)
       return
@@ -265,11 +218,11 @@ export function ActivationBar({
 
         {/*
           Desktop (lg+): 2 rows
-            Row A: [avatar + name + elo]  ———  [buttons]
+            Row A: [avatar + name]  ———  [buttons]
             Row B: [status text]  ———  [countdown + cost]
 
           Mobile (<lg): stacked
-            1. Identity: avatar + name + elo
+            1. Identity: avatar + name
             2. Buttons: centered
             3. Status + metadata: text left, countdown/cost right
         */}
@@ -285,9 +238,6 @@ export function ActivationBar({
             <h2 className="text-lg font-semibold text-[var(--text-primary)] truncate">
               {selectedBot.config_name || 'Untitled Bot'}
             </h2>
-            {isPaperTrading && selectedBot.elo_rating != null && (
-              <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
-            )}
           </div>
           <div className="flex-shrink-0">
             <ActionButtons
@@ -296,23 +246,10 @@ export function ActivationBar({
               isStopping={isStopping}
               isManualTriggering={isManualTriggering}
               canRunOnce={canRunOnce}
-              dojoLocked={dojoLocked}
               canAccess={canAccess}
               freeRunsRemaining={freeRunsRemaining}
-              isPaperTrading={isPaperTrading}
-              isRegisteredForArena={isRegisteredForArena}
-              deployButtonState={deployButtonState}
               onManualTrigger={handleManualTrigger}
               onToggleActive={isActive ? onStop : handleActivate}
-              onDeployLive={() => {
-                if (onDeployLive) {
-                  onDeployLive(selectedBot.config_id)
-                } else {
-                  // Legacy fallback — open the old Degen Arena modal
-                  setDegenArenaOpen(true)
-                }
-              }}
-              onArena={() => setArenaModalOpen(true)}
             />
           </div>
         </div>
@@ -329,9 +266,6 @@ export function ActivationBar({
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               {selectedBot.config_name || 'Untitled Bot'}
             </h2>
-            {isPaperTrading && selectedBot.elo_rating != null && (
-              <EloTierBadge elo={selectedBot.elo_rating} size="sm" />
-            )}
           </div>
           {/* Mobile Row 2: Buttons */}
           <div className="flex items-center justify-center gap-2">
@@ -341,23 +275,10 @@ export function ActivationBar({
               isStopping={isStopping}
               isManualTriggering={isManualTriggering}
               canRunOnce={canRunOnce}
-              dojoLocked={dojoLocked}
               canAccess={canAccess}
               freeRunsRemaining={freeRunsRemaining}
-              isPaperTrading={isPaperTrading}
-              isRegisteredForArena={isRegisteredForArena}
-              deployButtonState={deployButtonState}
               onManualTrigger={handleManualTrigger}
               onToggleActive={isActive ? onStop : handleActivate}
-              onDeployLive={() => {
-                if (onDeployLive) {
-                  onDeployLive(selectedBot.config_id)
-                } else {
-                  // Legacy fallback — open the old Degen Arena modal
-                  setDegenArenaOpen(true)
-                }
-              }}
-              onArena={() => setArenaModalOpen(true)}
             />
           </div>
         </div>
@@ -390,52 +311,24 @@ export function ActivationBar({
         </div>
 
         {/* Row 2: KPI Metrics — always render grid, show placeholder dashes pre-SSE */}
-        {usePnlOnlyKPIs ? (
-          <>
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <KPICard
-                label="Cumulative P&L"
-                value={metrics ? `${metrics.totalEquity >= 0 ? '+' : ''}$${Math.round(metrics.totalEquity).toLocaleString()}` : '—'}
-                positive={metrics ? metrics.totalEquity >= 0 : undefined}
-              />
-              <KPICard
-                label="Unrealized"
-                value={metrics ? `${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}` : '—'}
-                positive={metrics ? metrics.pnl >= 0 : undefined}
-              />
-              <KPICard label="Trades" value={metrics ? String(metrics.trades) : '—'} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <KPICard label="Win Rate" value={metrics ? `${Math.round(metrics.winRate)}%` : '—'} />
-              <KPICard
-                label="Perf"
-                value={metrics ? `${metrics.performance.toFixed(2)}%` : '—'}
-                positive={metrics ? metrics.performance >= 0 : undefined}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <KPICard label="Total Equity" value={metrics ? `$${Math.round(metrics.totalEquity).toLocaleString()}` : '—'} />
-              <KPICard label="Available" value={metrics ? `$${Math.round(metrics.availableBalance).toLocaleString()}` : '—'} />
-              <KPICard
-                label="Unrealized"
-                value={metrics ? `${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}` : '—'}
-                positive={metrics ? metrics.pnl >= 0 : undefined}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <KPICard label="Trades" value={metrics ? String(metrics.trades) : '—'} />
-              <KPICard label="Win Rate" value={metrics ? `${Math.round(metrics.winRate)}%` : '—'} />
-              <KPICard
-                label="Perf"
-                value={metrics ? `${metrics.performance.toFixed(2)}%` : '—'}
-                positive={metrics ? metrics.performance >= 0 : undefined}
-              />
-            </div>
-          </>
-        )}
+        <div className="grid grid-cols-3 gap-3 mb-2">
+          <KPICard label="Total Equity" value={metrics ? `$${Math.round(metrics.totalEquity).toLocaleString()}` : '—'} />
+          <KPICard label="Available" value={metrics ? `$${Math.round(metrics.availableBalance).toLocaleString()}` : '—'} />
+          <KPICard
+            label="Unrealized"
+            value={metrics ? `${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}` : '—'}
+            positive={metrics ? metrics.pnl >= 0 : undefined}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <KPICard label="Trades" value={metrics ? String(metrics.trades) : '—'} />
+          <KPICard label="Win Rate" value={metrics ? `${Math.round(metrics.winRate)}%` : '—'} />
+          <KPICard
+            label="Perf"
+            value={metrics ? `${metrics.performance.toFixed(2)}%` : '—'}
+            positive={metrics ? metrics.performance >= 0 : undefined}
+          />
+        </div>
       </div>
 
       {/* Upgrade Modal */}
@@ -460,34 +353,6 @@ export function ActivationBar({
         tradingMode={selectedBot.trading_mode || 'paper'}
         botName={selectedBot.config_name || 'Untitled Bot'}
       />
-
-      {/* Arena Registration Modal */}
-      <ArenaRegistrationModal
-        isOpen={arenaModalOpen}
-        onClose={() => setArenaModalOpen(false)}
-        configId={selectedBot.config_id}
-        configName={selectedBot.config_name || 'Untitled Bot'}
-        onSuccess={() => {
-          // Trigger a refresh - the SSE will pick up the change
-          window.location.reload()
-        }}
-        isBotActive={isActive}
-        onActivateBot={onStart}
-        isActivating={isStarting}
-      />
-
-      {/* Degen Arena (DGClaw) Modal */}
-      <DegenArenaModal
-        isOpen={degenArenaOpen}
-        onClose={() => {
-          setDegenArenaOpen(false)
-        }}
-        configId={selectedBot.config_id}
-        configName={selectedBot.config_name || 'Untitled Bot'}
-        isBotActive={isActive}
-        onActivateBot={onStart}
-        isActivating={isStarting}
-      />
     </>
   )
 }
@@ -500,70 +365,22 @@ interface KPICardProps {
 
 function ActionButtons({
   isActive, isStarting, isStopping, isManualTriggering,
-  canRunOnce, dojoLocked, canAccess, freeRunsRemaining,
-  isPaperTrading, isRegisteredForArena, deployButtonState,
-  onManualTrigger, onToggleActive, onDeployLive, onArena,
+  canRunOnce, canAccess, freeRunsRemaining,
+  onManualTrigger, onToggleActive,
 }: {
   isActive: boolean; isStarting: boolean; isStopping: boolean; isManualTriggering: boolean
-  canRunOnce: boolean; dojoLocked: boolean; canAccess: (feature: string) => boolean; freeRunsRemaining: number
-  isPaperTrading: boolean; isRegisteredForArena: boolean
-  deployButtonState: 'deploy' | 'needs_funds' | 'manage' | null
-  onManualTrigger: () => void; onToggleActive: () => void; onDeployLive: () => void; onArena: () => void
+  canRunOnce: boolean; canAccess: (feature: string) => boolean; freeRunsRemaining: number
+  onManualTrigger: () => void; onToggleActive: () => void
 }) {
   return (
     <div className="flex items-center gap-2">
-      {deployButtonState && (
-        <button
-          onClick={onDeployLive}
-          className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-colors ${
-            deployButtonState === 'manage'
-              ? 'border-green-500/30 bg-green-500/10 text-green-500'
-              : deployButtonState === 'needs_funds'
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-500'
-                : 'border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-          }`}
-        >
-          {deployButtonState === 'manage' ? (
-            <CheckCircle className="h-4 w-4" />
-          ) : (
-            <Trophy className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline">
-            {deployButtonState === 'manage'
-              ? 'Manage Live Bot'
-              : deployButtonState === 'needs_funds'
-                ? 'Live Bot: Needs Funds'
-                : 'Deploy Live Version'}
-          </span>
-        </button>
-      )}
-
-      {/* Enter Arena — hidden until S2 registration API ready */}
-      {false && isPaperTrading && (
-        isRegisteredForArena ? (
-          <div className="inline-flex items-center gap-1.5 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm text-green-500">
-            <CheckCircle className="h-4 w-4" />
-            <span>In Arena</span>
-          </div>
-        ) : (
-          <button
-            onClick={onArena}
-            disabled={!isActive}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Trophy className="h-4 w-4" />
-            <span>Enter Arena</span>
-          </button>
-        )
-      )}
-
       <button
         onClick={onManualTrigger}
-        disabled={isManualTriggering || isStarting || isStopping || !canRunOnce || dojoLocked}
+        disabled={isManualTriggering || isStarting || isStopping || !canRunOnce}
         className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors disabled:cursor-not-allowed ${
-          !canRunOnce || dojoLocked ? 'opacity-50' : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
+          !canRunOnce ? 'opacity-50' : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
         }`}
-        title={dojoLocked ? 'Locked for Dojo match' : !canRunOnce ? 'No free test runs remaining.' : undefined}
+        title={!canRunOnce ? 'No free test runs remaining.' : undefined}
       >
         {!canAccess('bot_activation') && freeRunsRemaining === 0 ? (
           <Crown className="h-4 w-4" />
@@ -582,8 +399,7 @@ function ActionButtons({
 
       <button
         onClick={onToggleActive}
-        disabled={isStarting || isStopping || (isActive && dojoLocked)}
-        title={isActive && dojoLocked ? 'Locked for Dojo match — forfeit to unlock' : undefined}
+        disabled={isStarting || isStopping}
         className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
           isActive
             ? 'bg-rose-600/90 hover:bg-rose-700 ring-rose-500 text-white'

@@ -39,7 +39,6 @@ interface BotRailProps {
   onSelect: (configId: string) => void
   onCreateNew?: () => void
   onOpenHyperliquidSetup?: () => void
-  onDeployLive?: (configId: string) => void
   isCreatingNew?: boolean
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
@@ -58,7 +57,6 @@ export function BotRail({
   onSelect,
   onCreateNew,
   onOpenHyperliquidSetup,
-  onDeployLive,
   isCreatingNew = false,
   onRename,
   onDuplicate,
@@ -68,8 +66,7 @@ export function BotRail({
   accounts = [],
   className = ''
 }: BotRailProps) {
-  // Paper + virtuals bots share this list — virtuals get a LIVE badge on the
-  // row. Only the legacy self-custody hyperliquid bot lives in the pinned slot.
+  // Paper bots live in this list; the hyperliquid bot lives in the pinned slot.
   const paperBots = bots.filter(b => b.trading_mode !== 'hyperliquid')
   const currentBotCount = paperBots.length
 
@@ -216,7 +213,6 @@ export function BotRail({
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 onResetAccount={onResetAccount}
-                onDeployLive={onDeployLive}
                 isBotAction={isBotAction}
                 performancePct={accounts.find(a => a.config_id === bot.config_id)?.performance_pct}
               />
@@ -358,7 +354,6 @@ interface BotRowProps {
   onDuplicate?: (configId: string) => void
   onDelete?: (configId: string) => void
   onResetAccount?: (configId: string) => void
-  onDeployLive?: (configId: string) => void
   isBotAction: boolean
   performancePct?: number
 }
@@ -371,7 +366,6 @@ function BotRow({
   onDuplicate,
   onDelete,
   onResetAccount,
-  onDeployLive,
   isBotAction,
   performancePct
 }: BotRowProps) {
@@ -415,17 +409,6 @@ function BotRow({
               className={`h-3 w-3 ${bot.state === 'active' ? 'text-[var(--accent)] fill-[var(--accent)]' : 'text-[var(--text-muted)]'}`}
             />
             <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
-            {bot.trading_mode === 'virtuals' && (
-              <span
-                className="rounded-full px-1.5 py-0 text-[10px] font-semibold"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-                  color: 'var(--accent)',
-                }}
-              >
-                LIVE
-              </span>
-            )}
           </div>
           {(onRename || onDuplicate || onDelete || onResetAccount) && (
             <BotManagementMenu
@@ -434,13 +417,12 @@ function BotRow({
               onDuplicate={onDuplicate || (() => {})}
               onDelete={onDelete || (() => {})}
               onResetAccount={onResetAccount}
-              onDeployLive={onDeployLive}
               isBotAction={isBotAction}
             />
           )}
         </div>
 
-        {/* Metadata badges: model, pair, performance, Elo */}
+        {/* Metadata badges: model, pair, performance */}
         <div className="flex flex-wrap gap-1 mb-2">
           {logoPath && (
             <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">

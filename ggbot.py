@@ -98,54 +98,14 @@ CREDIT_PURCHASE_MAX_CENTS = 50000    # $500
 API_BASE_URL = os.getenv("API_BASE_URL", "https://ggbots-api.nightingale.business")
 
 
-def _check_dojo_lock(config_id: str) -> None:
-    """Raise 400 if bot is locked in an active Dojo match."""
-    from core.arena.matches import is_dojo_locked
-    if is_dojo_locked(config_id):
-        raise HTTPException(
-            status_code=400,
-            detail="Bot is locked for an active Dojo match. Forfeit to unlock."
-        )
-
-
-async def _check_arena_assignment(config_id: str) -> None:
-    """Raise 409 if bot has an assigned Degen Arena agent holding live funds.
-
-    DGClaw lite agents hold real USDC (ACP fee reserve on Base + pool balance
-    on Hyperliquid). Deleting the bot would leave the user with no UI path to
-    withdraw — the Degen Arena modal looks up the agent by config_id. Users
-    must withdraw funds and release the agent first.
-    """
-    from core.common.db import db_fetch_one
-    row = await db_fetch_one(
-        """
-        SELECT agent_name, wallet_address, hl_subaccount_address
-        FROM arena_agents
-        WHERE assigned_config_id = %s AND status = 'assigned'
-        """,
-        (config_id,)
-    )
-    if row:
-        agent_name = row[0]
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Cannot delete: this bot has an assigned Degen Arena agent "
-                f"({agent_name}) which may hold live funds on DGClaw. "
-                f"Open the Degen Arena modal, withdraw all funds, and release "
-                f"the agent before deleting this bot."
-            )
-        )
-
-
 class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
     config_type: str = "scheduled_trading"
     trading_mode: str = "paper"  # 'paper' | 'hyperliquid'
-    selected_pair: Optional[str] = "BTC/USDT"  # Optional for agents
-    extraction: Optional[Dict[str, Any]] = None  # Optional for agents and signal_validation
-    decision: Optional[Dict[str, Any]] = None  # Optional for agents
+    selected_pair: Optional[str] = "BTC/USDT"
+    extraction: Optional[Dict[str, Any]] = None
+    decision: Optional[Dict[str, Any]] = None
     trading: Dict[str, Any]  # Always required
     llm_config: Optional[Dict[str, Any]] = None  # Optional for agents
     telegram_integration: Optional[Dict[str, Any]] = None
@@ -244,27 +204,19 @@ app = FastAPI(
 
 # Include API routers
 from api.paper_trading import router as paper_trading_router
-from api.agent import router as agent_router
 from api.activities import router as activities_router
 from api.snapshots import router as snapshots_router
 from api.assistant import router as assistant_router
 from api.admin import router as admin_router
 from api.public import router as public_router
 from api.usage import router as usage_router
-from api.virtuals_arena import router as virtuals_arena_router
-from api.acp_v2_test import router as acp_v2_test_router
-from api.arena_v2 import router as arena_v2_router
 app.include_router(paper_trading_router)
-app.include_router(agent_router)
 app.include_router(activities_router)
 app.include_router(snapshots_router)
 app.include_router(assistant_router)
 app.include_router(admin_router)
 app.include_router(public_router)
 app.include_router(usage_router)
-app.include_router(virtuals_arena_router)
-app.include_router(acp_v2_test_router)
-app.include_router(arena_v2_router)
 
 
 # Orchestrator instance (used by "Run Now" and signal validation endpoints)
@@ -400,8 +352,8 @@ async def create_config(
     trading_mode = request.trading_mode
 
     # Validate trading mode
-    if trading_mode not in ["paper", "hyperliquid", "virtuals"]:
-        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper', 'hyperliquid', or 'virtuals'")
+    if trading_mode not in ["paper", "hyperliquid"]:
+        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper' or 'hyperliquid'")
 
     # NOTE: No subscription check here — users can CREATE live trading bots on any tier.
     # The real gate is bot ACTIVATION (start_bot endpoint) which checks can_activate_bots.
@@ -528,260 +480,15 @@ async def create_config(
 async def list_configs(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """List all configurations for the current user, with arena registration status."""
+    """List all configurations for the current user."""
     configs = await config_service.list_configs(current_user.user_id)
     config_dicts = [config.to_dict() for config in configs]
-
-    # Enrich with arena registration data
-    config_ids = [c['config_id'] for c in config_dicts]
-    if config_ids:
-        from core.arena.seasons import SEASONS, get_season_phase
-        arena_map = {}
-        try:
-            from core.common.db import get_db_connection
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT config_id, season_id, registered_at
-                        FROM arena_registrations
-                        WHERE config_id = ANY(%s) AND unregistered_at IS NULL
-                    """, (config_ids,))
-                    for row in cur.fetchall():
-                        cid = str(row[0])
-                        sid = row[1]
-                        phase = get_season_phase(sid)
-                        season = SEASONS.get(sid, {})
-                        arena_map[cid] = {
-                            "season_id": sid,
-                            "season_name": season.get('name', f'Season {sid}'),
-                            "registered_at": row[2].isoformat() if row[2] else None,
-                            "is_locked": phase in ('registration', 'competition'),
-                            "can_unregister": phase == 'registration',
-                        }
-        except Exception:
-            pass  # Non-critical enrichment
-
-        for c in config_dicts:
-            c['arena_registration'] = arena_map.get(c['config_id'])
-
-        # Enrich with dojo data (elo_rating, dojo_visible, lock state)
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT config_id, elo_rating, dojo_visible
-                        FROM configurations
-                        WHERE config_id = ANY(%s)
-                    """, (config_ids,))
-                    for row in cur.fetchall():
-                        cid = str(row[0])
-                        for c in config_dicts:
-                            if c['config_id'] == cid:
-                                c['elo_rating'] = row[1] or 1200
-                                c['dojo_visible'] = row[2] if row[2] is not None else True
-
-                    # Active matches for lock state
-                    cur.execute("""
-                        SELECT
-                            CASE WHEN challenger_config_id = ANY(%s) THEN challenger_config_id
-                                 ELSE opponent_config_id END AS config_id,
-                            id, format, ends_at,
-                            CASE WHEN challenger_config_id = ANY(%s)
-                                 THEN (SELECT config_name FROM configurations WHERE config_id = opponent_config_id)
-                                 ELSE (SELECT config_name FROM configurations WHERE config_id = challenger_config_id)
-                            END AS opponent_name
-                        FROM dojo_matches
-                        WHERE status = 'active'
-                          AND (challenger_config_id = ANY(%s) OR opponent_config_id = ANY(%s))
-                    """, (config_ids, config_ids, config_ids, config_ids))
-
-                    dojo_lock_map = {}
-                    for row in cur.fetchall():
-                        cid = str(row[0])
-                        if cid not in dojo_lock_map:
-                            dojo_lock_map[cid] = []
-                        dojo_lock_map[cid].append({
-                            'match_id': str(row[1]),
-                            'format': row[2],
-                            'ends_at': row[3].isoformat() if row[3] else None,
-                            'opponent_name': row[4],
-                        })
-
-                    for c in config_dicts:
-                        active = dojo_lock_map.get(c['config_id'], [])
-                        c['dojo_locked'] = len(active) > 0
-                        c['dojo_matches_active'] = active
-        except Exception:
-            pass  # Non-critical enrichment
 
     return {
         "status": "success",
         "configs": config_dicts,
         "count": len(config_dicts)
     }
-
-
-@app.put("/api/v2/config/{config_id}/dojo-visibility")
-async def toggle_dojo_visibility(
-    config_id: str,
-    body: Dict[str, Any],
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Toggle dojo_visible flag for a bot configuration."""
-    visible = body.get("dojo_visible")
-    if visible is None:
-        raise HTTPException(status_code=400, detail="dojo_visible is required")
-
-    from core.common.db import get_db_connection
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE configurations
-                SET dojo_visible = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE config_id = %s AND user_id = %s
-                RETURNING config_id
-            """, (bool(visible), config_id, str(current_user.user_id)))
-            result = cur.fetchone()
-            if not result:
-                raise HTTPException(status_code=404, detail="Configuration not found")
-            conn.commit()
-
-    return {"status": "success", "dojo_visible": bool(visible)}
-
-
-@app.get("/api/v2/dojo/elo-history/{config_id}")
-async def get_elo_history(
-    config_id: str,
-    limit: int = Query(default=20, le=100),
-    offset: int = Query(default=0, ge=0),
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get Elo rating history for a bot."""
-    from core.common.db import get_db_connection
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            # Verify ownership
-            cur.execute(
-                "SELECT config_id FROM configurations WHERE config_id = %s AND user_id = %s",
-                (config_id, str(current_user.user_id))
-            )
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Configuration not found")
-
-            cur.execute("""
-                SELECT id, elo_before, elo_after, change, reason, match_id, details, created_at
-                FROM elo_history
-                WHERE config_id = %s
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s
-            """, (config_id, limit, offset))
-
-            history = []
-            for row in cur.fetchall():
-                history.append({
-                    "id": str(row[0]),
-                    "elo_before": row[1],
-                    "elo_after": row[2],
-                    "change": row[3],
-                    "reason": row[4],
-                    "match_id": str(row[5]) if row[5] else None,
-                    "details": row[6],
-                    "created_at": row[7].isoformat() if row[7] else None,
-                })
-
-            cur.execute("SELECT COUNT(*) FROM elo_history WHERE config_id = %s", (config_id,))
-            total = cur.fetchone()[0]
-
-    return {"status": "success", "history": history, "total": total}
-
-
-# ─── Dojo Match Endpoints ────────────────────────────────────────────────────
-
-@app.get("/api/v2/dojo/can-enter/{config_id}")
-async def dojo_can_enter(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Check if a bot is eligible to enter a Dojo match."""
-    from core.arena.matches import check_entry_gate
-    return check_entry_gate(config_id, current_user.user_id)
-
-
-@app.post("/api/v2/dojo/challenge")
-async def dojo_challenge(
-    body: Dict[str, Any],
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Issue a Dojo challenge. House Bot opponents auto-accept and auto-start."""
-    from core.arena.matches import create_challenge
-
-    challenger_config_id = body.get('config_id')
-    opponent_config_id = body.get('opponent_config_id')
-    match_format = body.get('format', 'rapid')
-
-    if not challenger_config_id or not opponent_config_id:
-        raise HTTPException(status_code=400, detail="config_id and opponent_config_id required")
-
-    result = create_challenge(
-        challenger_config_id=challenger_config_id,
-        opponent_config_id=opponent_config_id,
-        match_format=match_format,
-        user_id=current_user.user_id,
-    )
-
-    if 'error' in result:
-        raise HTTPException(status_code=400, detail=result['error'])
-
-    return result
-
-
-@app.post("/api/v2/dojo/match/{match_id}/forfeit")
-async def dojo_forfeit(
-    match_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Forfeit an active Dojo match."""
-    from core.arena.matches import forfeit_match
-
-    result = forfeit_match(match_id, current_user.user_id)
-
-    if 'error' in result:
-        raise HTTPException(status_code=400, detail=result['error'])
-
-    return result
-
-
-@app.get("/api/v2/dojo/matches/{config_id}")
-async def dojo_match_history(
-    config_id: str,
-    limit: int = Query(default=20, le=100),
-    offset: int = Query(default=0, ge=0),
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get completed match history for a bot."""
-    from core.arena.matches import get_match_history
-    matches = get_match_history(config_id, limit=limit, offset=offset)
-    return {"status": "success", "matches": matches}
-
-
-@app.get("/api/v2/dojo/stats/{config_id}")
-async def dojo_bot_stats(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get aggregate Dojo stats for a bot (wins, losses, draws)."""
-    from core.arena.matches import get_bot_dojo_stats
-    return get_bot_dojo_stats(config_id)
-
-
-@app.get("/api/v2/dojo/active/{config_id}")
-async def dojo_active_matches(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Get active/pending matches for a bot."""
-    from core.arena.matches import get_active_matches
-    return {"status": "success", "matches": get_active_matches(config_id)}
 
 
 @app.get("/api/v2/config/{config_id}")
@@ -803,7 +510,6 @@ async def get_config(
                         config_type,
                         state,
                         trading_mode,
-                        symphony_agent_id,
                         created_at,
                         updated_at,
                         config_data,
@@ -825,12 +531,11 @@ async def get_config(
                     "config_type": row[3],
                     "state": row[4],
                     "trading_mode": row[5],
-                    "symphony_agent_id": row[6],
-                    "created_at": row[7].isoformat() if row[7] else None,
-                    "updated_at": row[8].isoformat() if row[8] else None,
-                    "config_data": row[9],
-                    "profile_image_url": row[10],
-                    "is_public_performance": row[11] or False
+                    "created_at": row[6].isoformat() if row[6] else None,
+                    "updated_at": row[7].isoformat() if row[7] else None,
+                    "config_data": row[8],
+                    "profile_image_url": row[9],
+                    "is_public_performance": row[10] or False
                 }
 
         return {
@@ -842,61 +547,6 @@ async def get_config(
     except Exception as e:
         logger.error(f"Failed to get config {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve configuration: {str(e)}")
-
-
-@app.get("/api/v2/configs/{config_id}/strategy")
-async def get_config_strategy(
-    config_id: str
-) -> Dict[str, Any]:
-    """
-    Get agent strategy for a configuration (PUBLIC for timeline viewing).
-
-    Used by Activity Timeline to display strategy in "View Configuration" modal.
-    Returns just the agent_strategy content, or 404 if not an agent config.
-    """
-    from core.common.db import get_db_connection
-
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT config_type, config_data
-                    FROM configurations
-                    WHERE config_id = %s
-                """, (config_id,))
-                row = cur.fetchone()
-
-                if not row:
-                    raise HTTPException(status_code=404, detail="Configuration not found")
-
-                config_type = row[0]
-                config_data = row[1]
-
-                # Check if this is an agent config
-                if config_type != 'agent':
-                    raise HTTPException(status_code=404, detail="Not an agent configuration")
-
-                # Extract agent_strategy
-                agent_strategy = config_data.get('agent_strategy', {})
-                strategy_content = agent_strategy.get('content', '')
-
-                if not strategy_content:
-                    raise HTTPException(status_code=404, detail="No strategy defined for this agent")
-
-                return {
-                    "status": "success",
-                    "strategy": strategy_content,
-                    "version": agent_strategy.get('version', 1),
-                    "autonomously_editable": agent_strategy.get('autonomously_editable', False),
-                    "last_updated_at": agent_strategy.get('last_updated_at'),
-                    "last_updated_by": agent_strategy.get('last_updated_by', 'user')
-                }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get strategy for config {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve strategy: {str(e)}")
 
 
 @app.put("/api/v2/config/{config_id}")
@@ -912,36 +562,6 @@ async def update_config(
     config_type = update_data.pop("config_type", None)
     trading_mode = update_data.pop("trading_mode", None)
     profile_image_url = update_data.pop("profile_image_url", None)
-
-    # Check Dojo lock — block strategy edits for bots in active matches
-    strategy_fields_in_update = {k for k in update_data if k in {'selected_pair', 'extraction', 'decision', 'trading', 'llm_config'}}
-    if strategy_fields_in_update:
-        _check_dojo_lock(config_id)
-
-    # Check arena lock — block strategy edits for registered bots
-    if strategy_fields_in_update:
-        from core.arena.seasons import get_season_phase
-        from core.common.db import get_db_connection as _get_db
-        with _get_db() as _conn:
-            with _conn.cursor() as _cur:
-                _cur.execute("""
-                    SELECT ar.season_id FROM arena_registrations ar
-                    WHERE ar.config_id = %s AND ar.unregistered_at IS NULL
-                    LIMIT 1
-                """, (config_id,))
-                active_reg = _cur.fetchone()
-                if active_reg:
-                    phase = get_season_phase(active_reg[0])
-                    if phase == 'registration':
-                        raise HTTPException(
-                            status_code=400,
-                            detail="Bot is locked for ggArena Season 2. Unregister during registration week to edit your strategy."
-                        )
-                    elif phase == 'competition':
-                        raise HTTPException(
-                            status_code=400,
-                            detail="Bot is locked for ggArena Season 2 competition. Strategy edits are frozen until the season ends."
-                        )
 
     # Validate symbol has real-time price data if changing selected_pair
     selected_pair = update_data.get("selected_pair")
@@ -1034,8 +654,6 @@ async def delete_config(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """Delete a configuration. Scheduler reconcile loop auto-removes orphaned jobs."""
-    _check_dojo_lock(config_id)
-    await _check_arena_assignment(config_id)
     try:
         success = await config_service.delete_config(config_id, current_user.user_id)
     except ConfigDeletionBlocked as e:
@@ -1059,8 +677,7 @@ async def run_orchestration(
     request: SignalOrchestrationRequest = SignalOrchestrationRequest(),
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> OrchestrationResult:
-    """Run autonomous trading cycle or signal validation for a configuration."""
-    _check_dojo_lock(config_id)
+    """Run autonomous trading cycle for a configuration."""
     try:
         result = await orchestrator.run_autonomous_cycle(
             config_id,
@@ -1089,103 +706,6 @@ async def run_orchestration(
         # Log any unexpected exceptions
         logger.error(f"Unexpected error in orchestration endpoint for config {config_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.post("/api/v2/signal-validation/{config_id}")
-async def run_signal_validation(
-    config_id: str,
-    user_id: str,
-    request: SignalOrchestrationRequest,
-    _: ServiceUser = Depends(get_service_user)
-) -> OrchestrationResult:
-    """Signal validation endpoint for service-to-service calls."""
-    try:
-        logger.info(f"Signal validation triggered by service for config {config_id}, user {user_id}")
-
-        result = await orchestrator.run_autonomous_cycle(
-            config_id,
-            user_id,
-            signal_data=request.signal_data,
-            override_symbol=request.override_symbol
-        )
-
-        if result.status == "error":
-            error_detail = "Unknown signal validation error"
-            if result.extraction_result and isinstance(result.extraction_result, dict):
-                error_detail = result.extraction_result.get('error', error_detail)
-
-            logger.error(f"Signal validation failed for config {config_id}: {error_detail}")
-            raise HTTPException(status_code=500, detail=f"Signal validation failed: {error_detail}")
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in signal validation for config {config_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.post("/api/v2/test/signal-publishing/{config_id}")
-async def test_signal_publishing(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """Test signal publishing functionality with mock data."""
-    try:
-        from signals.publishing_service import SignalPublishingService, AccessControlService
-
-        # Check permissions first and give specific error
-        access_control = AccessControlService()
-        can_publish = await access_control.can_publish_signals(current_user.user_id)
-        if not can_publish:
-            raise HTTPException(
-                status_code=403,
-                detail="Telegram publishing requires an active subscription. Upgrade at ggbots.ai/pricing"
-            )
-
-        # Check telegram config exists
-        telegram_config = await access_control.get_user_telegram_config(config_id)
-        if not telegram_config:
-            raise HTTPException(
-                status_code=400,
-                detail="Telegram publishing not configured. Enable it and enter your channel ID first."
-            )
-
-        # Create service and test message
-        service = SignalPublishingService()
-
-        # Send a simple test message directly
-        test_message = (
-            "🧪 ggbots Test Message\n\n"
-            "Your Telegram publishing is configured correctly!\n\n"
-            "Your bot's trading signals will appear here.\n\n"
-            "🌐 https://ggbots.ai"
-        )
-
-        success = await service.telegram_bot.send_message(
-            chat_id=telegram_config.chat_id,
-            text=test_message
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to send message. Make sure @ggFilter_Bot is admin in your channel/group with 'Post Messages' permission."
-            )
-
-        return {
-            "status": "success",
-            "message": "Test message sent successfully!",
-            "chat_id": telegram_config.chat_id,
-            "config_id": config_id
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Signal publishing test failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Signal publishing test failed: {str(e)}")
 
 
 # Symbols API Endpoints
@@ -1318,10 +838,8 @@ async def get_user_profile(
         "can_use_premium_features": profile.can_use_premium_features,
         "requires_own_llm_keys": profile.requires_own_llm_keys,
         "can_publish_telegram_signals": profile.can_publish_telegram_signals,
-        "can_use_signal_validation": profile.can_use_signal_validation,
         "can_use_live_trading": profile.can_use_live_trading,
         "can_activate_bots": profile.can_activate_bots,
-        "can_use_agents": profile.can_use_agents,
         "paid_data_points": profile.paid_data_points,
         # Credit-related fields for prepaid tier handling
         "credit_balance_usd": credit_balance_usd,
@@ -2196,8 +1714,6 @@ async def close_hyperliquid_position(
                 if str(user_id) != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Unauthorized")
 
-        _check_dojo_lock(str(config_id))
-
         from trading.live.hyperliquid_service import HyperliquidLiveTradingService
         hl_service = HyperliquidLiveTradingService()
         close_result = await hl_service.close_position(batch_id, current_user.user_id)
@@ -2207,29 +1723,6 @@ async def close_hyperliquid_position(
                 status_code=500,
                 detail=close_result.get("reason", "Failed to close position")
             )
-
-        # Mirror close to arena (fire-and-forget)
-        try:
-            from trading.virtuals.arena_sync import mirror_close_to_arena
-            asyncio.create_task(mirror_close_to_arena(
-                config_id=str(config_id),
-                symbol=trade_symbol,
-                close_reason='manual',
-                user_id=current_user.user_id,
-            ))
-        except Exception:
-            pass
-
-        # Mirror close to Dojo match accounts (fire-and-forget)
-        try:
-            from core.arena.dojo_mirror import mirror_close_to_dojo
-            asyncio.create_task(mirror_close_to_dojo(
-                config_id=str(config_id),
-                symbol=trade_symbol,
-                close_reason='manual',
-            ))
-        except Exception:
-            pass
 
         return close_result
 
@@ -2788,107 +2281,6 @@ async def get_bot_decisions(
         raise HTTPException(status_code=500, detail="Failed to get decisions")
 
 
-# Agent Trade Execution Endpoint
-@app.post("/api/v2/agent/execute-trade")
-async def agent_execute_trade(
-    request: Dict[str, Any],
-    user_id: str = Query(...),
-    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
-) -> Dict[str, Any]:
-    """
-    Execute trade for agent with optional position sizing overrides.
-
-    This endpoint is called by autonomous agents via MCP tools.
-    Supports position size and leverage overrides for agent decision-making.
-
-    Args:
-        request: Trade execution request with:
-            - config_id: Bot configuration ID
-            - symbol: Trading symbol (any format accepted)
-            - side: "long" or "short"
-            - confidence: Optional confidence score (0.0-1.0, default 0.7)
-            - stop_loss_price: Optional stop loss price
-            - take_profit_price: Optional take_profit price
-            - decision_id: Optional decision UUID to link
-            - position_size_override: Optional position size in base asset (e.g., 0.005 BTC)
-            - position_size_usd_override: Optional total position size in USD NOTIONAL (e.g., 500)
-                                          Note: This is the FULL POSITION SIZE, not margin/collateral
-                                          Example: 1000 with 10x leverage = $1000 position using $100 margin
-            - leverage_override: Optional leverage (e.g., 15)
-        user_id: User ID (passed as query param by service client)
-        x_service_auth: Service authentication header
-
-    Returns:
-        Trade execution result with status, trade_id/batch_id, etc.
-    """
-    try:
-        # Service authentication check (same as signal-listener pattern)
-        if x_service_auth != "agent-runner":
-            raise HTTPException(status_code=401, detail="Unauthorized service")
-
-        # Extract required fields
-        config_id = request.get("config_id")
-        symbol = request.get("symbol")
-        side = request.get("side")
-
-        if not config_id or not symbol or not side:
-            raise HTTPException(status_code=400, detail="Missing required fields: config_id, symbol, side")
-
-        # Validate config belongs to user
-        config = await config_service.get_config(config_id, user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Build trade intent with overrides
-        intent = {
-            "config_id": config_id,
-            "user_id": user_id,
-            "symbol": symbol,
-            "action": side,  # "long" or "short"
-            "confidence": request.get("confidence", 0.7),
-            "stop_loss_price": request.get("stop_loss_price"),
-            "take_profit_price": request.get("take_profit_price"),
-            "decision_id": request.get("decision_id"),
-            # Agent override parameters
-            "position_size_override": request.get("position_size_override"),
-            "position_size_usd_override": request.get("position_size_usd_override"),
-            "leverage_override": request.get("leverage_override")
-        }
-
-        # Route to appropriate trading service based on trading_mode
-        trading_mode = getattr(config, 'trading_mode', 'paper')
-
-        if trading_mode == 'hyperliquid':
-            result = await orchestrator.hyperliquid_trading.execute_trade_intent(intent)
-            return {
-                "status": "success",
-                "message": "Trade executed on Hyperliquid",
-                "trade": {
-                    "batch_id": result.get("batch_id"),
-                    "status": result.get("status")
-                }
-            }
-        else:
-            # Paper trading
-            result = await orchestrator.paper_trading.execute_trade_intent(intent)
-            return {
-                "status": "success",
-                "message": "Paper trade executed",
-                "trade": {
-                    "trade_id": result.get("trade_id"),
-                    "entry_price": result.get("entry_price"),
-                    "size_usd": result.get("size_usd"),
-                    "status": result.get("status")
-                }
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Agent trade execution failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Trade execution failed: {str(e)}")
-
-
 # Bot Lifecycle Endpoints (placeholders for now)
 @app.post("/api/v2/bot/{config_id}/start")
 async def start_bot(
@@ -2937,7 +2329,7 @@ async def start_bot(
         # =====================================================================
 
         # =====================================================================
-        # LIVE-MODE CHECKS (hyperliquid / virtuals)
+        # LIVE-MODE CHECKS (hyperliquid)
         # =====================================================================
         if config.trading_mode == 'hyperliquid':
             # 1. Credential check — user must have completed Hyperliquid setup
@@ -2963,25 +2355,6 @@ async def start_bot(
                 raise HTTPException(
                     status_code=400,
                     detail="You already have an active live bot. Stop it before starting another."
-                )
-        elif config.trading_mode == 'virtuals':
-            # Virtuals bots are keyed to arena_agents_v2 rows — each config has
-            # its own Privy wallet + HL API wallet, so the 1-per-user cap does
-            # NOT apply. The gate is simply: is the agent provisioned?
-            from core.auth.vault_utils import get_arena_v2_credential
-            v2_creds = await get_arena_v2_credential(config_id)
-            if not v2_creds:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Virtuals agent not provisioned. Deploy via Deploy Live Version."
-                )
-            if not v2_creds.get('hl_api_wallet_key'):
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Virtuals agent still provisioning — HL API wallet not yet "
-                        "authorized. Complete the deploy flow first."
-                    )
                 )
         # =====================================================================
 
@@ -3032,7 +2405,6 @@ async def stop_bot(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """Stop a bot by setting state to inactive. Scheduler detects within 10s."""
-    _check_dojo_lock(config_id)
     try:
         config = await config_service.get_config(config_id, current_user.user_id)
         if not config:
@@ -3082,7 +2454,6 @@ async def reset_account(
     but preserves trade history for analysis. Sets last_reset_at timestamp
     to distinguish current run metrics from historical data.
     """
-    _check_dojo_lock(config_id)
     try:
         config = await config_service.get_config(config_id, current_user.user_id)
         if not config:
@@ -3113,471 +2484,6 @@ async def reset_account(
     except Exception as e:
         logger.error(f"Failed to reset account {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to reset account: {str(e)}")
-
-
-@app.post("/api/v2/bot/{config_id}/arena/register")
-async def register_for_arena(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Register a bot for ggArena Season 1 competition.
-
-    Requirements:
-    - User must own the bot
-    - Bot must be in 'active' state
-    - User must have active subscription (usage-based)
-
-    Sets is_public_performance = true for the configuration.
-    Account will be reset to $10k when competition starts (Jan 21).
-    """
-    try:
-        # 1. Verify user owns this configuration
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # 2. Verify bot is active
-        if config.state != 'active':
-            raise HTTPException(
-                status_code=400,
-                detail="Bot must be active to enter the Arena. Start your bot first."
-            )
-
-        # 3. Verify user has active subscription
-        profile = await user_service.get_profile(current_user.user_id)
-        if not profile or not profile.can_use_premium_features:
-            raise HTTPException(
-                status_code=403,
-                detail="Arena registration requires an active subscription."
-            )
-
-        # 4. Set is_public_performance = true and record registration time
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE configurations
-                    SET is_public_performance = true,
-                        arena_registered_at = CURRENT_TIMESTAMP,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE config_id = %s AND user_id = %s
-                """, (config_id, current_user.user_id))
-                conn.commit()
-
-        # 5. If competition has started, reset account to $10k immediately
-        from datetime import datetime, timezone
-        competition_start = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)
-        account_reset = False
-
-        if datetime.now(timezone.utc) >= competition_start:
-            try:
-                from trading.paper.supabase_service import SupabasePaperTradingService
-                paper_trading = SupabasePaperTradingService()
-                reset_result = await paper_trading.reset_account(config_id, current_user.user_id)
-                account_reset = reset_result.get('status') == 'success'
-                logger.info(f"Late arena entry - account reset: config_id={config_id}, success={account_reset}")
-            except Exception as e:
-                logger.error(f"Failed to reset account for late arena entry: {e}")
-
-        logger.info(f"Bot registered for Arena: config_id={config_id}, user_id={current_user.user_id}, account_reset={account_reset}")
-
-        if account_reset:
-            return {
-                "status": "success",
-                "config_id": config_id,
-                "message": "You're in! Your account has been reset to $10,000. Good luck!",
-                "competition_start": "2026-01-21T12:00:00Z",
-                "account_reset": True
-            }
-        else:
-            return {
-                "status": "success",
-                "config_id": config_id,
-                "message": "Your bot is registered for ggArena Season 1! Account will be reset to $10,000 on January 21st.",
-                "competition_start": "2026-01-21T12:00:00Z",
-                "account_reset": False
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to register bot for arena {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-
-@app.post("/api/v2/bot/{config_id}/arena/unregister")
-async def unregister_from_arena(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Remove bot from ggArena competition.
-
-    Sets is_public_performance = false for the configuration.
-    """
-    try:
-        # 1. Verify user owns this configuration
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # 2. Set is_public_performance = false
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE configurations
-                    SET is_public_performance = false, updated_at = CURRENT_TIMESTAMP
-                    WHERE config_id = %s AND user_id = %s
-                """, (config_id, current_user.user_id))
-                conn.commit()
-
-        logger.info(f"Bot unregistered from Arena: config_id={config_id}, user_id={current_user.user_id}")
-
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "message": "Your bot has been removed from ggArena Season 1."
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to unregister bot from arena {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Unregistration failed: {str(e)}")
-
-
-# =============================================================================
-# Arena Season 2 Registration
-# =============================================================================
-
-@app.post("/api/v2/arena/season/{season_id}/register")
-async def register_for_arena_s2(
-    season_id: int,
-    request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Register a bot for ggArena Season 2.
-
-    Requirements:
-    - Season must be in 'registration' phase
-    - User must own the bot
-    - Bot must be active and in paper trading mode
-    - User must have active subscription
-    """
-    from core.arena.seasons import SEASONS, is_registration_open
-
-    season = SEASONS.get(season_id)
-    if not season:
-        raise HTTPException(status_code=404, detail="Season not found")
-
-    if not is_registration_open(season_id):
-        from core.arena.seasons import get_season_phase
-        phase = get_season_phase(season_id)
-        if phase == 'training':
-            raise HTTPException(status_code=400, detail=f"Registration opens {season['registration_start'].strftime('%B %d')}.")
-        elif phase == 'competition':
-            raise HTTPException(status_code=400, detail="Registration is closed. Competition is underway.")
-        else:
-            raise HTTPException(status_code=400, detail="Registration is closed for this season.")
-
-    body = await request.json()
-    config_id = body.get("config_id")
-    if not config_id:
-        raise HTTPException(status_code=400, detail="config_id is required")
-
-    try:
-        # Verify user owns config
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Must be active
-        if config.state != 'active':
-            raise HTTPException(status_code=400, detail="Bot must be active to enter the Arena. Start your bot first.")
-
-        # Must be paper trading
-        if config.trading_mode != 'paper':
-            raise HTTPException(status_code=400, detail="Only paper trading bots can enter the Arena.")
-
-        # Must have subscription
-        profile = await user_service.get_profile(current_user.user_id)
-        if not profile or not profile.can_use_premium_features:
-            raise HTTPException(status_code=403, detail="Arena registration requires an active subscription.")
-
-        # Insert registration
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO arena_registrations (season_id, config_id, user_id)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (season_id, config_id) DO UPDATE
-                    SET unregistered_at = NULL, registered_at = NOW()
-                    RETURNING id
-                """, (season_id, config_id, current_user.user_id))
-                reg_id = cur.fetchone()[0]
-                conn.commit()
-
-        logger.info(f"Bot registered for Arena S{season_id}: config_id={config_id}, user_id={current_user.user_id}")
-
-        return {
-            "status": "success",
-            "registration_id": str(reg_id),
-            "config_id": config_id,
-            "season_id": season_id,
-            "message": f"Your bot is registered for {season['name']}! Strategy is now locked."
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to register bot for arena S{season_id}: {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-
-@app.post("/api/v2/arena/season/{season_id}/unregister")
-async def unregister_from_arena_s2(
-    season_id: int,
-    request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Unregister a bot from ggArena Season 2.
-
-    Only allowed during registration phase (not during competition).
-    Soft-deletes by setting unregistered_at timestamp.
-    """
-    from core.arena.seasons import SEASONS, get_season_phase
-
-    season = SEASONS.get(season_id)
-    if not season:
-        raise HTTPException(status_code=404, detail="Season not found")
-
-    phase = get_season_phase(season_id)
-    if phase == 'competition':
-        raise HTTPException(status_code=400, detail="Cannot unregister during competition. Strategy is frozen.")
-    if phase == 'completed':
-        raise HTTPException(status_code=400, detail="Season is completed. Cannot modify registrations.")
-
-    body = await request.json()
-    config_id = body.get("config_id")
-    if not config_id:
-        raise HTTPException(status_code=400, detail="config_id is required")
-
-    try:
-        # Verify user owns config
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
-            raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Set unregistered_at
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE arena_registrations
-                    SET unregistered_at = NOW()
-                    WHERE season_id = %s AND config_id = %s AND user_id = %s AND unregistered_at IS NULL
-                    RETURNING id
-                """, (season_id, config_id, current_user.user_id))
-                result = cur.fetchone()
-                conn.commit()
-
-        if not result:
-            raise HTTPException(status_code=404, detail="No active registration found for this bot.")
-
-        logger.info(f"Bot unregistered from Arena S{season_id}: config_id={config_id}, user_id={current_user.user_id}")
-
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "season_id": season_id,
-            "message": f"Your bot has been removed from {season['name']}. Strategy is now unlocked."
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to unregister bot from arena S{season_id}: {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Unregistration failed: {str(e)}")
-
-
-# =============================================================================
-# Arena USX Pledges (Staking on Bot Competition)
-# =============================================================================
-
-@app.post("/api/v2/arena/pledge")
-async def record_arena_pledge(
-    request: Request,
-) -> Dict[str, Any]:
-    """
-    Record a USX staking pledge on an arena bot (public endpoint).
-
-    No auth required — wallet_address is the identity.
-    Called after the user completes on-chain staking (USX → sUSX vault).
-    Records which bot they're backing for prize distribution.
-
-    Request body:
-    {
-        "wallet_address": "0x...",
-        "config_id": "uuid",
-        "usx_amount": "100.50",
-        "susx_amount": "95.25",  # optional
-        "tx_hash": "0x..."
-    }
-    """
-    try:
-        data = await request.json()
-
-        wallet_address = data.get('wallet_address')
-        config_id = data.get('config_id')
-        usx_amount = data.get('usx_amount')
-        susx_amount = data.get('susx_amount')  # Optional
-        tx_hash = data.get('tx_hash')
-
-        # Validate required fields
-        if not all([wallet_address, config_id, usx_amount, tx_hash]):
-            raise HTTPException(
-                status_code=400,
-                detail="Missing required fields: wallet_address, config_id, usx_amount, tx_hash"
-            )
-
-        # Basic wallet address validation
-        if not wallet_address.startswith('0x') or len(wallet_address) != 42:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid wallet address format"
-            )
-
-        # Basic tx_hash validation
-        if not tx_hash.startswith('0x') or len(tx_hash) != 66:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid transaction hash format"
-            )
-
-        # Validate config_id is a public arena bot
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT config_id, config_name
-                    FROM configurations
-                    WHERE config_id = %s AND is_public_performance = true
-                """, (config_id,))
-                bot = cur.fetchone()
-
-                if not bot:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="Bot not found or not in Arena competition"
-                    )
-
-                bot_name = bot[1]
-
-                # Insert pledge record (user_id nullable for public endpoint)
-                cur.execute("""
-                    INSERT INTO arena_pledges
-                        (wallet_address, config_id, usx_amount, susx_amount, tx_hash)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (tx_hash) DO NOTHING
-                    RETURNING id
-                """, (
-                    wallet_address,
-                    config_id,
-                    usx_amount,
-                    susx_amount,
-                    tx_hash
-                ))
-                result = cur.fetchone()
-                conn.commit()
-
-                if not result:
-                    # tx_hash already exists
-                    logger.warning(f"Duplicate pledge tx_hash: {tx_hash}")
-                    return {
-                        "status": "duplicate",
-                        "message": "This transaction has already been recorded"
-                    }
-
-                pledge_id = result[0]
-
-        logger.info(
-            f"Arena pledge recorded: wallet={wallet_address[:10]}..., "
-            f"bot={config_id}, amount={usx_amount} USX, tx={tx_hash[:16]}..."
-        )
-
-        return {
-            "status": "success",
-            "pledge_id": str(pledge_id),
-            "bot_name": bot_name,
-            "usx_amount": usx_amount,
-            "message": f"You're backing {bot_name} with {usx_amount} USX!"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to record arena pledge: {e}")
-        raise HTTPException(status_code=500, detail=f"Pledge recording failed: {str(e)}")
-
-
-@app.get("/api/v2/arena/pledges")
-async def get_user_pledges(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Get all arena pledges for the current user.
-
-    Returns list of bots they've staked on with amounts.
-    """
-    try:
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT
-                        p.id,
-                        p.config_id,
-                        c.config_name,
-                        c.profile_image_url,
-                        p.usx_amount,
-                        p.susx_amount,
-                        p.tx_hash,
-                        p.pledged_at,
-                        p.unstaked_at
-                    FROM arena_pledges p
-                    JOIN configurations c ON p.config_id = c.config_id
-                    WHERE p.user_id = %s
-                    ORDER BY p.pledged_at DESC
-                """, (current_user.user_id,))
-                pledges = cur.fetchall()
-
-        return {
-            "status": "success",
-            "pledges": [
-                {
-                    "id": str(row[0]),
-                    "config_id": str(row[1]),
-                    "bot_name": row[2],
-                    "profile_image_url": row[3],
-                    "usx_amount": float(row[4]),
-                    "susx_amount": float(row[5]) if row[5] else None,
-                    "tx_hash": row[6],
-                    "pledged_at": row[7].isoformat() if row[7] else None,
-                    "unstaked": row[8] is not None
-                }
-                for row in pledges
-            ],
-            "total_pledged": sum(float(row[4]) for row in pledges)
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to get user pledges: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch pledges: {str(e)}")
 
 
 @app.get("/api/v2/scheduler/status")
@@ -3670,153 +2576,6 @@ async def get_bot_status(
     except Exception as e:
         logger.error(f"Failed to get bot status for {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get bot status: {str(e)}")
-
-
-# =============================================================================
-# MARKET CONDITIONS (Sebastian AI Research Agent)
-# =============================================================================
-
-SEBASTIAN_API_KEY = os.getenv('SEBASTIAN_API_KEY')
-
-
-async def verify_sebastian_auth(request: Request):
-    """Authenticate Sebastian's service requests via dedicated API key."""
-    auth_header = request.headers.get('authorization', '')
-    if not auth_header.startswith('Bearer ') or not SEBASTIAN_API_KEY:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    token = auth_header.split(' ', 1)[1]
-    if token != SEBASTIAN_API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-
-@app.get("/api/v2/market-conditions/latest")
-async def get_market_conditions_latest(request: Request):
-    """
-    Get the latest market conditions report.
-
-    Sebastian reads this before producing the next report to maintain
-    temporal context (trends, changes vs previous state).
-    """
-    await verify_sebastian_auth(request)
-
-    try:
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, generated_at, schema_version, regime, domains,
-                           narratives, synthesis, data_quality, raw_tables, created_at
-                    FROM market_conditions
-                    ORDER BY generated_at DESC
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-
-                if not row:
-                    return {"status": "empty", "message": "No market conditions reports yet"}
-
-                return {
-                    "status": "ok",
-                    "report": {
-                        "id": str(row[0]),
-                        "generated_at": row[1].isoformat() if row[1] else None,
-                        "schema_version": row[2],
-                        "regime": row[3],
-                        "domains": row[4],
-                        "narratives": row[5],
-                        "synthesis": row[6],
-                        "data_quality": row[7],
-                        "raw_tables": row[8],
-                        "created_at": row[9].isoformat() if row[9] else None,
-                    }
-                }
-    except Exception as e:
-        logger.error(f"Failed to get market conditions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/v2/market-conditions")
-async def post_market_conditions(request: Request):
-    """
-    Create a new market conditions report.
-
-    Sebastian POSTs structured JSON after his daily research pass.
-    The report is stored in Supabase and cached in Redis for
-    fast consumption by the MI pipeline.
-    """
-    await verify_sebastian_auth(request)
-
-    try:
-        body = await request.json()
-
-        # Validate required fields
-        required = ['generated_at', 'regime', 'domains', 'narratives', 'synthesis']
-        missing = [f for f in required if f not in body]
-        if missing:
-            raise HTTPException(status_code=400, detail=f"Missing required fields: {missing}")
-
-        # Validate regime structure
-        regime = body['regime']
-        if not isinstance(regime, dict) or 'overall' not in regime:
-            raise HTTPException(status_code=400, detail="regime must be a dict with 'overall' key")
-
-        # Insert into Supabase
-        from core.common.db import get_db_connection
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO market_conditions
-                        (generated_at, schema_version, regime, domains, narratives,
-                         synthesis, data_quality, raw_tables)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, created_at
-                """, (
-                    body['generated_at'],
-                    body.get('schema_version', '0.1'),
-                    json.dumps(body['regime']),
-                    json.dumps(body['domains']),
-                    json.dumps(body['narratives']),
-                    body['synthesis'],
-                    json.dumps(body.get('data_quality')) if body.get('data_quality') else None,
-                    json.dumps(body.get('raw_tables')) if body.get('raw_tables') else None,
-                ))
-                result = cur.fetchone()
-                conn.commit()
-
-        report_id = str(result[0])
-
-        # Cache in Redis for fast MI pipeline access
-        try:
-            import redis as sync_redis
-            r = sync_redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
-            cache_data = {
-                'generated_at': body['generated_at'],
-                'schema_version': body.get('schema_version', '0.1'),
-                'regime': body['regime'],
-                'domains': body['domains'],
-                'narratives': body['narratives'],
-                'synthesis': body['synthesis'],
-                'data_quality': body.get('data_quality'),
-                'raw_tables': body.get('raw_tables'),
-            }
-            r.set('market_conditions:latest', json.dumps(cache_data, default=str), ex=86400)  # 24h TTL
-            r.close()
-        except Exception as e:
-            logger.warning(f"Failed to cache market conditions in Redis: {e}")
-
-        logger.info(f"Market conditions report stored: {report_id} (regime: {regime.get('overall', 'unknown')})")
-
-        return {
-            "status": "ok",
-            "id": report_id,
-            "created_at": result[1].isoformat() if result[1] else None,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to store market conditions: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================

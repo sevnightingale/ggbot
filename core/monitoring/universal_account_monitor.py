@@ -1,7 +1,7 @@
 """
 Universal Account Monitor Service
 
-Single monitoring service for ALL trading modes (paper, symphony, aster).
+Single monitoring service for ALL trading modes (paper, hyperliquid).
 Monitors positions, tracks balances, and stores account snapshots.
 """
 
@@ -16,7 +16,7 @@ from typing import Dict, Optional, List
 from core.common.db import get_db_connection
 from core.common.logger import logger as base_logger
 from core.domain.account_snapshot import AccountSnapshot
-from core.monitoring.adapters import PaperAccountAdapter, SymphonyAccountAdapter, AsterAccountAdapter, HyperliquidAccountAdapter
+from core.monitoring.adapters import PaperAccountAdapter, HyperliquidAccountAdapter
 from core.monitoring.usage_monitor import UsageMonitor
 
 # Create monitoring logger
@@ -31,7 +31,7 @@ class UniversalAccountMonitor:
     Universal monitoring service for all trading modes.
 
     Features:
-    - Monitors paper, Symphony, and AsterDEX bots at same cadence (5s)
+    - Monitors paper and Hyperliquid bots at same cadence (5s)
     - Stores snapshots only on meaningful change or heartbeat (5min)
     - Unified interface for all consumers
     - Efficient adapter pattern
@@ -46,8 +46,6 @@ class UniversalAccountMonitor:
         # Create adapters
         self.adapters = {
             'paper': PaperAccountAdapter(),
-            'symphony': SymphonyAccountAdapter(),
-            'aster': AsterAccountAdapter(),
             'hyperliquid': HyperliquidAccountAdapter()
         }
 
@@ -111,9 +109,8 @@ class UniversalAccountMonitor:
                             f"{elapsed:.1f}s, {len(self.last_snapshots)} cached"
                         )
 
-                # Every 5 minutes (60 cycles at 5s each): stale agents + account performance
+                # Every 5 minutes (60 cycles at 5s each): account performance
                 if self.cycle_count % 60 == 0:
-                    await self._check_stale_agents()
                     if active_configs:
                         self._cache_all_account_performance(active_configs)
 
@@ -349,71 +346,6 @@ class UniversalAccountMonitor:
         except Exception as e:
             logger.error(f"Failed to get active configs: {e}")
             return []
-
-    async def _check_stale_agents(self):
-        """
-        Check for agent configs that haven't been active in 24 hours and restart them.
-
-        Agent bots use wait_for() with max 24 hours. If an agent hasn't been active
-        for longer than that, it's likely stuck and needs a restart.
-        """
-        import subprocess
-
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # Find active agent configs with stale sessions (>24 hours)
-                    cur.execute("""
-                        SELECT
-                            c.config_id,
-                            c.config_name,
-                            s.last_active_at,
-                            EXTRACT(EPOCH FROM (NOW() - s.last_active_at)) / 3600 as hours_stale
-                        FROM configurations c
-                        JOIN agent_sessions s ON c.config_id = s.config_id
-                        WHERE c.config_type = 'agent'
-                          AND c.state = 'active'
-                          AND s.last_active_at < NOW() - INTERVAL '24 hours'
-                    """)
-
-                    stale_agents = cur.fetchall()
-
-                    if not stale_agents:
-                        return
-
-                    logger.warning(f"🔄 Found {len(stale_agents)} stale agent(s) to restart")
-
-                    for agent in stale_agents:
-                        config_id, config_name, last_active, hours_stale = agent
-                        pm2_name = f"agent-{config_id}"
-
-                        logger.warning(
-                            f"🔄 Restarting stale agent: {config_name or config_id} "
-                            f"(inactive for {hours_stale:.1f} hours)"
-                        )
-
-                        try:
-                            # Restart the PM2 process
-                            result = subprocess.run(
-                                ["pm2", "restart", pm2_name],
-                                capture_output=True,
-                                text=True,
-                                timeout=30
-                            )
-
-                            if result.returncode == 0:
-                                logger.info(f"✅ Successfully restarted agent: {pm2_name}")
-                            else:
-                                logger.error(
-                                    f"❌ Failed to restart agent {pm2_name}: {result.stderr}"
-                                )
-                        except subprocess.TimeoutExpired:
-                            logger.error(f"❌ Timeout restarting agent: {pm2_name}")
-                        except Exception as e:
-                            logger.error(f"❌ Error restarting agent {pm2_name}: {e}")
-
-        except Exception as e:
-            logger.error(f"❌ Failed to check stale agents: {e}")
 
     def _cache_all_account_performance(self, active_configs: List[Dict]):
         """

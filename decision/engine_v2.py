@@ -2,8 +2,8 @@
 Decision Engine V2 - Clean Architecture Implementation
 
 A complete rewrite of the decision engine using domain models, repositories,
-and clean separation of concerns. Supports both autonomous trading and signal
-validation modes with context-aware position management.
+and clean separation of concerns. Supports autonomous trading with
+context-aware position management.
 """
 
 import asyncio
@@ -25,7 +25,6 @@ from core.common.activity_logger import log_llm_activity_safe, log_activity
 from decision.llm_providers import get_llm_provider
 from core.common.formatting import format_hours
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
-from decision.prompts.signal_validation import build_signal_validation_prompt
 from decision.prompts.position_management import build_position_management_prompt
 import uuid
 import json
@@ -71,7 +70,7 @@ class DecisionEngineV2:
     - Uses ConfigRepository instead of raw JSONB queries
     - Domain model-based data access
     - Template-based prompt system with variable injection
-    - Mode-aware decision routing (autonomous vs signal validation)
+    - Decision routing (opportunity analysis vs position management)
     - Context preservation for position management
     - Direct OpenAI API integration (no custom provider complexity)
     """
@@ -253,19 +252,15 @@ class DecisionEngineV2:
         return logger.bind(**base)
 
     async def make_decision(self, symbol: Optional[str] = None,
-                          signal_data: Optional[Dict] = None,
-                          ggshot_signals: Optional[Dict] = None,
                           market_intelligence: Optional[Dict] = None,
                           run_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Main entry point for decision making.
 
-        Routes to appropriate decision type based on config_type and current state.
+        Routes to opportunity analysis or position management based on current state.
 
         Args:
-            symbol: Trading symbol (required for signal validation, optional for autonomous)
-            signal_data: External signal data (for signal validation mode)
-            ggshot_signals: ggShot signals from extraction (optional market context)
+            symbol: Trading symbol (optional; falls back to config.selected_pair)
             market_intelligence: Market intelligence data from orchestrator (funding rates, macro, etc.)
             run_id: 6-char hex correlation ID for log tracing
 
@@ -274,8 +269,7 @@ class DecisionEngineV2:
         """
         self._run_id = run_id
 
-        # Store ggshot signals and market intelligence for use in prompt building
-        self.ggshot_signals = ggshot_signals or {}
+        # Store market intelligence for use in prompt building
         self.market_intelligence = market_intelligence or {}
 
         if not self.config:
@@ -285,26 +279,11 @@ class DecisionEngineV2:
         await self._check_prepaid_credits()
 
         try:
-            # Route based on config type and signal data presence
-            config_type = self.config.config_type
-
-            self._log_bind().debug(
-                f"config_type='{config_type}', signal_data present={signal_data is not None}"
+            # Autonomous trading mode: Check for existing positions first
+            self._log_bind(symbol=symbol).debug(
+                "Autonomous trading mode: Checking positions"
             )
-
-            if config_type == "signal_validation" and signal_data:
-                # Signal validation mode: Always evaluate signals independently
-                # Bypasses position management to allow multiple concurrent positions
-                self._log_bind(symbol=symbol).debug(
-                    "Signal validation mode: Evaluating signal independently"
-                )
-                return await self._handle_signal_validation(symbol, signal_data)
-            else:
-                # Autonomous trading mode: Check for existing positions first
-                self._log_bind(symbol=symbol).debug(
-                    f"Autonomous trading mode: Checking positions (config_type={config_type})"
-                )
-                return await self._handle_autonomous_trading(symbol)
+            return await self._handle_autonomous_trading(symbol)
 
         except (DecisionError, MarketDataError, ConfigurationError, LLMError):
             # Re-raise domain-specific errors (they're already logged)
@@ -312,74 +291,6 @@ class DecisionEngineV2:
         except Exception as e:
             self._log_bind().error(f"Unexpected decision error: {e}\n{traceback.format_exc()}")
             raise DecisionError(f"Decision making failed: {e}")
-    
-    async def _handle_signal_validation(self, symbol: str, signal_data: Dict) -> Dict[str, Any]:
-        """
-        Handle signal validation mode - validate external signal using current market data.
-        
-        Process:
-        1. Get fresh market data for signal's symbol
-        2. Build signal validation prompt (4-pillar ggShot framework)
-        3. Call GPT-5 for validation decision
-        4. Create signal validation decision record
-        5. Return trading intent
-        """
-        # Get fresh market data for signal's symbol
-        market_data = await self._get_fresh_market_data(symbol)
-        if not market_data:
-            return self._create_error_intent(f"No market data available for signal {symbol}")
-        
-        # Get current price
-        current_price = await self._get_current_price(symbol)
-        
-        # Get volume confirmation analysis
-        volume_analysis = await self._get_volume_confirmation(symbol, signal_data.get('timeframe', '1h'))
-
-        # Build signal validation prompt
-        prompt, formatted_sections = await self._build_signal_validation_prompt(
-            symbol, signal_data, market_data, current_price, volume_analysis
-        )
-
-        # Log market_query activity with formatted data (run in thread — contains sync DB)
-        await asyncio.to_thread(
-            lambda: self._log_market_query_activity(
-                symbol=symbol,
-                query_mode="signal_validation",
-                current_price=current_price,
-                data_age_seconds=market_data.get('data_age_seconds', 0),
-                formatted_sections=formatted_sections,
-                metadata={
-                    "timeframes_analyzed": market_data.get('timeframes_available', []),
-                    "indicators_count": 21,  # All preprocessors
-                    "signal_direction": signal_data.get('direction', 'UNKNOWN'),
-                    "signal_source": signal_data.get('source', 'unknown')
-                }
-            )
-        )
-
-        # Call LLM for validation
-        llm_response, metadata = await self._call_llm(prompt)
-
-        # Parse response with validation
-        try:
-            decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
-        except Exception as e:
-            logger.bind(config_id=self.config_id).error(
-                f"Failed to parse LLM response: {e}\n{traceback.format_exc()}\n"
-                f"Response (first 500 chars): {llm_response[:500]}"
-            )
-            raise
-
-        # Save signal validation decision to database
-        decision_id = await self._save_signal_decision_to_db(
-            symbol, decision_data, signal_data, market_data,
-            current_price, prompt, llm_response, metadata
-        )
-        
-        # Return signal validation intent
-        return self._create_signal_validation_intent(
-            decision_id, symbol, decision_data, signal_data
-        )
     
     async def _handle_autonomous_trading(self, symbol: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -394,15 +305,6 @@ class DecisionEngineV2:
         trading_symbol = symbol or self.config.selected_pair
         if not trading_symbol:
             return self._create_error_intent("No trading symbol specified")
-
-        # Signal Mode: awareness_level='low' skips position management entirely.
-        # Used by House Bots in The Dojo — they only output entry signals, never manage positions.
-        awareness_level = (self.config.decision or {}).get('awareness_level', 'medium') if isinstance(self.config.decision, dict) else 'medium'
-        if awareness_level == 'low':
-            self._log_bind().info(
-                f"Signal Mode (awareness_level=low): opportunity analysis only for {trading_symbol}"
-            )
-            return await self._handle_opportunity_analysis(trading_symbol)
 
         # Check for active position to determine routing
         active_position = await self._get_active_position(trading_symbol, self.config_id)
@@ -456,7 +358,6 @@ class DecisionEngineV2:
                 metadata={
                     "timeframes_analyzed": market_data.get('timeframes_available', []),
                     "indicators_count": 21,  # All preprocessors
-                    "ggshot_available": bool(formatted_sections.get('ggshot_signals')),
                     "market_intelligence_categories": list(self.market_intelligence.keys()) if self.market_intelligence else []
                 }
             )
@@ -605,53 +506,6 @@ class DecisionEngineV2:
             # No more dangerous mock fallback - let the error propagate for proper handling
             raise MarketDataError(f"Unable to get current price for {symbol}: {e}")
     
-    async def _build_signal_validation_prompt(
-        self,
-        symbol: str,
-        signal_data: Dict,
-        market_data: Dict[str, Any],
-        current_price: Decimal,
-        volume_analysis: str
-    ) -> tuple[str, Dict[str, str]]:
-        """
-        Build signal validation prompt using template.
-
-        Returns:
-            Tuple of (prompt, formatted_sections) where formatted_sections contains
-            the individual formatted strings sent to LLM
-        """
-
-        signal_context = self._format_signal_for_llm(signal_data)
-        market_context = self._format_market_data_for_llm(market_data)
-        # NO FALLBACK - fail explicitly if config is missing required data
-        user_prompt = self.config.decision.get('user_prompt') if isinstance(self.config.decision, dict) else getattr(self.config.decision, 'user_prompt', None)
-        if not user_prompt:
-            raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
-        user_strategy = user_prompt
-
-        # Extract signal direction for prompt
-        signal_direction = signal_data.get('direction', 'UNKNOWN')
-
-        # Build prompt
-        prompt = build_signal_validation_prompt(
-            symbol=symbol,
-            current_price=f"${current_price:,.2f}",
-            market_data=market_context,
-            volume_analysis=volume_analysis,
-            signal_context=signal_context,
-            user_strategy=user_strategy,
-            signal_direction=signal_direction
-        )
-
-        # Also return the formatted sections for activity logging
-        formatted_sections = {
-            "technical_analysis": market_context,
-            "volume_confirmation": volume_analysis,
-            "signal_context": signal_context
-        }
-
-        return prompt, formatted_sections
-    
     async def _build_opportunity_analysis_prompt(self, symbol: str,
                                                 market_data: Dict[str, Any],
                                                 current_price: Decimal,
@@ -671,9 +525,6 @@ class DecisionEngineV2:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
         user_strategy = user_prompt
 
-        # Format ggshot signals if available
-        ggshot_context = self._format_ggshot_signals_for_llm() if hasattr(self, 'ggshot_signals') and self.ggshot_signals else None
-
         # Format market intelligence if available
         market_intel_context = self._format_market_intelligence_for_llm() if hasattr(self, 'market_intelligence') and self.market_intelligence else None
 
@@ -684,7 +535,6 @@ class DecisionEngineV2:
             market_data=market_context,
             volume_analysis=volume_analysis,
             user_strategy=user_strategy,
-            ggshot_signals=ggshot_context,
             market_intelligence=market_intel_context
         )
 
@@ -692,7 +542,6 @@ class DecisionEngineV2:
         formatted_sections = {
             "technical_analysis": market_context,
             "volume_confirmation": volume_analysis,
-            "ggshot_signals": ggshot_context,
             "market_intelligence": market_intel_context
         }
 
@@ -1330,75 +1179,6 @@ Take Profit: {take_profit_text}
         
         return formatted
     
-    def _format_signal_for_llm(self, signal_data: Dict) -> str:
-        """Format signal data for LLM consumption."""
-        # Get the raw ggShot signal (this is the most important part!)
-        raw_signal = signal_data.get('raw_message', 'No original message available')
-
-        return f"""
-## GGSHOT SIGNAL (RAW)
-{raw_signal}
-
-## PARSED SIGNAL DATA
-- Source: {signal_data.get('source', 'Unknown')}
-- Symbol: {signal_data.get('symbol', 'Unknown')}
-- Direction: {signal_data.get('direction', 'Unknown')}
-- Timeframe: {signal_data.get('timeframe', 'Unknown')}
-- Entry Zone: {signal_data.get('entry_zone', 'N/A')}
-- Stop Loss: {signal_data.get('stop_loss', 'N/A')}
-- Take Profit: {signal_data.get('take_profit', 'N/A')}
-"""
-
-    def _format_ggshot_signals_for_llm(self) -> str:
-        """Format ggshot signals for LLM consumption in autonomous trading mode."""
-        if not self.ggshot_signals:
-            return None
-
-        formatted = []
-
-        # Count directional bias
-        directions = {'LONG': 0, 'SHORT': 0}
-        total_confidence = 0
-        signal_count = 0
-
-        for timeframe, signal in self.ggshot_signals.items():
-            direction = signal.get('direction')
-            if direction in directions:
-                directions[direction] += 1
-
-            confidence = signal.get('strategy_accuracy')
-            if confidence:
-                total_confidence += confidence
-                signal_count += 1
-
-            # Format each signal
-            entry_zone = signal.get('entry_zone', {})
-            formatted.append(f"[{timeframe.upper()}]")
-            formatted.append(f"  Direction: {direction}")
-            formatted.append(f"  Entry: ${entry_zone.get('low', 0):,.2f} - ${entry_zone.get('high', 0):,.2f} (mid: ${entry_zone.get('mid', 0):,.2f})")
-            formatted.append(f"  Stop Loss: ${signal.get('stop_loss', 0):,.2f}")
-            formatted.append(f"  Take Profit: ${signal.get('take_profit', 0):,.2f}")
-
-            if confidence:
-                formatted.append(f"  Confidence: {confidence}%")
-
-            # Show targets
-            targets = signal.get('targets', [])
-            if targets and len(targets) > 1:
-                target_prices = [f"${t['price']:,.2f}" for t in targets[:3]]  # Show first 3 targets
-                formatted.append(f"  Targets: {', '.join(target_prices)}")
-
-            formatted.append("")
-
-        # Add directional summary
-        avg_confidence = total_confidence / signal_count if signal_count > 0 else 0
-        formatted.insert(0, f"Timeframes: {len(self.ggshot_signals)} signals ({', '.join(sorted(self.ggshot_signals.keys()))})")
-        formatted.insert(1, f"Directional Bias: {directions['LONG']} LONG vs {directions['SHORT']} SHORT")
-        formatted.insert(2, f"Average Confidence: {avg_confidence:.0f}%")
-        formatted.insert(3, "")
-
-        return "\n".join(formatted)
-
     def _format_market_intelligence_for_llm(self) -> Optional[str]:
         """
         Format market intelligence data for LLM consumption.
@@ -1458,14 +1238,6 @@ Take Profit: {take_profit_text}
             )
             if acct_section:
                 sections.append(acct_section)
-
-        # Format Agentic Intelligence (ACP agent data — Sebastian, Otto, Wolfpack, BlackSwan)
-        if 'agentic_intelligence' in self.market_intelligence:
-            agentic_section = self._format_agentic_intelligence_data(
-                self.market_intelligence['agentic_intelligence']
-            )
-            if agentic_section:
-                sections.append(agentic_section)
 
         return "\n\n".join(sections) if sections else None
 
@@ -1658,36 +1430,6 @@ Take Profit: {take_profit_text}
 
         return "\n".join(lines)
 
-    def _format_agentic_intelligence_data(self, agentic: Dict[str, Any]) -> str:
-        """Format agentic intelligence data (ACP agent deliverables) for LLM prompt."""
-        lines = ["## AGENTIC INTELLIGENCE", ""]
-
-        for agent_name, data in agentic.items():
-            if not data:
-                continue
-
-            # Agent data can be a dict (structured) or string (raw deliverable)
-            if isinstance(data, str):
-                lines.append(f"**{agent_name.replace('_', ' ').title()}**:")
-                lines.append(data)
-                lines.append("")
-            elif isinstance(data, dict):
-                label = data.get('agent_name', agent_name).replace('_', ' ').title()
-                lines.append(f"**{label}**:")
-                # Format known fields, fall back to dumping key-value pairs
-                summary = data.get('summary') or data.get('content') or data.get('deliverable')
-                if summary:
-                    lines.append(str(summary))
-                else:
-                    for key, value in data.items():
-                        if key in ('agent_name', 'fetched_at', 'metadata'):
-                            continue
-                        lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
-                lines.append("")
-
-        # Only return if we have actual content beyond the header
-        return "\n".join(lines) if len(lines) > 2 else ""
-
     async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> tuple[str, Dict[str, Any]]:
         """
         Call LLM API using configured provider.
@@ -1872,114 +1614,7 @@ Take Profit: {take_profit_text}
                     parsed['take_profit_price'] = None
 
         return parsed
-    
-    async def _save_signal_decision_to_db(
-        self,
-        symbol: str,
-        decision_data: Dict[str, Any],
-        signal_data: Dict,
-        market_data: Dict[str, Any],
-        current_price: Decimal,
-        prompt: str,
-        llm_response: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> str:
-        """
-        Save signal validation decision to the decisions table (DEPRECATED).
-        Also logs llm_thought activity with token tracking for metered billing.
-        """
-        decision_id = str(uuid.uuid4())
-        
-        # Map signal validation actions to schema-compliant actions
-        raw_action = decision_data.get('action', 'wait')
-        if raw_action in ['long', 'short']:
-            schema_action = 'enter'
-        elif raw_action in ['close', 'exit']:
-            schema_action = 'exit'
-        else:  # wait, hold, etc.
-            schema_action = 'wait'
-        
-        try:
-            decision_data_json = {
-                'signal_source': signal_data.get('source'),
-                'signal_data': signal_data,
-                'validation_framework': '4-pillar',
-                'current_price': float(current_price),
-                'raw_action': raw_action  # Preserve original action
-            }
 
-            await db_execute("""
-                INSERT INTO decisions (
-                    decision_id, user_id, config_id, symbol, action, status,
-                    confidence, reasoning, prompt, decision_data, created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                decision_id,
-                self.user_id,
-                self.config_id,
-                symbol,
-                schema_action,  # Use schema-compliant action
-                'completed',
-                decision_data.get('confidence', 0.5),
-                decision_data.get('reasoning', llm_response),
-                None,  # prompt no longer stored (redundant with activities.market_query)
-                json.dumps(decision_data_json, cls=DecisionJSONEncoder),
-                datetime.now(timezone.utc).isoformat()
-            ))
-
-            logger.bind(
-                config_id=self.config_id,
-                decision_id=decision_id,
-                symbol=symbol,
-                action=decision_data.get('action')
-            ).info("Signal validation decision saved to database")
-
-            # NEW: Log llm_thought activity with token tracking (standalone)
-            if metadata:
-                await self._log_llm_activity(
-                    symbol=symbol,
-                    decision_data=decision_data,
-                    metadata=metadata
-                )
-
-            return decision_id
-
-        except Exception as e:
-            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save signal decision: {e}")
-            raise DecisionError(f"Failed to save signal decision to database: {e}")
-    
-    def _create_signal_validation_intent(
-        self, 
-        decision_id: str, 
-        symbol: str,
-        decision_data: Dict[str, Any], 
-        signal_data: Dict
-    ) -> Dict[str, Any]:
-        """Create signal validation trading intent."""
-        return {
-            'decision_id': decision_id,
-            'user_id': self.user_id,
-            'config_id': self.config_id,
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'decision_type': 'signal_validation',
-            'symbol': symbol,
-            'signal_source': signal_data.get('source'),
-            
-            # Core decision data
-            'action': decision_data.get('action', 'no_action'),
-            'confidence': decision_data.get('confidence', 0.5),
-            'reasoning': decision_data.get('reasoning', 'No reasoning provided'),
-            
-            # Trade parameters (use signal defaults if not overridden by decision)
-            'stop_loss_price': decision_data.get('stop_loss_price') or signal_data.get('stop_loss'),
-            'take_profit_price': decision_data.get('take_profit_price') or signal_data.get('take_profit'),
-            
-            # Signal context
-            'original_signal': signal_data.get('raw_message', ''),
-            'signal_confidence': signal_data.get('confidence', 0.0),
-            'signal_timeframe': signal_data.get('timeframe'),
-        }
-    
     def _get_dynamic_volume_period(self, timeframe: str) -> int:
         """
         Get dynamic period for volume average calculation based on timeframe.
@@ -2018,7 +1653,7 @@ Take Profit: {take_profit_text}
             # Determine trading mode from config
             trading_mode = getattr(self.config, 'trading_mode', 'paper')
 
-            if trading_mode in ('symphony', 'hyperliquid'):
+            if trading_mode == 'hyperliquid':
                 # DB query in thread pool — async API calls follow below
                 row = await db_fetch_one("""
                     SELECT
@@ -2049,149 +1684,110 @@ Take Profit: {take_profit_text}
                 entry_confidence = float(row[8]) if row[8] else 0.0
                 entry_decision_data = row[9] if row[9] else {}
 
-                if trading_mode == 'symphony':
-                    # Fetch REAL position data from Symphony API
-                    try:
-                        from trading.live.symphony_service import SymphonyLiveTradingService
-                        symphony_service = SymphonyLiveTradingService()
+                # Hyperliquid: fetch position data from Hyperliquid Info API
+                try:
+                    from hyperliquid.info import Info
+                    from hyperliquid.utils import constants
+                    from core.auth.vault_utils import VaultManager
 
-                        live_positions = await symphony_service.get_open_positions(config_id)
-
-                        matching_position = None
-                        for pos in live_positions:
-                            if pos.get('batch_id') == batch_id:
-                                matching_position = pos
-                                break
-
-                        if matching_position:
-                            matching_position['entry_reasoning'] = entry_reasoning
-                            matching_position['entry_confidence'] = entry_confidence
-                            matching_position['entry_decision_data'] = entry_decision_data
-                            matching_position['is_live'] = True
-
-                            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                                f"Found active LIVE position from Symphony: batch_id={batch_id}, "
-                                f"entry_price=${matching_position.get('entry_price', 0):.2f}"
-                            )
-                            return matching_position
-                        else:
-                            logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
-                                f"Live position batch_id={batch_id} found in database but not in Symphony API. "
-                                f"Position may have been closed externally."
-                            )
-                            return None
-
-                    except Exception as e:
-                        logger.bind(config_id=self.config_id, user_id=self.user_id).error(
-                            f"Failed to fetch live position from Symphony: {e}"
+                    credentials = await VaultManager.get_hyperliquid_credential(self.user_id)
+                    if not credentials:
+                        logger.bind(config_id=self.config_id).warning(
+                            "No Hyperliquid credentials — cannot check position"
                         )
                         return None
 
-                else:
-                    # Hyperliquid: fetch position data from Hyperliquid Info API
-                    try:
-                        from hyperliquid.info import Info
-                        from hyperliquid.utils import constants
-                        from core.auth.vault_utils import VaultManager
+                    wallet_address = credentials['wallet_address']
+                    info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                    user_state = info.user_state(wallet_address)
 
-                        credentials = await VaultManager.get_hyperliquid_credential(self.user_id)
-                        if not credentials:
-                            logger.bind(config_id=self.config_id).warning(
-                                "No Hyperliquid credentials — cannot check position"
-                            )
-                            return None
+                    # Find the matching position by coin
+                    # trade_symbol is platform format e.g. "BTC-USDT", coin is "BTC"
+                    coin = trade_symbol.split('-')[0] if trade_symbol else symbol.split('/')[0]
 
-                        wallet_address = credentials['wallet_address']
-                        info = Info(constants.MAINNET_API_URL, skip_ws=True)
-                        user_state = info.user_state(wallet_address)
+                    matching_pos = None
+                    for ap in user_state.get("assetPositions", []):
+                        pos = ap.get("position", {})
+                        if pos.get("coin") == coin and float(pos.get("szi", 0)) != 0:
+                            matching_pos = pos
+                            break
 
-                        # Find the matching position by coin
-                        # trade_symbol is platform format e.g. "BTC-USDT", coin is "BTC"
-                        coin = trade_symbol.split('-')[0] if trade_symbol else symbol.split('/')[0]
-
-                        matching_pos = None
-                        for ap in user_state.get("assetPositions", []):
-                            pos = ap.get("position", {})
-                            if pos.get("coin") == coin and float(pos.get("szi", 0)) != 0:
-                                matching_pos = pos
-                                break
-
-                        if not matching_pos:
-                            # Position in our DB but not on Hyperliquid — closed externally
-                            logger.bind(config_id=self.config_id).warning(
-                                f"Live trade batch_id={batch_id} in DB but no {coin} position on Hyperliquid. "
-                                f"May have been closed externally or liquidated."
-                            )
-                            return None
-
-                        # Build position_data dict matching the format position management expects
-                        szi = float(matching_pos.get("szi", 0))
-                        entry_px = float(matching_pos.get("entryPx", 0))
-                        unrealized_pnl = float(matching_pos.get("unrealizedPnl", 0))
-                        margin_used = float(matching_pos.get("marginUsed", 0))
-                        leverage_info = matching_pos.get("leverage", {})
-                        leverage_val = int(leverage_info.get("value", 1)) if isinstance(leverage_info, dict) else 1
-
-                        # Get current mid price for this coin
-                        all_mids = info.all_mids()
-                        current_mid = float(all_mids.get(coin, entry_px))
-                        notional = abs(szi) * current_mid
-
-                        side = "long" if szi > 0 else "short"
-
-                        # Ensure opened_at is timezone-aware (live_trades.created_at is timestamp without time zone)
-                        opened_at_raw = row[3]
-                        if opened_at_raw and opened_at_raw.tzinfo is None:
-                            from datetime import timezone as tz
-                            opened_at_raw = opened_at_raw.replace(tzinfo=tz.utc)
-
-                        # Compute SL/TP prices from config risk_management
-                        trading_config = self.config.trading if hasattr(self.config, 'trading') else {}
-                        risk_config = trading_config.get('risk_management', {}) if isinstance(trading_config, dict) else {}
-                        sl_pct = risk_config.get('default_stop_loss_percent', 2.0) / 100.0
-                        tp_pct = risk_config.get('default_take_profit_percent', 3.0) / 100.0
-                        if side == 'long':
-                            sl_price = entry_px * (1 - sl_pct)
-                            tp_price = entry_px * (1 + tp_pct)
-                        else:
-                            sl_price = entry_px * (1 + sl_pct)
-                            tp_price = entry_px * (1 - tp_pct)
-
-                        position_data = {
-                            'trade_id': batch_id,
-                            'batch_id': batch_id,
-                            'symbol': trade_symbol,
-                            'side': side,
-                            'entry_price': entry_px,
-                            'current_price': current_mid,
-                            'size_usd': notional,
-                            'unrealized_pnl': unrealized_pnl,
-                            'opened_at': opened_at_raw,
-                            'stop_loss': sl_price,
-                            'take_profit': tp_price,
-                            'confidence_score': entry_confidence,
-                            'entry_reasoning': entry_reasoning,
-                            'entry_confidence': entry_confidence,
-                            'entry_decision_data': entry_decision_data,
-                            'is_live': True,
-                            'leverage': leverage_val,
-                            'margin_used': margin_used,
-                            'quantity': abs(szi),
-                        }
-
-                        logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                            f"Found active Hyperliquid position: {side} {coin}, "
-                            f"entry=${entry_px:,.2f}, size=${notional:,.2f}, "
-                            f"P&L=${unrealized_pnl:+.2f}, leverage={leverage_val}x"
-                        )
-
-                        return position_data
-
-                    except Exception as e:
-                        logger.bind(config_id=self.config_id, user_id=self.user_id).error(
-                            f"Failed to fetch Hyperliquid position: {e}"
+                    if not matching_pos:
+                        # Position in our DB but not on Hyperliquid — closed externally
+                        logger.bind(config_id=self.config_id).warning(
+                            f"Live trade batch_id={batch_id} in DB but no {coin} position on Hyperliquid. "
+                            f"May have been closed externally or liquidated."
                         )
                         return None
+
+                    # Build position_data dict matching the format position management expects
+                    szi = float(matching_pos.get("szi", 0))
+                    entry_px = float(matching_pos.get("entryPx", 0))
+                    unrealized_pnl = float(matching_pos.get("unrealizedPnl", 0))
+                    margin_used = float(matching_pos.get("marginUsed", 0))
+                    leverage_info = matching_pos.get("leverage", {})
+                    leverage_val = int(leverage_info.get("value", 1)) if isinstance(leverage_info, dict) else 1
+
+                    # Get current mid price for this coin
+                    all_mids = info.all_mids()
+                    current_mid = float(all_mids.get(coin, entry_px))
+                    notional = abs(szi) * current_mid
+
+                    side = "long" if szi > 0 else "short"
+
+                    # Ensure opened_at is timezone-aware (live_trades.created_at is timestamp without time zone)
+                    opened_at_raw = row[3]
+                    if opened_at_raw and opened_at_raw.tzinfo is None:
+                        from datetime import timezone as tz
+                        opened_at_raw = opened_at_raw.replace(tzinfo=tz.utc)
+
+                    # Compute SL/TP prices from config risk_management
+                    trading_config = self.config.trading if hasattr(self.config, 'trading') else {}
+                    risk_config = trading_config.get('risk_management', {}) if isinstance(trading_config, dict) else {}
+                    sl_pct = risk_config.get('default_stop_loss_percent', 2.0) / 100.0
+                    tp_pct = risk_config.get('default_take_profit_percent', 3.0) / 100.0
+                    if side == 'long':
+                        sl_price = entry_px * (1 - sl_pct)
+                        tp_price = entry_px * (1 + tp_pct)
+                    else:
+                        sl_price = entry_px * (1 + sl_pct)
+                        tp_price = entry_px * (1 - tp_pct)
+
+                    position_data = {
+                        'trade_id': batch_id,
+                        'batch_id': batch_id,
+                        'symbol': trade_symbol,
+                        'side': side,
+                        'entry_price': entry_px,
+                        'current_price': current_mid,
+                        'size_usd': notional,
+                        'unrealized_pnl': unrealized_pnl,
+                        'opened_at': opened_at_raw,
+                        'stop_loss': sl_price,
+                        'take_profit': tp_price,
+                        'confidence_score': entry_confidence,
+                        'entry_reasoning': entry_reasoning,
+                        'entry_confidence': entry_confidence,
+                        'entry_decision_data': entry_decision_data,
+                        'is_live': True,
+                        'leverage': leverage_val,
+                        'margin_used': margin_used,
+                        'quantity': abs(szi),
+                    }
+
+                    logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                        f"Found active Hyperliquid position: {side} {coin}, "
+                        f"entry=${entry_px:,.2f}, size=${notional:,.2f}, "
+                        f"P&L=${unrealized_pnl:+.2f}, leverage={leverage_val}x"
+                    )
+
+                    return position_data
+
+                except Exception as e:
+                    logger.bind(config_id=self.config_id, user_id=self.user_id).error(
+                        f"Failed to fetch Hyperliquid position: {e}"
+                    )
+                    return None
 
             else:
                 # Paper trading: DB query in thread pool
@@ -2479,20 +2075,17 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
 
         Args:
             symbol: Trading pair
-            query_mode: 'opportunity_analysis', 'signal_validation', or 'position_management'
+            query_mode: 'opportunity_analysis' or 'position_management'
             current_price: Current market price
             data_age_seconds: How old the market data is
             formatted_sections: Dict containing the formatted strings sent to LLM:
                 - 'technical_analysis': Multi-timeframe indicator summary
                 - 'volume_confirmation': Volume analysis text
-                - 'ggshot_signals': ggShot signal text (if present)
                 - 'market_intelligence': Market intel text (if present)
                 - 'position_context': Position data (for position management)
-                - 'signal_context': External signal (for signal validation)
             metadata: Additional metadata:
                 - timeframes_analyzed: List of timeframes
                 - indicators_count: Number of indicators
-                - ggshot_available: Boolean
                 - market_intelligence_categories: List of MI categories
                 - cost_breakdown: Dict of query costs
         """

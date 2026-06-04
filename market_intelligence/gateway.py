@@ -330,8 +330,6 @@ class MarketIntelligence:
         name_without_suffix = name_without_suffix.replace('WebSocket', 'Websocket')
         # Special case for CoinGecko to avoid coin_gecko
         name_without_suffix = name_without_suffix.replace('CoinGecko', 'Coingecko')
-        # Special case for ACP to avoid a_c_p_agent
-        name_without_suffix = name_without_suffix.replace('ACP', 'Acp')
         snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', name_without_suffix).lower()
 
         # Determine category from name patterns
@@ -349,13 +347,9 @@ class MarketIntelligence:
             category = 'macro'
         elif 'grok' in snake_case or 'agentic' in snake_case:
             category = 'agentic'
-        elif 'ggshot' in snake_case or 'signals' in snake_case:
-            category = 'signals'
         elif 'funding' in snake_case or 'derivatives' in snake_case:
             category = 'derivatives'
-        elif 'acp' in snake_case:
-            category = 'acp'
-        elif 'account_performance' in snake_case or 'market_conditions' in snake_case:
+        elif 'account_performance' in snake_case:
             category = 'internal'
         else:
             # Default to market_data

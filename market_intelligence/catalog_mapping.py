@@ -13,7 +13,6 @@ Mapping Structure:
 
 Examples:
     - BTC funding rate: Use funding_rate adapter with symbol='BTC/USDT'
-    - ggShot signals: Use ggshot_signals adapter with symbol from config
     - VIX index: Use vix_index adapter with no params
 """
 
@@ -21,17 +20,6 @@ from typing import Dict, Tuple, Any
 
 
 CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
-    # ========================================================================
-    # TRADING SIGNALS (Premium)
-    # ========================================================================
-    ('trading_signals', 'ggshot'): {
-        'data_type': 'ggshot_signals',
-        'params_template': {
-            'symbol': '{symbol}',  # Replaced with actual symbol at runtime
-            'include_raw': False
-        }
-    },
-
     # ========================================================================
     # DERIVATIVES & LEVERAGE (Free)
     # ========================================================================
@@ -165,68 +153,6 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
         },
         'cache_ttl': 300,  # 5 minutes
     },
-
-    # ========================================================================
-    # AGENTIC INTELLIGENCE (Virtuals ACP agents - Free)
-    # ========================================================================
-    ('agentic_intelligence', 'sebastian'): {
-        'data_type': 'market_conditions',
-        'params_template': {},
-        'cache_ttl': 0,  # Adapter handles own caching (Redis, refreshed on POST)
-        'global': True,  # Not symbol-specific — shared across all bots
-    },
-
-    # ========================================================================
-    # AGENTIC INTELLIGENCE — ACP On-Chain (Virtuals ACP protocol)
-    # These generate on-chain ACP transactions for $GG graduation volume.
-    # Per-bot jobs: config_id in service_requirement ensures each bot
-    # triggers its own ACP job, even for global data.
-    # ========================================================================
-
-    # ggbots_acp removed — consolidated into 'sebastian' (direct Redis read).
-    # ACP self-consumption can be re-added when $GG graduation pipeline is active.
-
-    # Third-party ACP agents — discovered + tested 2026-04-01
-    # Otto AI: crypto news with bull/bear sentiment. $0.01/call, ~19s latency.
-    # Deliverable: markdown market brief with key stories + sentiment score.
-    ('agentic_intelligence', 'otto_ai_news'): {
-        'data_type': 'acp_agent',
-        'params_template': {
-            'agent_name': 'otto_ai',
-            'agent_address': '0xe5B38F112b92Ce8F2103eDAbA7E9a9842f12d5f6',
-            'offering_name': 'crypto_news',
-            'service_requirement': {
-                'initiate_AI_crypto_news_report_job': True,
-            }
-        },
-        'cache_ttl': 3600,
-        'global': True,  # News is not symbol-specific
-    },
-    # BlackSwan: market risk flare detection. $0.01/call, ~19s latency.
-    # Deliverable: {status, severity, assessment, signals[], datapointsAnalysed}
-    ('agentic_intelligence', 'blackswan_predictions'): {
-        'data_type': 'acp_agent',
-        'params_template': {
-            'agent_name': 'blackswan',
-            'agent_address': '0x0aFE3b8497De824A230986Ddab7f66EE4C80CBd8',
-            'offering_name': 'flare',
-            'service_requirement': {}
-        },
-        'cache_ttl': 3600,
-        'global': True,
-    },
-    # Wolfpack: requires Base token contract address — not suitable for perp trading.
-    # Revisit if they add a symbol-based offering.
-    # ('agentic_intelligence', 'wolfpack_risk'): {
-    #     'data_type': 'acp_agent',
-    #     'params_template': {
-    #         'agent_name': 'wolfpack',
-    #         'agent_address': '0xbaC206A51E126DD97DC8046CB9a17fF4F4D9d7f2',
-    #         'offering_name': 'token_risk_analysis',
-    #         'service_requirement': {'token_address': '0x...'},
-    #     },
-    #     'cache_ttl': 3600,
-    # },
 
     # ========================================================================
     # LEGACY CATEGORY ALIASES (for backward compatibility)

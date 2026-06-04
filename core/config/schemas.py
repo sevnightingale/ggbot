@@ -29,8 +29,6 @@ class ConfigType(str, Enum):
 class TradingMode(str, Enum):
     """Trading execution modes."""
     PAPER = "paper"
-    SYMPHONY = "symphony"  # Database stores as 'live' but canonical is 'symphony'
-    ASTER = "aster"
     HYPERLIQUID = "hyperliquid"
 
 class BotState(str, Enum):
@@ -271,7 +269,7 @@ class BotConfiguration(BaseModel):
 
     Table Columns:
     - config_id, user_id, config_name, config_type, state
-    - trading_mode, symphony_agent_id
+    - trading_mode
     - created_at, updated_at
 
     JSONB Blob:
@@ -284,20 +282,11 @@ class BotConfiguration(BaseModel):
     config_type: ConfigType
     state: BotState = BotState.INACTIVE
     trading_mode: TradingMode = TradingMode.PAPER
-    symphony_agent_id: Optional[str] = None
     created_at: str  # ISO format timestamp
     updated_at: str  # ISO format timestamp
 
     # JSONB data (automatically validated by discriminated union)
     config_data: ConfigData
-
-    @field_validator('symphony_agent_id')
-    def validate_symphony_agent_id(cls, v, info):
-        """Symphony mode requires agent ID."""
-        trading_mode = info.data.get('trading_mode')
-        if trading_mode == TradingMode.SYMPHONY and not v:
-            raise ValueError("symphony_agent_id required when trading_mode=symphony")
-        return v
 
     @model_validator(mode='after')
     def validate_config_type_consistency(self):
@@ -318,15 +307,7 @@ class ConfigCreateRequest(BaseModel):
     config_name: str = Field(min_length=1, max_length=100)
     config_type: ConfigType
     trading_mode: TradingMode = TradingMode.PAPER
-    symphony_agent_id: Optional[str] = None
     config_data: ConfigData  # ← Discriminated union validates type-specific fields
-
-    @field_validator('symphony_agent_id')
-    def validate_symphony_agent_id(cls, v, info):
-        """Symphony mode requires agent ID."""
-        if info.data.get('trading_mode') == TradingMode.SYMPHONY and not v:
-            raise ValueError("symphony_agent_id required for symphony trading mode")
-        return v
 
     @model_validator(mode='after')
     def validate_config_type_match(self):
@@ -349,7 +330,7 @@ class ConfigUpdateRequest(BaseModel):
     config_type: Optional[ConfigType] = None
     config_data: Optional[Dict[str, Any]] = None  # Partial update dict
 
-    # Note: trading_mode and symphony_agent_id updates should be rare/restricted
+    # Note: trading_mode updates should be rare/restricted
     # Changing trading mode requires different credentials/setup
 
 # ============================================================================

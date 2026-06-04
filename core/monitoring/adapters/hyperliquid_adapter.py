@@ -11,7 +11,6 @@ Key differences from Symphony/Aster:
 - Positions are account-wide (shared across all bots for same wallet)
 """
 
-import asyncio
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, Set, Dict, List
@@ -43,12 +42,10 @@ class HyperliquidAccountAdapter(AccountAdapter):
         config_id: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Get wallet address from cache or Vault. CredentialResolver picks the
-        right wallet based on trading_mode: personal HL wallet for 'hyperliquid'
-        mode, Privy agent wallet for 'virtuals' mode.
+        Get wallet address from cache or Vault via resolve_hl_credentials()
+        (user-attached HL credentials).
 
-        Cache key includes config_id so a user's personal HL wallet never
-        collides with their virtuals agent wallets.
+        Cache key includes config_id for per-config isolation.
         """
         cache_key = f"{user_id}:{config_id or '-'}"
         if cache_key in self._wallet_cache:
@@ -92,8 +89,7 @@ class HyperliquidAccountAdapter(AccountAdapter):
                     selected_pair = result[1]
                     trading_mode = result[2] or 'hyperliquid'
 
-            # Get wallet address — virtuals bots read from arena_agents_v2,
-            # hyperliquid bots read from user_profiles (same adapter, different creds).
+            # Get wallet address from user-attached HL credentials
             wallet = await self._get_wallet_address(user_id, trading_mode, config_id)
             if not wallet:
                 self._log.warning(f"No Hyperliquid wallet for user {user_id}")
@@ -482,29 +478,6 @@ class HyperliquidAccountAdapter(AccountAdapter):
                     related_symbol=platform_symbol,
                     importance=9
                 )
-
-                # Mirror close to arena (fire-and-forget)
-                try:
-                    from trading.virtuals.arena_sync import mirror_close_to_arena
-                    asyncio.create_task(mirror_close_to_arena(
-                        config_id=config_id,
-                        symbol=platform_symbol,
-                        close_reason=inferred_close_reason,
-                        user_id=user_id,
-                    ))
-                except Exception:
-                    pass
-
-                # Mirror close to Dojo match accounts (fire-and-forget)
-                try:
-                    from core.arena.dojo_mirror import mirror_close_to_dojo
-                    asyncio.create_task(mirror_close_to_dojo(
-                        config_id=config_id,
-                        symbol=platform_symbol,
-                        close_reason=inferred_close_reason,
-                    ))
-                except Exception:
-                    pass
 
                 for h in agg['hashes']:
                     self._logged_closes.add(h)

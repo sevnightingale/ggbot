@@ -5,7 +5,6 @@ import { arbitrum } from 'wagmi/chains'
  * Wagmi configuration for Hyperliquid setup page
  *
  * Scoped to /hyperliquid page only — uses Arbitrum chain.
- * Separate from Arena config which uses Scroll.
  */
 export const hyperliquidWagmiConfig = getDefaultConfig({
   appName: 'ggbots Hyperliquid',

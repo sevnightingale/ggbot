@@ -24,10 +24,12 @@ class OpenRouterProvider(LLMProvider):
     # Model + Reasoning Tier → OpenRouter model ID
     # Tiers: economy (cheap/fast), standard (balanced), premium (best quality)
     MODEL_TIER_MAP = {
-        # Grok (xAI) - Updated 2026-03-26: premium → grok-4.20-beta
-        ('grok', 'economy'): 'x-ai/grok-3-mini',
-        ('grok', 'standard'): 'x-ai/grok-4-fast',
-        ('grok', 'premium'): 'x-ai/grok-4.20-beta',
+        # Grok (xAI) - Updated 2026-06-04: grok-3-mini/grok-4-fast/grok-4.20-beta all
+        # delisted from OpenRouter. Economy = 4.3 with no reasoning effort (tier
+        # differentiated by effort, same pattern as Kimi/Gemini).
+        ('grok', 'economy'): 'x-ai/grok-4.3',
+        ('grok', 'standard'): 'x-ai/grok-4.3',
+        ('grok', 'premium'): 'x-ai/grok-4.20',
 
         # DeepSeek
         ('deepseek', 'economy'): 'deepseek/deepseek-chat',
@@ -62,22 +64,21 @@ class OpenRouterProvider(LLMProvider):
 
     # Legacy MODEL_MAP for backward compatibility (maps to standard tier)
     MODEL_MAP = {
-        'grok': 'x-ai/grok-4-fast',
+        'grok': 'x-ai/grok-4.3',
         'claude': 'anthropic/claude-sonnet-4.6',
         'gemini': 'google/gemini-2.5-pro',
         'deepseek': 'deepseek/deepseek-v3.2',
         'gpt': 'openai/gpt-5',
         'kimi': 'moonshotai/kimi-k2.5',
         'qwen': 'qwen/qwen-plus',
-        'default': 'x-ai/grok-4-fast'
+        'default': 'x-ai/grok-4.3'
     }
 
     # All OpenRouter model IDs that support reasoning parameter
     REASONING_SUPPORTED = {
         # Grok
-        'x-ai/grok-3-mini',
-        'x-ai/grok-4-fast',
-        'x-ai/grok-4.20-beta',
+        'x-ai/grok-4.3',
+        'x-ai/grok-4.20',
         # DeepSeek
         'deepseek/deepseek-chat',
         'deepseek/deepseek-v3.2',
@@ -103,9 +104,8 @@ class OpenRouterProvider(LLMProvider):
     # Models that support temperature parameter
     TEMPERATURE_SUPPORTED = {
         # Grok
-        'x-ai/grok-3-mini',
-        'x-ai/grok-4-fast',
-        'x-ai/grok-4.20-beta',
+        'x-ai/grok-4.3',
+        'x-ai/grok-4.20',
         # DeepSeek
         'deepseek/deepseek-chat',
         'deepseek/deepseek-v3.2',

@@ -11,7 +11,6 @@ Key responsibilities:
 - Query open positions from Hyperliquid Info API
 - Save audit trail to live_trades table (provider='hyperliquid')
 - Idempotency protection (prevent duplicate trades)
-- Telegram exit notifications (entry notifications handled by orchestrator)
 
 SDK: hyperliquid-python-sdk
 Authentication: Per-user API wallet private key from Vault
@@ -128,15 +127,13 @@ class HyperliquidLiveTradingService:
         config_id: Optional[str] = None,
     ) -> Optional[Exchange]:
         """
-        Initialize Hyperliquid Exchange SDK with whatever credentials the
-        trading_mode resolves to (user-attached HL creds or virtuals-agent
-        HL API wallet). CredentialResolver is the single source of truth.
+        Initialize Hyperliquid Exchange SDK with user-attached HL credentials.
+        resolve_hl_credentials() is the single source of truth.
 
         Args:
             user_id: User UUID
-            trading_mode: 'hyperliquid' or 'virtuals'
-            config_id: Required when trading_mode='virtuals' — resolves the
-                       config's arena_agents_v2 row.
+            trading_mode: 'hyperliquid'
+            config_id: Config UUID (for credential cache isolation)
 
         Returns:
             Exchange instance, or None if credentials not found
@@ -405,8 +402,7 @@ class HyperliquidLiveTradingService:
                         "reason": "Trade already executed (idempotency protection)"
                     }
 
-            # Step 2: Get Exchange instance — CredentialResolver picks the right
-            # wallet based on trading_mode (user HL creds vs arena_agents_v2 row).
+            # Step 2: Get Exchange instance from user-attached HL credentials
             exchange = await self._get_exchange(user_id, trading_mode, config_id)
             if not exchange:
                 return {
@@ -1023,38 +1019,6 @@ class HyperliquidLiveTradingService:
                 )
             except Exception as e:
                 self._log.warning(f"Failed to log close activity (non-critical): {e}")
-
-            # Step 9: Publish exit notification to Telegram
-            try:
-                from signals.publishing_service import publish_exit_to_telegram
-
-                # Get bot name from config
-                bot_name = 'ggbot'
-                try:
-                    with get_db_connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("SELECT config_name FROM configurations WHERE config_id = %s", (config_id,))
-                            result = cur.fetchone()
-                            bot_name = result[0] if result else 'ggbot'
-                except Exception:
-                    pass
-
-                await publish_exit_to_telegram(
-                    config_id=str(config_id),
-                    user_id=str(user_id),
-                    exit_data={
-                        'bot_name': bot_name,
-                        'symbol': symbol,
-                        'side': position_side,
-                        'pnl': realized_pnl,
-                        'pnl_pct': pnl_pct,
-                        'close_reason': close_reason,
-                        'duration_seconds': duration_seconds,
-                        'live_tag': 'Hyperliquid'
-                    }
-                )
-            except Exception as e:
-                self._log.warning(f"Failed to publish exit to Telegram (non-critical): {e}")
 
             return {
                 "status": "success",

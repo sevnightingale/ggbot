@@ -19,7 +19,7 @@ Or for research first:
 
 | Model | Economy | Standard | Premium |
 |-------|---------|----------|---------|
-| **Grok** | `x-ai/grok-3-mini` | `x-ai/grok-4-fast` | `x-ai/grok-4.20-beta` |
+| **Grok** | `x-ai/grok-4.3` | `x-ai/grok-4.3` | `x-ai/grok-4.20` |
 | **DeepSeek** | `deepseek/deepseek-chat` | `deepseek/deepseek-v3.2` | `deepseek/deepseek-r1` |
 | **Gemini** | `google/gemini-2.0-flash-001` | `google/gemini-2.5-pro` | `google/gemini-3-pro-preview` |
 | **Claude** | `anthropic/claude-haiku-4.5` | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.6` |
@@ -27,7 +27,7 @@ Or for research first:
 | **Kimi** | `moonshotai/kimi-k2` | `moonshotai/kimi-k2.5` | `moonshotai/kimi-k2.5` |
 | **Qwen** | `qwen/qwen-turbo` | `qwen/qwen-plus` | `qwen/qwen3-max` |
 
-**Last updated**: 2026-03-26 (Claude → 4.6, Grok premium → 4.20 beta)
+**Last updated**: 2026-06-04 (Grok all tiers — grok-3-mini/grok-4-fast/grok-4.20-beta delisted from OpenRouter)
 
 ---
 
@@ -154,6 +154,7 @@ If adding a new provider (e.g., "mistral") rather than updating existing tiers:
 
 | Date | Model | Tiers Changed | Old → New | Reason |
 |------|-------|---------------|-----------|--------|
+| 2026-06-04 | Grok | All | `grok-3-mini`, `grok-4-fast`, `grok-4.20-beta` → `grok-4.3` (eco+std), `grok-4.20` (premium) | All three delisted; grok-4-fast 404s ("deprecated, switch to 4.3"). 4.3: $1.25/$2.50, 1M ctx. 4.20 stable: $1.25/$2.50, 2M ctx. Economy=4.3 without reasoning effort. |
 | 2026-03-26 | Claude | Standard, Premium | `claude-sonnet-4.5`, `claude-opus-4.5` → `claude-sonnet-4.6`, `claude-opus-4.6` | Gen upgrade. Opus 4.6 gets 1M context (was 200K). Same pricing. |
 | 2026-03-26 | Grok | Premium | `grok-4` → `grok-4.20-beta` | New flagship. $2/$6 (was $3/$15). 2M context (was 256K). |
 | 2026-01-27 | Kimi | Standard, Premium | `kimi-k2-0905`, `kimi-k2-thinking` → `kimi-k2.5` | K2.5 launch: multimodal SOTA, reasoning support, gen upgrade |

@@ -2,20 +2,18 @@
 
 import React from 'react'
 
-type Tab = 'monitor' | 'configure' | 'dojo'
+type Tab = 'monitor' | 'configure'
 
 interface TabNavigationProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
-  showDojoTab?: boolean
   className?: string
 }
 
-export function TabNavigation({ activeTab, onTabChange, showDojoTab = false, className = '' }: TabNavigationProps) {
+export function TabNavigation({ activeTab, onTabChange, className = '' }: TabNavigationProps) {
   const tabs: Array<{ key: Tab; label: string; description: string }> = [
     { key: 'monitor', label: 'Monitor', description: 'Real-time bot status and performance' },
-    { key: 'configure', label: 'Configure', description: 'Edit bot strategy and settings' },
-    ...(showDojoTab ? [{ key: 'dojo' as Tab, label: 'Dojo', description: 'Competitive matches and Elo rating' }] : [])
+    { key: 'configure', label: 'Configure', description: 'Edit bot strategy and settings' }
   ]
 
   return (

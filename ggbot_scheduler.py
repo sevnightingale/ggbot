@@ -19,7 +19,6 @@ import sys
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from core.orchestrator.orchestrator import GGBotOrchestrator
 from core.scheduler.bot_runner import reconcile_loop, init as init_runner
@@ -78,40 +77,6 @@ async def main():
         logger.info("Snapshot retention scheduled (daily at 3am UTC)")
     except ImportError:
         logger.warning("snapshot_retention not available, skipping")
-
-    # Dojo match lifecycle processor (start, complete, expire — every 5 minutes)
-    try:
-        from core.arena.matches import process_dojo_matches
-
-        scheduler.add_job(
-            func=process_dojo_matches,
-            trigger=IntervalTrigger(minutes=5),
-            id="dojo_match_lifecycle",
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=300,
-        )
-        logger.info("Dojo match lifecycle scheduled (every 5 min)")
-    except ImportError:
-        logger.warning("core.arena.matches not available, skipping Dojo lifecycle")
-
-    # Weekly rolling Elo update (Sundays at midnight UTC)
-    try:
-        from core.arena.elo import weekly_rolling_update
-
-        scheduler.add_job(
-            func=weekly_rolling_update,
-            trigger=CronTrigger(day_of_week='sun', hour=0, minute=0),
-            id="weekly_rolling_elo",
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-        logger.info("Weekly rolling Elo scheduled (Sundays at midnight UTC)")
-    except ImportError:
-        logger.warning("core.arena.elo not available, skipping weekly Elo")
 
     logger.info("Entering reconciliation loop (10s interval)")
     await reconcile_loop(scheduler, orchestrator, interval=10)

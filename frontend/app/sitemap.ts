@@ -34,12 +34,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     ...blogEntries,
     {
-      url: `${baseUrl}/arena`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
       url: `${baseUrl}/login`,
       lastModified: new Date(),
       changeFrequency: 'monthly',

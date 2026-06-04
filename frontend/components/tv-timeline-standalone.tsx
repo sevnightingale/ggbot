@@ -621,7 +621,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                     animation: 'statusPulse 2s ease-in-out infinite'
                   }}
                 />
-                <span>{statusText || 'ARENA STATUS'}</span>
+                <span>{statusText || 'BOT STATUS'}</span>
               </div>
             </div>
           </div>

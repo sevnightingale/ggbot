@@ -75,17 +75,18 @@ async def fetch_market_intelligence(
     _log = logger.bind(**_bind_extra)
 
     # Normalize symbol format to CCXT standard (BTC/USDT)
-    # Handles multiple input formats: BTCUSDT (ggshot), BTC-USDT (platform), BTC/USDT (ccxt)
+    # Handles multiple input formats: BTCUSDT (bare), BTC-USDT (platform), BTC/USDT (ccxt)
     standardizer = UniversalSymbolStandardizer()
     normalized_symbol = symbol
 
     # Try normalizing from common formats to CCXT
     if '/' not in symbol and '-' not in symbol:
-        # Likely ggshot format (BTCUSDT) - try normalizing
+        # Likely bare concatenated format (BTCUSDT) - try normalizing
+        # ("ggshot" is the standardizer's registered name for this format)
         ccxt_symbol = standardizer.normalize(symbol, "ggshot", "ccxt")
         if ccxt_symbol:
             normalized_symbol = ccxt_symbol
-            _log.debug(f"Normalized symbol: {symbol} → {normalized_symbol} (ggshot→ccxt)")
+            _log.debug(f"Normalized symbol: {symbol} → {normalized_symbol} (bare→ccxt)")
     elif '-' in symbol:
         # Platform format (BTC-USDT) - convert to CCXT
         ccxt_symbol = standardizer.normalize(symbol, "platform", "ccxt")
@@ -263,7 +264,7 @@ async def _get_user_permissions(user_id: str) -> List[str]:
         user_id: User ID
 
     Returns:
-        List of data point names user has access to (e.g., ['ggshot'])
+        List of data point names user has access to
     """
     try:
         user_service = UserService()
@@ -323,7 +324,6 @@ async def _check_permission(
 
         # If premium, check user permissions
         # For now, point_name must be in paid_data_points array
-        # Example: 'ggshot' in user.paid_data_points grants access to ggshot signals
         return point_name in user_permissions
 
     except Exception as e:
@@ -370,7 +370,7 @@ def _replace_param_templates(params: Dict[str, Any], **replacements) -> Dict[str
             # Replace template
             replaced[key] = value.format(**replacements)
         elif isinstance(value, dict):
-            # Recurse into nested dicts (e.g., ACP service_requirement with {config_id})
+            # Recurse into nested dicts (e.g., params with {config_id} templates)
             replaced[key] = _replace_param_templates(value, **replacements)
         else:
             replaced[key] = value

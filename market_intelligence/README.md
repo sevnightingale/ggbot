@@ -1,10 +1,10 @@
 # Market Data System - Complete Architecture
 
 **Status**: ✅ Production Deployed
-**Version**: Phase 1 Complete (39 data points live, cost-optimized + ACP agents)
-**Last Updated**: 2026-04-01
+**Version**: Phase 1 Complete (36 data points live, cost-optimized)
+**Last Updated**: 2026-06-04
 
-The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **39 data points** across **8 categories**, from technical indicators to real-time sentiment and third-party ACP agent intelligence, using a scalable catalog-driven architecture.
+The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading bots. It orchestrates **36 data points** across **7 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
 
 ---
 
@@ -13,7 +13,7 @@ The **Market Data System** is ggbots' unified pipeline for acquiring, processing
 1. [Overview & Evolution](#-overview--evolution)
 2. [Architecture](#-architecture)
 3. [Core Components](#-core-components)
-4. [Data Sources (32 Total)](#-data-sources-32-total)
+4. [Data Sources (36 Total)](#-data-sources-36-total)
 5. [Data Flow Examples](#-data-flow-examples)
 6. [Adding New Data Sources](#-adding-new-data-sources)
 7. [Performance & Economics](#-performance--economics)
@@ -44,11 +44,10 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 **Intelligence Orchestrator** → Config-driven routing, parallel execution, permission system, agent support
 
 ### **Current Capabilities**
-- ✅ **39 data points** across 8 categories (all FREE tier)
-- ✅ **9 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, ggShot, Internal DB, Sebastian AI, ACP agents — Otto AI, BlackSwan)
-- ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
+- ✅ **36 data points** across 7 categories (all FREE tier)
+- ✅ **5 adapter types** handling diverse data sources (Grok agentic, CoinGecko, Binance, WebSocket, Internal DB)
+- ✅ **Parallel query execution** (~30s for all sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
-- ✅ **Agent dynamic queries** (query without modifying config)
 - ✅ **$0.76/user/month** at 257 users, scales to $0.20/user at 1000 users
 
 ---
@@ -104,16 +103,16 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
         ↓                                             ↓
 ┌──────────────────┐                         ┌────────────────┐
 │   Redis Cache    │                         │   Adapters     │
-│                  │                         │   (4 types)    │
+│                  │                         │   (5 types)    │
 │  TTL: Variable   │                         │                │
 │  - VIX: 15min    │                         │ 1. ExtractionV2│
 │  - CPI: 24hrs    │                         │ 2. Grok Agentic│
 │  - News: 10min   │                         │ 3. Binance API │
-│  Cache hit →     │                         │ 4. ggShot DB   │
-│  Return cached   │                         │                │
-│                  │                         │ Cache miss →   │
-│  Key format:     │                         │ Fetch from API │
-│  "intel:name:    │                         │                │
+│  Cache hit →     │                         │ 4. CoinGecko   │
+│  Return cached   │                         │ 5. Internal DB │
+│                  │                         │                │
+│  Key format:     │                         │ Cache miss →   │
+│  "intel:name:    │                         │ Fetch from API │
 │  {query_params}" │                         │                │
 └──────────────────┘                         └────────────────┘
         ↓                                             ↓
@@ -123,7 +122,7 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 │  - Shared across │                         │ • XAI Grok API │
 │    all users     │                         │ • Binance API  │
 │  - Cost savings  │                         │ • Supabase DB  │
-│    via reuse     │                         │ • Hummingbot   │
+│    via reuse     │                         │ • CoinGecko API│
 └──────────────────┘                         └────────────────┘
                               ↓
 ┌────────────────────────────────────────────────────────────┐
@@ -195,14 +194,14 @@ async def fetch_market_intelligence(
     config,                                    # BotConfigV2 with selected_data_sources
     user_id: str,
     symbol: str,
-    data_points_override: Optional[Dict] = None  # For agent dynamic queries
+    data_points_override: Optional[Dict] = None  # Bypass config for a one-off query
 ) -> Dict[str, Dict[str, Any]]:
     # Returns: {"macro_economics": {"vix": {...}}, "sentiment_social": {...}}
 ```
 
-**Agent Support**:
+**Dynamic Query Override**:
 ```python
-# Agent can query dynamically without modifying config
+# Query specific data points for a single call without modifying config
 market_intel = await fetch_market_intelligence(
     config, user_id, symbol,
     data_points_override={
@@ -291,7 +290,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
 
 ---
 
-### **4. Adapters** (4 Types)
+### **4. Adapters** (5 Types)
 
 Adapters are specialized modules that fetch data from specific sources.
 
@@ -367,7 +366,7 @@ Grok synthesizes what people are saying. The decision LLM decides if that matter
 
 ---
 
-#### **Macro Data (VIX, DXY, CPI, NFP, USDT.D, MOVE)**
+#### **Type 3: CoinGeckoGlobalAdapter & Macro Data (VIX, DXY, CPI, NFP, USDT.D, MOVE)**
 
 Macro economic indicators use two adapter types:
 - **GrokAgenticAdapter** (`grok-4-1-fast` + web search) for indices requiring real-time web lookup
@@ -399,19 +398,7 @@ All marked `global: True` in `catalog_mapping.py` — shared cache across all bo
 
 ---
 
-#### **Type 5: GGShotAdapter** (`adapters/signals/ggshot_adapter.py`)
-**Purpose**: Premium trading signals from ggShot Telegram channels
-
-**Integration**:
-- Signals stored in `market_data` table by listener service
-- Adapter queries database for latest signal per timeframe
-- **PREMIUM** (requires third-party subscription, manually added to `paid_data_points`)
-
-**Data Source**: `trading_signals` (seeded in database)
-
----
-
-#### **Type 6: AccountPerformanceAdapter** (`adapters/internal/account_performance.py`)
+#### **Type 5: AccountPerformanceAdapter** (`adapters/internal/account_performance.py`)
 **Purpose**: Bot's own trading history and account performance metrics
 
 **Architecture**: Pre-computed by `account-monitor` service (separate PM2 process) every 5 minutes. Adapter reads from Redis `acct_perf:{config_id}` — zero DB queries in bot execution pipeline. This prevents event loop deadlocks from sync DB pool contention at concurrent bot boundaries.
@@ -470,8 +457,6 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 |----------|-----------|---------|------------|-----------|------|
 | **Technical Analysis** (21 indicators) |
 | | RSI, MACD, Stochastic, Williams %R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian | ExtractionV2 | FREE | N/A (realtime calc) | 🆓 |
-| **Trading Signals** (1 source) |
-| | ggShot signals | GGShotAdapter (DB) | N/A | N/A | 💎 Premium |
 | **Derivatives & Leverage** (2 rates) |
 | | BTC Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
 | | ETH Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
@@ -493,15 +478,8 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | | Crypto News Headlines | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
 | **Account Performance** (1 source) |
 | | Trading History | AccountPerformance (DB) | FREE | 5 min | 🆓 |
-| **Agentic Intelligence** (3 active sources) |
-| | Sebastian — Daily Market Brief | MarketConditions (Redis/DB) | FREE | Daily | 🆓 |
-| | Otto AI — Crypto News & Alpha | ACPAgent (ACP on-chain) | $0.01 | 1 hour | 🆓 |
-| | BlackSwan — Event Flares | ACPAgent (ACP on-chain) | $0.01 | 1 hour | 🆓 |
-| | ~~Wolfpack — Token Risk~~ | ~~ACPAgent~~ | ~~$0.02~~ | - | 🚫 Disabled (requires Base token address) |
 
-**Total**: 39 data points (all FREE tier, ACP agents cost $0.01-0.02/query cached 1hr)
-
-*Note: ggShot (Premium) disabled 2026-01-23 due to stale signals. Wolfpack disabled 2026-04-01 (requires Base chain token contract address, not compatible with perp trading).*
+**Total**: 36 data points (all FREE tier)
 
 ---
 
@@ -576,27 +554,10 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 
 ---
 
-### **Example 2: Agent Queries Twitter Sentiment Dynamically**
+### **Example 2: Dynamic Query Override (data_points_override)**
 
 ```
-1. Agent Runtime:
-   Agent wants to check current BTC sentiment on Twitter (not in config)
-   ↓
-   agent.query_market_data({
-     "symbol": "BTCUSDT",
-     "data_sources": {
-       "sentiment_social": ["twitter_sentiment"]  # Not in config!
-     }
-   })
-
-2. API Endpoint:
-   POST /api/v2/agent/query-market-data
-   {
-     "config_id": "abc123",
-     "symbol": "BTCUSDT",
-     "data_sources": {"sentiment_social": ["twitter_sentiment"]}
-   }
-   ↓
+1. Caller wants Twitter sentiment for this one query, bypassing the config:
    orchestrator.fetch_market_intelligence(
      config,
      user_id,
@@ -606,7 +567,7 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
    ↓
    Uses override instead of config → routes to gateway
 
-3. Gateway Query:
+2. Gateway Query:
    data_type='grok_agentic'
    params={'query_type': 'twitter_sentiment', 'symbol': 'BTC'}
    cache_ttl_override=1800 (30min)
@@ -634,7 +595,7 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
    Store in Redis (TTL=1800s / 30min)
    Cost: ~$0.0637
 
-4. Agent Receives:
+3. Caller Receives:
    {
      "market_intelligence": {
        "sentiment_social": {
@@ -643,7 +604,7 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
      }
    }
    ↓
-   Agent interprets sentiment data in context of strategy:
+   The decision LLM interprets sentiment data in context of strategy:
    "Twitter sentiment at 0.3 with ETF-driven themes — social momentum aligns with technical setup..."
 ```
 
@@ -1118,20 +1079,15 @@ market_intelligence/
 ├── response_formatter.py               # Response formatting utilities
 ├── catalog/                            # Catalog system
 │   ├── __init__.py                    # Catalog loader
-│   └── data_types/                    # YAML schemas (4 types currently)
+│   └── data_types/                    # YAML schemas (5 types currently)
 │       ├── derivatives/
 │       │   └── funding_rate.yaml      # BTC/ETH funding rates
 │       ├── agentic/
 │       │   └── grok_agentic.yaml      # Universal Grok intelligence
-│       ├── signals/
-│       │   └── ggshot_signals.yaml    # ggShot trading signals
 │       ├── macro/
 │       │   └── coingecko_global.yaml  # USDT dominance (CoinGecko)
 │       ├── internal/
-│       │   ├── account_performance.yaml  # Bot account performance
-│       │   └── market_conditions.yaml    # Sebastian daily market brief
-│       ├── acp/
-│       │   └── acp_agent.yaml            # ACP agent intelligence (Otto, BlackSwan)
+│       │   └── account_performance.yaml  # Bot account performance
 │       └── market_data/
 │           └── ohlcv.yaml             # OHLCV candle data
 ├── adapters/                           # Data source adapters
@@ -1142,13 +1098,8 @@ market_intelligence/
 │   │   └── grok_agentic.py            # XAI Grok (all agentic sources)
 │   ├── macro/
 │   │   └── coingecko_global.py        # CoinGecko global market data
-│   ├── signals/
-│   │   └── ggshot_adapter.py          # ggShot signal queries
 │   ├── internal/
-│   │   ├── account_performance.py     # Bot trading history (Redis cache, pre-computed)
-│   │   └── market_conditions.py       # Sebastian daily market brief (Redis/Supabase)
-│   ├── acp/
-│   │   └── acp_agent.py               # ACP agent adapter (Otto AI, BlackSwan — on-chain jobs)
+│   │   └── account_performance.py     # Bot trading history (Redis cache, pre-computed)
 │   └── market_data/
 │       └── redis_websocket.py         # WebSocket price cache
 └── cache/
@@ -1180,10 +1131,10 @@ vix_data = result["macro_economics"]["vix"]
 print(f"VIX: {vix_data['value']}, Signal: {vix_data['signal']}")
 ```
 
-### **Example 2: Agent Dynamic Query**
+### **Example 2: Dynamic Query Override**
 
 ```python
-# Agent queries Twitter sentiment without config
+# Query Twitter sentiment for a single call, bypassing the config
 result = await fetch_market_intelligence(
     config,
     user_id,

@@ -241,12 +241,6 @@ export default async function BlogPostPage({ params }: PageProps) {
             >
               Get Started Free
             </Link>
-            <Link
-              href="/arena"
-              className="inline-block border border-[var(--border)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium px-6 py-3 rounded-lg transition-colors"
-            >
-              Watch Live Bots
-            </Link>
           </div>
         </div>
       </article>

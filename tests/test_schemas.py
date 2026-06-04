@@ -33,7 +33,6 @@ def test_schemas():
                         config_data,
                         state,
                         trading_mode,
-                        symphony_agent_id,
                         created_at,
                         updated_at
                     FROM configurations
@@ -55,9 +54,8 @@ def test_schemas():
                     'config_data': row[4],
                     'state': row[5],
                     'trading_mode': row[6] or 'paper',
-                    'symphony_agent_id': row[7],
-                    'created_at': row[8].isoformat() if row[8] else '',
-                    'updated_at': row[9].isoformat() if row[9] else ''
+                    'created_at': row[7].isoformat() if row[7] else '',
+                    'updated_at': row[8].isoformat() if row[8] else ''
                 }
 
                 print(f"\n  Config: {config_dict['config_name']}")

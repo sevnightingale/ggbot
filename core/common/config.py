@@ -11,10 +11,6 @@ load_dotenv(dotenv_path=dotenv_path)
 # General settings
 ENV = os.getenv("ENV", "development")
 
-# Gains Network Settings
-GAINS_NETWORK_RPC_URL = os.getenv("GAINS_NETWORK_RPC_URL", "")
-GAINS_DIAMOND_ADDRESS = os.getenv("GAINS_DIAMOND_ADDRESS", "")
-
 # Database settings
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")

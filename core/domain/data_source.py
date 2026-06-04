@@ -45,7 +45,7 @@ class DataPoint:
     
     data_point_id: str
     source_id: str  # References DataSource.source_id
-    name: str  # Internal identifier: "RSI", "MACD", "ggShot"
+    name: str  # Internal identifier: "RSI", "MACD"
     display_name: str  # User-friendly: "RSI (Relative Strength Index)"
     config_values: list[str]  # Values for config_data: ["RSI_5m", "RSI_15m", ...]
     enabled: bool = True
@@ -146,7 +146,7 @@ class DataPoint:
         
         Args:
             source_id: ID of the signals data source
-            name: Signal name (ggShot, etc.)
+            name: Data point name
             display_name: User-friendly name
             description: Optional description
             requires_premium: Whether this signal requires premium access

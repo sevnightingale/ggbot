@@ -27,7 +27,7 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
     - Account summaries enhanced with portfolio analytics
 
     Enhanced with runtime data from scheduler, Redis execution status, and exchange APIs
-    (Symphony, AsterDEX, Hyperliquid).
+    (Hyperliquid).
 
     Args:
         user_id: User UUID string
@@ -62,9 +62,9 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
         # account_snapshots handles account-level metrics, but individual positions
         # need enrichment because the DB query returns NULL for live position details
         if db_data.get('bots'):
-            # Check for any live trading bots (symphony, aster, hyperliquid)
+            # Check for any live trading bots (hyperliquid)
             has_live_bots = any(
-                b.get('trading_mode') in ('symphony', 'aster', 'hyperliquid')
+                b.get('trading_mode') == 'hyperliquid'
                 for b in db_data['bots']
             )
             if has_live_bots:
@@ -106,14 +106,12 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     query = """
     WITH bot_configs AS (
         SELECT c.config_id, c.user_id, c.config_name, c.config_type, c.state, c.config_data,
-               c.trading_mode, c.symphony_agent_id, c.profile_image_url,
+               c.trading_mode, c.profile_image_url,
                c.first_run_used, c.free_runs_remaining,
                c.initial_equity,
-               c.elo_rating, c.dojo_visible, c.is_house_bot,
                c.created_at, c.updated_at
         FROM configurations c
         WHERE c.user_id = %s AND c.state != 'archived'
-          AND (c.config_type IS NULL OR c.config_type != 'dojo_match')
     ),
     open_positions AS (
         -- Paper trading positions
@@ -123,26 +121,6 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         FROM paper_trades pt
         INNER JOIN bot_configs bc ON pt.config_id = bc.config_id
         WHERE pt.status = 'open' AND (bc.trading_mode IS NULL OR bc.trading_mode = 'paper')
-
-        UNION ALL
-
-        -- Symphony trading positions (batch_ids only - details fetched from Symphony)
-        SELECT lt.config_id, lt.batch_id::text AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
-               NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
-               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'symphony' AS source
-        FROM live_trades lt
-        INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
-        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'symphony'
-
-        UNION ALL
-
-        -- Aster trading positions (batch_ids only - details fetched from AsterDEX)
-        SELECT lt.config_id, lt.batch_id::text AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
-               NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
-               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'aster' AS source
-        FROM live_trades lt
-        INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
-        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'aster'
 
         UNION ALL
 
@@ -243,7 +221,6 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'config_type', bc.config_type,
                 'state', bc.state,
                 'trading_mode', bc.trading_mode,
-                'symphony_agent_id', bc.symphony_agent_id,
                 'profile_image_url', bc.profile_image_url,
                 'first_run_used', COALESCE(bc.first_run_used, false),
                 'free_runs_remaining', COALESCE(bc.free_runs_remaining, 3),
@@ -257,14 +234,6 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                     'llm_config', bc.config_data->'llm_config',
                     'telegram_integration', bc.config_data->'telegram_integration',
                     'agent_strategy', bc.config_data->'agent_strategy'
-                ),
-                'elo_rating', COALESCE(bc.elo_rating, 1200),
-                'dojo_visible', COALESCE(bc.dojo_visible, true),
-                'is_house_bot', COALESCE(bc.is_house_bot, false),
-                'dojo_locked', EXISTS(
-                    SELECT 1 FROM dojo_matches dm
-                    WHERE dm.status = 'active'
-                      AND (dm.challenger_config_id = bc.config_id OR dm.opponent_config_id = bc.config_id)
                 ),
                 'created_at', bc.created_at,
                 'updated_at', bc.updated_at
@@ -431,136 +400,30 @@ async def _enrich_live_positions_and_accounts(
     accounts: List[Dict[str, Any]]
 ) -> tuple:
     """
-    Fetch live exchange data for Symphony, AsterDEX, and Hyperliquid bots
-    and merge with SSE response.
+    Fetch live exchange data for Hyperliquid bots and merge with SSE response.
 
     Args:
         bots: List of bot configurations
-        positions: List of positions from database (may include live/aster/hyperliquid batch_ids)
+        positions: List of positions from database (may include hyperliquid batch_ids)
         accounts: List of accounts from database (paper only)
 
     Returns:
         tuple: (enriched_positions, enriched_accounts)
     """
-    from trading.live.symphony_service import SymphonyLiveTradingService
-    from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
     from trading.live.hyperliquid_service import HyperliquidLiveTradingService
 
-    symphony = SymphonyLiveTradingService()
-    aster = AsterDEXV3LiveTradingService()
     hyperliquid = HyperliquidLiveTradingService()
 
     # Filter bots by trading mode
-    symphony_bots = [b for b in bots if b.get('trading_mode') == 'symphony']
-    aster_bots = [b for b in bots if b.get('trading_mode') == 'aster']
     hyperliquid_bots = [b for b in bots if b.get('trading_mode') == 'hyperliquid']
 
-    if not symphony_bots and not aster_bots and not hyperliquid_bots:
+    if not hyperliquid_bots:
         return positions, accounts
 
     enriched_positions = list(positions)
     enriched_accounts = list(accounts)
 
-    # Fetch Symphony data for each symphony bot (in parallel)
-    tasks = []
-    for bot in symphony_bots:
-        config_id = bot['config_id']
-        tasks.append(symphony.get_account_metrics(config_id))
-        tasks.append(symphony.get_open_positions(config_id))
-
     try:
-        # Gather all results, catching exceptions
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results (account metrics and positions alternate)
-        for i, bot in enumerate(symphony_bots):
-            config_id = bot['config_id']
-
-            # Extract account metrics (even indices: 0, 2, 4, ...)
-            account_result = results[i * 2]
-            if isinstance(account_result, dict) and not isinstance(account_result, Exception):
-                enriched_accounts.append({
-                    **account_result,
-                    'source': 'live',
-                    'account_id': f"symphony_{config_id}"  # Synthetic ID for consistency
-                })
-            elif isinstance(account_result, Exception):
-                logger.warning(f"Failed to fetch Symphony account for {config_id}: {account_result}")
-
-            # Extract positions (odd indices: 1, 3, 5, ...)
-            positions_result = results[i * 2 + 1]
-            if isinstance(positions_result, list):
-                # Remove placeholder symphony positions from DB (they have NULL fields)
-                enriched_positions = [
-                    p for p in enriched_positions
-                    if not (p.get('config_id') == config_id and p.get('source') == 'symphony')
-                ]
-
-                # Add enriched Symphony positions
-                for pos in positions_result:
-                    enriched_positions.append({
-                        'config_id': config_id,
-                        'position_id': pos.get('batch_id'),
-                        'symbol': pos.get('symbol'),
-                        'side': pos.get('side'),
-                        'size_usd': pos.get('size_usd'),
-                        'collateral': pos.get('collateral'),  # Actual margin/collateral deployed
-                        'entry_price': pos.get('entry_price'),
-                        'current_price': pos.get('current_price'),
-                        'unrealized_pnl': pos.get('unrealized_pnl'),
-                        'pnl_percentage': pos.get('pnl_percentage'),
-                        'opened_at': pos.get('opened_at'),
-                        'stop_loss': pos.get('stop_loss'),
-                        'take_profit': pos.get('take_profit'),
-                        'liquidation_price': pos.get('liquidation_price'),
-                        'leverage': pos.get('leverage'),
-                        'status': pos.get('status', 'Open'),
-                        'source': 'symphony'  # Match frontend expectations for close routing
-                    })
-            elif isinstance(positions_result, Exception):
-                logger.warning(f"Failed to fetch Symphony positions for {config_id}: {positions_result}")
-
-        # Fetch AsterDEX data for aster bots (similar pattern)
-        aster_tasks = []
-        for bot in aster_bots:
-            config_id = bot['config_id']
-            # Aster service doesn't have account_metrics yet, so just fetch positions
-            aster_tasks.append(aster.get_open_positions(config_id))
-
-        if aster_tasks:
-            aster_results = await asyncio.gather(*aster_tasks, return_exceptions=True)
-
-            for i, bot in enumerate(aster_bots):
-                config_id = bot['config_id']
-                positions_result = aster_results[i]
-
-                if isinstance(positions_result, list):
-                    # Remove placeholder aster positions from DB
-                    enriched_positions = [
-                        p for p in enriched_positions
-                        if not (p.get('config_id') == config_id and p.get('source') == 'aster')
-                    ]
-
-                    # Add enriched Aster positions
-                    for pos in positions_result:
-                        enriched_positions.append({
-                            'config_id': config_id,
-                            'position_id': pos.get('batch_id') or pos.get('order_id'),
-                            'symbol': pos.get('symbol'),
-                            'side': pos.get('side'),
-                            'size_usd': pos.get('size_usd'),
-                            'entry_price': pos.get('entry_price'),
-                            'current_price': pos.get('current_price'),
-                            'unrealized_pnl': pos.get('unrealized_pnl'),
-                            'opened_at': pos.get('opened_at'),
-                            'stop_loss': pos.get('stop_loss'),
-                            'take_profit': pos.get('take_profit'),
-                            'leverage': pos.get('leverage'),
-                            'source': 'aster'
-                        })
-                elif isinstance(positions_result, Exception):
-                    logger.warning(f"Failed to fetch Aster positions for {config_id}: {positions_result}")
-
         # Fetch Hyperliquid data for hyperliquid bots
         if hyperliquid_bots:
             # Group bots by user_id to avoid duplicate API calls per user

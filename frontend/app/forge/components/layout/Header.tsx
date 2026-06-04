@@ -2,7 +2,6 @@
 
 import React from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { ThemeToggle } from '../shared/ThemeToggle'
 import { UserProfile } from './UserProfile'
 
@@ -42,16 +41,8 @@ export function Header({}: HeaderProps) {
           />
         </div>
 
-        {/* Right: Arena + Social + Theme + Profile */}
+        {/* Right: Social + Theme + Profile */}
         <div className="flex items-center gap-3">
-          {/* ggArena Link */}
-          <Link
-            href="/arena"
-            className="hidden sm:block text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            ggArena
-          </Link>
-
           {/* Social Links */}
           <div className="hidden sm:flex items-center gap-2">
             <a

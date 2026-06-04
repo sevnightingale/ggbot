@@ -283,14 +283,6 @@ async def close_paper_position(
         - realized_pnl: Final P&L with correct leverage calculation
         - close_reason: "manual"
     """
-    # Check Dojo lock
-    from core.arena.matches import is_dojo_locked
-    if is_dojo_locked(config_id):
-        raise HTTPException(
-            status_code=400,
-            detail="Bot is locked for an active Dojo match. Forfeit to unlock."
-        )
-
     try:
         service = SupabasePaperTradingService()
 

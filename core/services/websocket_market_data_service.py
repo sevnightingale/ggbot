@@ -37,7 +37,7 @@ class WebSocketMarketDataService:
     3. Storage: Maintain 300-candle rolling windows in Redis
     """
 
-    # 100 overlapping symbols (ggbots + Symphony compatible)
+    # 100 cached symbols (websocket-cached set)
     # Expanded from 20 → 100 for comprehensive market coverage
     SYMBOLS = [
         '1INCHUSDT', 'AAVEUSDT', 'ADAUSDT', 'ALGOUSDT', 'ALICEUSDT', 'ALTUSDT', 'ANKRUSDT', 'APEUSDT', 'API3USDT', 'APTUSDT',

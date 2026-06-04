@@ -1,7 +1,7 @@
 """
 Universal AI Assistant API - Chat endpoint for bot configuration
 
-Provides AI assistance for configuring all bot types (agent, scheduled, signal_validation)
+Provides AI assistance for configuring scheduled trading bots
 using Claude Haiku with function calling.
 """
 
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/v2", tags=["assistant"])
 
 class AssistantChatRequest(BaseModel):
     config_id: str
-    bot_type: Literal["agent", "scheduled", "signal_validation"]
+    bot_type: Literal["scheduled"]
     message: str
     conversation_history: List[Dict[str, Any]] = []
 
@@ -146,7 +146,7 @@ Based on their answers, adapt your approach using one of the 4 scenarios below.
 
 When users need to know what's available, you can reference these data sources:
 
-### 32 Data Sources Across 7 Categories:
+### Data Sources Across 6 Categories:
 
 **1. Technical Analysis (21 indicators)**
 - RSI, MACD, BB (Bollinger Bands), Volume, Price (OHLC)
@@ -154,24 +154,21 @@ When users need to know what's available, you can reference these data sources:
 - OBV, VWAP, ADX, Aroon, PSAR, KC (Keltner), DC (Donchian)
 - **7 timeframes**: 5m, 15m, 30m, 1h, 4h, 1d, 1w
 
-**2. Trading Signals**
-- ggShot AI Signals (AI-filtered signals with confidence scores)
-
-**3. On-Chain Analytics**
+**2. On-Chain Analytics**
 - BTC Total Value Locked (TVL)
 - Whale Activity
 
-**4. Derivatives & Leverage**
+**3. Derivatives & Leverage**
 - BTC Funding Rate
 - ETH Funding Rate
 
-**5. Sentiment & Social**
+**4. Sentiment & Social**
 - Twitter Sentiment
 
-**6. News & Regulatory**
+**5. News & Regulatory**
 - Crypto News Feed
 
-**7. Macro Economics**
+**6. Macro Economics**
 - VIX (Volatility Index)
 - DXY (Dollar Index)
 - CPI (Consumer Price Index)
@@ -179,8 +176,7 @@ When users need to know what's available, you can reference these data sources:
 
 ### Trading Modes
 - **Paper Trading**: Risk-free testing with $10k virtual account
-- **Symphony.io**: Live CEX trading with real money (premium feature)
-- **AsterDEX**: Decentralized futures (33 symbols, up to 20x leverage, premium)
+- **Hyperliquid**: Live decentralized perp trading with real money
 
 ---
 
@@ -188,11 +184,10 @@ When users need to know what's available, you can reference these data sources:
 
 You'll be configuring these sections using the `update_full_config` tool:
 
-### For ALL Bot Types:
+### Bot Configuration:
 
 **decision.user_prompt** (REQUIRED)
 - This is where the strategy goes (in markdown format)
-- Used for agent, scheduled, AND signal_validation bots
 - Should include: entry conditions, exit conditions, position sizing, risk management, timing
 
 **Example strategy structure:**
@@ -220,7 +215,7 @@ You'll be configuring these sections using the `update_full_config` tool:
 - Wait periods between trades
 ```
 
-### Additional Sections (for scheduled/signal_validation bots):
+### Additional Sections:
 
 **extraction** (what data to fetch)
 ```json
@@ -284,7 +279,7 @@ You have access to 3 tools via function calling:
 
 1. **query_available_data(category)**
    - Get detailed list of available data sources
-   - Categories: "all", "technical", "signals", "on_chain", "derivatives", "sentiment", "news", "macro"
+   - Categories: "all", "technical", "on_chain", "derivatives", "sentiment", "news", "macro"
    - Use when user asks "what data can I use?"
 
 2. **load_full_config(config_id)**
@@ -325,11 +320,10 @@ You have access to 3 tools via function calling:
 
 ## Important Technical Rules
 
-1. **Strategy field**: ALWAYS use `decision.user_prompt` for strategy (for ALL bot types)
-   - `agent_strategy` is deprecated — do NOT use it
+1. **Strategy field**: ALWAYS use `decision.user_prompt` for strategy
    - Strategy should be markdown format with clear executable instructions
 
-2. **Data sources**: Only suggest data sources from the 32 available (use `query_available_data` if unsure)
+2. **Data sources**: Only suggest data sources that actually exist (use `query_available_data` if unsure)
 
 3. **Risk management**: Always include stop loss and take profit rules in strategies
 
@@ -346,7 +340,7 @@ You have access to 3 tools via function calling:
    - The `config_data` and `config_name` keys are reserved for internal use
 
 8. **Valid analysis frequencies**: Only use these values for `decision.analysis_frequency`:
-   - `5m`, `15m`, `30m`, `1h`, `4h`, `1d` (for scheduled bots)
+   - `5m`, `15m`, `30m`, `1h`, `4h`, `1d`
    - Do NOT use `6h`, `2h`, `12h`, or `1w` — they are not supported by the scheduler
 
 9. **Timeframes**: The bot supports per-indicator timeframe customization.
@@ -401,7 +395,7 @@ TOOL_QUERY_AVAILABLE_DATA = {
         "properties": {
             "category": {
                 "type": "string",
-                "enum": ["all", "technical", "signals", "on_chain", "derivatives", "sentiment", "news", "macro"],
+                "enum": ["all", "technical", "on_chain", "derivatives", "sentiment", "news", "macro"],
                 "description": "Which category of data to query. Use 'all' to see everything."
             }
         },
@@ -436,7 +430,7 @@ TOOL_UPDATE_FULL_CONFIG = {
             },
             "updates": {
                 "type": "object",
-                "description": "Configuration updates (partial or full). Will be deep merged with existing config. For ALL bot types, use 'decision.user_prompt' for the trading strategy. Other sections: 'extraction', 'trading', 'llm_config'. Do NOT use 'agent_strategy' - it is deprecated."
+                "description": "Configuration updates (partial or full). Will be deep merged with existing config. Use 'decision.user_prompt' for the trading strategy. Other sections: 'extraction', 'trading', 'llm_config'."
             }
         },
         "required": ["config_id", "updates"]
@@ -521,8 +515,7 @@ async def query_available_data(category: str) -> Dict[str, Any]:
         'macro_economics': 'macro',
         'sentiment_social': 'sentiment',
         'onchain_analytics': 'on_chain',
-        'news_regulatory': 'news',
-        'trading_signals': 'signals'
+        'news_regulatory': 'news'
     }
 
     all_data = {}
@@ -607,7 +600,7 @@ async def update_full_config(
         )
 
     # Validate analysis_frequency if present
-    VALID_FREQUENCIES = {'5m', '15m', '30m', '1h', '4h', '1d', 'signal_driven', 'agent_driven'}
+    VALID_FREQUENCIES = {'5m', '15m', '30m', '1h', '4h', '1d'}
     if 'decision' in updates and 'analysis_frequency' in updates.get('decision', {}):
         freq = updates['decision']['analysis_frequency']
         if freq not in VALID_FREQUENCIES:
@@ -673,12 +666,9 @@ async def universal_assistant_chat(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
-    Universal AI assistant for bot configuration.
+    AI assistant for scheduled trading bot configuration.
 
-    Works for all bot types:
-    - agent: Configure agent_strategy
-    - scheduled: Configure extraction, decision, trading, llm_config
-    - signal_validation: Configure signal validation logic
+    Configures extraction, decision, trading, and llm_config sections.
 
     Uses Claude Haiku with function calling.
     """

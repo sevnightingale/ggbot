@@ -28,7 +28,8 @@
 ```
 Production Pages:
 ├── /forge                    # Main application (Forge architecture)
-├── /arena                   # ggArena competition page
+├── /hyperliquid             # Hyperliquid live trading setup (deposit/withdraw/authorize)
+├── /view/[config_id]        # Public shareable bot timeline view
 ├── /new-landing             # Modern landing page (ready to replace /landing)
 ├── /login                   # Supabase authentication (login)
 ├── /signup                  # Supabase authentication (signup)
@@ -58,11 +59,10 @@ Legacy/Archive (Moved to /archive/):
 │
 ├── configure/               # Bot configuration system (auto-save)
 │   ├── ConfigureLayout.tsx # Main layout with Strategy Advisor panel + SaveStatusContext
-│   ├── ConfigTabs.tsx      # Sub-navigation (Strategy | Market Data | Trade Settings | Signals)
+│   ├── ConfigTabs.tsx      # Sub-navigation (Strategy | Market Data | Trade Settings)
 │   ├── StrategyEditor.tsx  # AI prompt editing with LLM provider selection (auto-saves)
 │   ├── MarketDataSelector.tsx # Technical indicator selection with premium gates (auto-saves)
-│   ├── TradeSettings.tsx   # Position sizing, risk management, Telegram integration (auto-saves)
-│   └── SignalsConfiguration.tsx # External signal sources (ggShot) (auto-saves)
+│   └── TradeSettings.tsx   # Position sizing, risk management, Telegram integration (auto-saves)
 │
 └── shared/                  # Reusable components
     ├── ThemeToggle.tsx     # Dark/light mode switching
@@ -410,10 +410,6 @@ const isLocked = !canAccess('premium_llms')
 <button disabled={isLocked} className={isLocked ? 'opacity-60 cursor-not-allowed' : ''}>
   {isLocked && <LockIcon />} OpenAI GPT-4
 </button>
-
-// ggShot signals
-const canUseSignals = canAccess('ggshot')
-<Toggle enabled={canUseSignals && isGgShotEnabled} />
 ```
 
 ### **Upgrade Flow (Stripe Integration)**
@@ -439,9 +435,8 @@ All features available with usage-based subscription:
 - **Any Frequency**: 5-minute to weekly analysis
 - **All 7 AI Models**: GPT, Claude, Grok, Gemini, DeepSeek, Kimi, Qwen
 - **All Reasoning Tiers**: Economy/Standard/Premium
-- **ggShot Signals**: Available with usage-based subscription
 - **Telegram Publishing**: Available with usage-based subscription
-- **Live Trading**: Symphony.io and AsterDEX integrations
+- **Live Trading**: Hyperliquid direct integration
 
 ### **Stripe Integration**
 ```typescript
@@ -758,10 +753,9 @@ Post-creation context-aware buttons in `StrategyAdvisorPanel.tsx`:
 ### **Configuration System** (Unified Batched Save - 2025-12-04)
 - **Strategy Advisor**: Inline AI chat panel (500px fixed) with Claude Haiku, markdown rendering, real-time config updates
 - **Unified Batched Save**: All config changes batched over 5s, single API call, dirty field tracking prevents SSE overwrites
-- **Controlled Components**: StrategyEditor, TradeSettings, MarketDataSelector, SignalsConfiguration - all just call `onUpdate()`
+- **Controlled Components**: StrategyEditor, TradeSettings, MarketDataSelector - all just call `onUpdate()`
 - **SSE Conflict Resolution**: User wins for dirty fields, SSE updates non-dirty fields, clears after save
 - **Market Data**: 21+ technical indicators with premium feature gating
-- **Signal Sources**: ggShot integration with subscription gatekeeping
 - **Strategy Editor**: AI prompt editing with LLM provider selection, thinking mode toggle
 - **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration
 
@@ -1035,7 +1029,7 @@ lineSeries.setMarkers(markers)
 
 #### **3. Live Status Indicator**
 
-Replaces static "ARENA STATUS • DATE" line with real-time agent status.
+Shows real-time agent status with a pulsing dot and live countdown/elapsed text.
 
 **Display Format**:
 ```
@@ -1195,8 +1189,7 @@ GET /api/v2/activities/{config_id}
 
 // Bot metadata (name, balance, win rate, performance) - BOTH MODES
 // Paper: Calculated from paper_trades (per-bot)
-// Symphony: Queries Symphony API get_account_metrics() (account-wide)
-// Aster: Queries Aster API balance + trades (account-wide)
+// Hyperliquid: Equity + realized P&L from live_trades + HL account value
 GET /api/v2/activities/{config_id}/metadata
 ```
 
@@ -1241,11 +1234,10 @@ Chart API:
   → Chart displays AI's discrete observations (not continuous snapshots)
 ```
 
-**Multi-Mode Architecture** (2025-11-13):
-All three trading modes (paper, Symphony, Aster) fully supported with smart backend routing:
+**Multi-Mode Architecture**:
+Both trading modes (paper, hyperliquid) fully supported with smart backend routing:
 - **Paper Trading**: Per-bot isolated metrics from `paper_trades` table
-- **Symphony Live**: Account-wide metrics from Symphony API (shared wallet design)
-- **AsterDEX Live**: Account-wide metrics from Aster API (shared wallet design)
+- **Hyperliquid Live**: Equity + realized P&L from `live_trades` table and HL account value
 
 **Data Transformation**:
 1. Fetch balance series (P&L snapshots)
@@ -1293,37 +1285,6 @@ groupedByTimestamp.forEach((activitiesAtTime, timestamp) => {
   // ... etc
 })
 ```
-
-### **Integration with Backend**
-
-#### **Enhanced Activity Logging** (2025-11-07)
-
-Market query activities now capture the full preprocessed data:
-
-**Backend** (`agent/mcp_server.py:220-234`):
-```python
-# Extract market data for activity logging
-market_data = {}
-if result.get('data', {}).get('technicals'):
-    market_data['technicals'] = result['data']['technicals']
-if result.get('data', {}).get('market_intelligence'):
-    market_data['market_intelligence'] = result['data']['market_intelligence']
-
-log_activity_safe(
-    config_id=agent_context.config_id,
-    user_id=agent_context.user_id,
-    activity_type='market_query',
-    details={
-        'symbol': symbol,
-        'categories': categories,
-        'timeframe': timeframe,
-        'market_data': market_data  # NEW: Full preprocessed data (200-500 fields)
-    },
-    related_symbol=symbol,
-)
-```
-
-This enables complete transparency into agent decision-making by showing the exact data that influenced each trade.
 
 ### **Performance Considerations**
 

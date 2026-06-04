@@ -97,7 +97,7 @@ export default function PrivacyPage() {
               <li><strong>Stripe:</strong> Payment processing and subscription management</li>
               <li><strong>Vercel:</strong> Frontend hosting and delivery</li>
               <li><strong>AI Providers:</strong> OpenAI, Anthropic, XAI, DeepSeek, Google (for LLM inference)</li>
-              <li><strong>Trading Platforms:</strong> Symphony.io, AsterDEX, Binance (for trade execution and market data)</li>
+              <li><strong>Trading Platforms:</strong> Hyperliquid, Binance (for trade execution and market data)</li>
             </ul>
 
             <h3 className="text-xl font-semibold mb-3 mt-4 text-[var(--text-primary)]">5.2 For Legal Compliance</h3>
@@ -155,7 +155,7 @@ export default function PrivacyPage() {
             <h2 className="text-2xl font-bold mb-4 text-[var(--text-primary)]">9. Third-Party Services</h2>
             <p>Our Services integrate with third-party platforms that have their own privacy policies:</p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Trading platforms (Symphony.io, AsterDEX, etc.)</li>
+              <li>Trading platforms (Hyperliquid, etc.)</li>
               <li>AI model providers (OpenAI, Anthropic, XAI, etc.)</li>
               <li>Market data providers (Binance, etc.)</li>
             </ul>

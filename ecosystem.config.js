@@ -30,69 +30,6 @@ module.exports = {
       max_restarts: 20,
       restart_delay: 4000
     },
-    // Signal processing services (V2 ggShot integration)
-    {
-      name: 'signal-listener',
-      script: '/home/sev/ggbot/signals/listener_service.py',
-      interpreter: '/home/sev/ggbot/.venv/bin/python',
-      cwd: '/home/sev/ggbot',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '500M',
-      env: {
-        NODE_ENV: 'production',
-        PYTHONPATH: '/home/sev/ggbot',
-        SERVICE_TYPE: 'signal_listener',
-        TG_API_ID: process.env.TG_API_ID,
-        TG_API_HASH: process.env.TG_API_HASH,
-        GGSHOT_CHANNEL: process.env.GGSHOT_CHANNEL,
-        DATABASE_URL: process.env.DATABASE_URL,
-        SUPABASE_URL: process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
-      },
-      error_file: '/dev/null',
-      out_file: '/dev/null',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      merge_logs: true,
-      min_uptime: '30s',
-      max_restarts: 20,
-      restart_delay: 4000
-    },
-    // X (Twitter) bot service for @ggbots_ai
-    {
-      name: 'x-bot',
-      script: '/home/sev/ggbot/x_bot/bot.py',
-      interpreter: '/home/sev/ggbot/.venv/bin/python',
-      cwd: '/home/sev/ggbot',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '500M',
-      env: {
-        NODE_ENV: 'production',
-        PYTHONPATH: '/home/sev/ggbot',
-        X_BOT_ENABLED: 'true',
-        X_API_KEY: process.env.X_API_KEY,
-        X_API_SECRET: process.env.X_API_SECRET,
-        X_ACCESS_TOKEN: process.env.X_ACCESS_TOKEN,
-        X_ACCESS_SECRET: process.env.X_ACCESS_SECRET,
-        X_BEARER_TOKEN: process.env.X_BEARER_TOKEN,
-        X_BOT_USERNAME: process.env.X_BOT_USERNAME,
-        DATABASE_URL: process.env.DATABASE_URL,
-        SUPABASE_URL: process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
-      },
-      error_file: '/dev/null',
-      out_file: '/dev/null',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      merge_logs: true,
-      min_uptime: '30s',
-      max_restarts: 20,
-      restart_delay: 4000
-    },
     // Error monitoring service
     {
       name: 'error-alerts',
@@ -146,32 +83,7 @@ module.exports = {
       max_restarts: 50,  // Increased from 20 for resilience
       restart_delay: 5000  // Increased to 5s for backoff
     },
-    // Telegram Bot Handler - Responds to /chatid and other commands
-    {
-      name: 'telegram-bot',
-      script: '/home/sev/ggbot/signals/telegram_bot_handler.py',
-      interpreter: '/home/sev/ggbot/.venv/bin/python',
-      cwd: '/home/sev/ggbot',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '100M',
-      env: {
-        NODE_ENV: 'production',
-        PYTHONPATH: '/home/sev/ggbot',
-        GG_FILTER_TOKEN: process.env.GG_FILTER_TOKEN,
-        DATABASE_URL: process.env.DATABASE_URL
-      },
-      error_file: 'logs/telegram-bot-error.log',
-      out_file: 'logs/telegram-bot-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      merge_logs: true,
-      min_uptime: '30s',
-      max_restarts: 20,
-      restart_delay: 4000
-    },
-    // Universal Account Monitor - Unified monitoring for paper/symphony/aster
+    // Universal Account Monitor - Unified monitoring for paper + hyperliquid
     {
       name: 'account-monitor',
       script: '/home/sev/ggbot/core/monitoring/universal_account_monitor.py',
@@ -188,9 +100,7 @@ module.exports = {
         DATABASE_URL: process.env.DATABASE_URL,
         SUPABASE_URL: process.env.SUPABASE_URL,
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
-        REDIS_URL: process.env.REDIS_URL,
-        ASTER_API_KEY: process.env.ASTER_API_KEY,
-        ASTER_API_SECRET: process.env.ASTER_API_SECRET
+        REDIS_URL: process.env.REDIS_URL
       },
       error_file: 'logs/account-monitor-error.log',
       out_file: 'logs/account-monitor-out.log',
@@ -199,39 +109,6 @@ module.exports = {
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
-    },
-    // Sebastian Virtuals — ACP buyer/provider + DGClaw arena trades
-    {
-      name: 'sebastian-virtuals',
-      script: '/home/sev/ggbot/sebastian_virtuals.py',
-      interpreter: '/home/sev/ggbot/.venv/bin/python',
-      cwd: '/home/sev/ggbot',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '300M',
-      env: {
-        NODE_ENV: 'production',
-        PYTHONPATH: '/home/sev/ggbot',
-        ACP_WALLET_ADDRESS: process.env.ACP_WALLET_ADDRESS,
-        ACP_WALLET_PRIVATE_KEY: process.env.ACP_WALLET_PRIVATE_KEY,
-        ACP_EOA_ADDRESS: process.env.ACP_EOA_ADDRESS,
-        ACP_ENTITY_ID: process.env.ACP_ENTITY_ID,
-        DGCLAW_AGENT_ADDRESS: process.env.DGCLAW_AGENT_ADDRESS,
-        DGCLAW_HL_SUBACCOUNT: process.env.DGCLAW_HL_SUBACCOUNT,
-        DATABASE_URL: process.env.DATABASE_URL,
-        SUPABASE_URL: process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
-        REDIS_URL: process.env.REDIS_URL
-      },
-      error_file: 'logs/sebastian-virtuals-error.log',
-      out_file: 'logs/sebastian-virtuals-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      merge_logs: true,
-      min_uptime: '30s',
-      max_restarts: 20,
-      restart_delay: 10000
     },
     // Scheduler process — runs bot cycles independently of API
     {
@@ -253,45 +130,10 @@ module.exports = {
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
-        REDIS_URL: process.env.REDIS_URL,
-        ARENA_ENABLED_CONFIGS: process.env.ARENA_ENABLED_CONFIGS
+        REDIS_URL: process.env.REDIS_URL
       },
       error_file: '/dev/null',
       out_file: '/dev/null',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      merge_logs: true,
-      min_uptime: '30s',
-      max_restarts: 20,
-      restart_delay: 4000
-    },
-    // acp-node — ACP v2 Privy-signed HL setup sidecar (Phase 1+)
-    {
-      name: 'acp-node',
-      script: '/home/sev/ggbot/acp-node/src/index.ts',
-      interpreter: '/home/sev/ggbot/acp-node/node_modules/.bin/tsx',
-      cwd: '/home/sev/ggbot/acp-node',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '300M',
-      env: {
-        NODE_ENV: 'production',
-        // Pin Node 22 bin at the front of PATH so tsx's `#!/usr/bin/env node`
-        // shebang always resolves to Node 22 (not the system /usr/bin/node which
-        // may still be Node 18). Defensive against PM2 resurrect using a stale
-        // dump.pm2 env, or systemd-launched daemon missing nvm init.
-        PATH: '/home/sev/.nvm/versions/node/v22.22.2/bin:' + (process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'),
-        ACP_NODE_PORT: process.env.ACP_NODE_PORT || '3101',
-        ACP_NODE_SHARED_SECRET: process.env.ACP_NODE_SHARED_SECRET,
-        PRIVY_APP_ID: process.env.PRIVY_APP_ID || 'cltsev9j90f67yhyw4sngtrpv',
-        PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
-        HL_API_URL: process.env.HL_API_URL || 'https://api.hyperliquid.xyz/exchange',
-        HL_CHAIN_ID: process.env.HL_CHAIN_ID || '42161',
-        LOG_LEVEL: process.env.LOG_LEVEL || 'info'
-      },
-      error_file: 'logs/acp-node-error.log',
-      out_file: 'logs/acp-node-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       min_uptime: '30s',

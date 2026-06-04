@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { BotConfiguration } from '@/lib/api'
-import { Edit2, Copy, RefreshCw, Check, MoreHorizontal, Trash2, Rocket } from 'lucide-react'
+import { Edit2, Copy, RefreshCw, Check, MoreHorizontal, Trash2 } from 'lucide-react'
 
 interface BotManagementMenuProps {
   bot: BotConfiguration
@@ -10,7 +10,6 @@ interface BotManagementMenuProps {
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
   onResetAccount?: (configId: string) => void
-  onDeployLive?: (configId: string) => void
   isBotAction: boolean
   hasUnsavedChanges?: boolean
   isLiveBot?: boolean
@@ -22,18 +21,15 @@ export function BotManagementMenu({
   onDuplicate,
   onDelete,
   onResetAccount,
-  onDeployLive,
   isBotAction,
   hasUnsavedChanges = false,
   isLiveBot = false
 }: BotManagementMenuProps) {
-  const dojoLocked = bot.dojo_locked ?? false
   const [isOpen, setIsOpen] = useState(false)
   const [isRenamingLocal, setIsRenamingLocal] = useState(false)
   const [newName, setNewName] = useState(bot.config_name)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
-  const [showDeployConfirm, setShowDeployConfirm] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -51,7 +47,6 @@ export function BotManagementMenu({
         setIsOpen(false)
         setShowDeleteConfirm(false)
         setShowResetConfirm(false)
-        setShowDeployConfirm(false)
         if (isRenamingLocal) {
           handleRenameCancel() // Automatically discard changes
         }
@@ -102,16 +97,6 @@ export function BotManagementMenu({
   const handleResetConfirm = () => {
     onResetAccount?.(bot.config_id)
     setShowResetConfirm(false)
-  }
-
-  const handleDeployClick = () => {
-    setShowDeployConfirm(true)
-    setIsOpen(false)
-  }
-
-  const handleDeployConfirm = () => {
-    onDeployLive?.(bot.config_id)
-    setShowDeployConfirm(false)
   }
 
   if (isRenamingLocal) {
@@ -223,39 +208,6 @@ export function BotManagementMenu({
     )
   }
 
-  if (showDeployConfirm) {
-    return (
-      <div ref={menuRef} data-bot-menu className="absolute right-0 top-8 z-50 min-w-64 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
-        <div className="p-3">
-          <div className="text-xs text-[var(--text-primary)] mb-2">
-            Deploy Live Version?
-          </div>
-          <div className="text-xs text-[var(--text-muted)] mb-3">
-            This duplicates &ldquo;{bot.config_name}&rdquo; into a Hyperliquid-trading
-            agent on Virtuals Protocol. You&apos;ll approve a signer popup, then
-            fund the agent&apos;s wallet with USDC on Arbitrum.
-            <div className="mt-2">Your paper bot keeps running for comparison.</div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleDeployConfirm}
-              disabled={isBotAction}
-              className="flex-1 px-2 py-1 text-xs bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50"
-            >
-              {isBotAction ? 'Deploying...' : 'Deploy'}
-            </button>
-            <button
-              onClick={() => setShowDeployConfirm(false)}
-              className="flex-1 px-2 py-1 text-xs border border-[var(--border)] rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -282,16 +234,6 @@ export function BotManagementMenu({
               <Edit2 className="h-3.5 w-3.5" />
               Rename
             </button>
-            {!isLiveBot && onDeployLive && bot.trading_mode !== 'virtuals' && (
-              <button
-                onClick={handleDeployClick}
-                disabled={isBotAction}
-                className="w-full px-3 py-2 text-left text-xs text-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Rocket className="h-3.5 w-3.5" />
-                Deploy Live Version
-              </button>
-            )}
             {!isLiveBot && (
               <button
                 onClick={() => {
@@ -308,8 +250,7 @@ export function BotManagementMenu({
             {onResetAccount && (
               <button
                 onClick={handleResetClick}
-                disabled={isBotAction || dojoLocked}
-                title={dojoLocked ? 'Locked for Dojo match' : undefined}
+                disabled={isBotAction}
                 className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -321,8 +262,7 @@ export function BotManagementMenu({
                 <hr className="my-1 border-[var(--border)]" />
                 <button
                   onClick={handleDeleteClick}
-                  disabled={isBotAction || dojoLocked}
-                  title={dojoLocked ? 'Locked for Dojo match' : undefined}
+                  disabled={isBotAction}
                   className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

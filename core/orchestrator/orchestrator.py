@@ -6,7 +6,6 @@ to share the same orchestration logic without importing FastAPI app creation.
 """
 
 import asyncio
-import json
 import os
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -22,8 +21,6 @@ from core.common.logger import logger
 from extraction.v2.extraction_engine import ExtractionEngineV2
 from decision.engine_v2 import DecisionEngineV2
 from trading.paper.supabase_service import SupabasePaperTradingService
-from trading.live.symphony_service import SymphonyLiveTradingService
-from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
 from trading.live.hyperliquid_service import HyperliquidLiveTradingService
 
 from core.scheduler.utils import extract_timeframe_from_config
@@ -91,8 +88,6 @@ class GGBotOrchestrator:
         self.config_service = config_service
         self.llm_service = llm_service
         self.paper_trading = SupabasePaperTradingService()
-        self.symphony_trading = SymphonyLiveTradingService()
-        self.aster_trading = AsterDEXV3LiveTradingService()
         self.hyperliquid_trading = HyperliquidLiveTradingService()
         self._log = logger.bind(component="orchestrator")
 
@@ -169,22 +164,8 @@ class GGBotOrchestrator:
                     detail="Configure a trading pair before running this bot."
                 )
 
-            log.debug(f"config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
-
-            # Execute the appropriate cycle
-            if config.config_type == "signal_validation":
-                if signal_data:
-                    result = await self._run_signal_validation_cycle(
-                        config, signal_data, override_symbol, run_id=run_id
-                    )
-                else:
-                    latest_signal = await self._fetch_latest_ggshot_signal()
-                    signal_dict = self._signal_data_to_dict(latest_signal)
-                    result = await self._run_signal_validation_cycle(
-                        config, signal_dict, override_symbol, run_id=run_id
-                    )
-            else:
-                result = await self._run_autonomous_trading_cycle(config, run_id=run_id)
+            # Execute the trading cycle (signal_validation config_type removed — scheduled_trading only)
+            result = await self._run_autonomous_trading_cycle(config, run_id=run_id)
 
             # Handle free run tracking after successful execution
             if result.status != "error":
@@ -252,35 +233,6 @@ class GGBotOrchestrator:
                 config, user_id, decision_result, run_id=run_id
             )
 
-            # Arena mirror: route trade to DGClaw
-            # Phase 2 (user agents via claw API) checked first, Phase 1 (admin via ACP SDK) as fallback
-            arena_agent = await self._get_user_arena_agent(config)
-            if arena_agent:
-                asyncio.create_task(
-                    self._execute_claw_arena_trade(arena_agent, config, decision_result, run_id)
-                )
-            elif self._is_arena_enabled(config):
-                await self._enqueue_arena_trade(config, decision_result, run_id)
-
-            # Dojo mirror: copy-trade to match accounts / House Bot signal dispatch
-            try:
-                from core.arena.dojo_mirror import mirror_trade_to_dojo, dispatch_house_bot_signal
-                if config.is_house_bot:
-                    asyncio.create_task(dispatch_house_bot_signal(
-                        config.config_id, decision_result
-                    ))
-                else:
-                    asyncio.create_task(mirror_trade_to_dojo(
-                        config.config_id, decision_result, trading_result
-                    ))
-            except Exception:
-                pass
-
-            if await self._should_publish_signal(config, decision_result):
-                await self._trigger_signal_publishing(
-                    config, {}, decision_result
-                )
-
             end_time = datetime.now(timezone.utc)
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
 
@@ -304,122 +256,6 @@ class GGBotOrchestrator:
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
 
             self._log.error(f"V2 autonomous cycle failed: {e}")
-            return OrchestrationResult(
-                status="error",
-                config_id=str(config_id),
-                extraction_result={"error": str(e)},
-                decision_result=None,
-                trading_result=None,
-                execution_time_ms=execution_time_ms,
-                timestamp=end_time.isoformat()
-            )
-
-    async def _run_signal_validation_cycle(
-        self,
-        config: BotConfigV2,
-        signal_data: Dict,
-        override_symbol: Optional[str] = None,
-        run_id: Optional[str] = None
-    ) -> OrchestrationResult:
-        """Run signal validation cycle for external signals."""
-        start_time = datetime.now(timezone.utc)
-        user_id = config.user_id
-        config_id = config.config_id
-
-        try:
-            symbol = override_symbol or signal_data.get('symbol') or config.selected_pair
-
-            if not symbol:
-                raise ValueError("No symbol specified for signal validation")
-
-            self._log.info(f"Running signal validation for {symbol}")
-
-            extraction_config = config.extraction or {}
-            signal_indicators = self._extract_indicators_from_config(extraction_config)
-            timeframes = self._extract_timeframes_from_config(extraction_config)
-            tf_indicator_groups = self._build_timeframe_indicator_groups(extraction_config)
-
-            extraction_engine = await self._get_extraction_engine(user_id)
-
-            from core.sse import set_execution_phase
-            await set_execution_phase(config_id, "extracting", f"Gathering market data for {symbol} signal...")
-
-            extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id,
-                signal_indicators, timeframes,
-                override_symbol=symbol, run_id=run_id,
-                tf_indicator_groups=tf_indicator_groups or None
-            )
-
-            await set_execution_phase(config_id, "deciding", "Analyzing signal against current market conditions...")
-
-            decision_result = await self._run_decision_v2(
-                config_id, config, extraction_result, signal_data, run_id=run_id
-            )
-
-            action = decision_result.get('action', 'wait')
-            if action in ['wait', 'no_action', 'hold']:
-                message = "Signal rejected - conditions not favorable..."
-            else:
-                message = f"Signal validated - executing {action} position..."
-
-            await set_execution_phase(config_id, "trading", message)
-
-            trading_result = await self._run_trading_v2(
-                config, user_id, decision_result, run_id=run_id
-            )
-
-            # Arena mirror: route trade to DGClaw
-            arena_agent = await self._get_user_arena_agent(config)
-            if arena_agent:
-                asyncio.create_task(
-                    self._execute_claw_arena_trade(arena_agent, config, decision_result, run_id)
-                )
-            elif self._is_arena_enabled(config):
-                await self._enqueue_arena_trade(config, decision_result, run_id)
-
-            # Dojo mirror: copy-trade to match accounts / House Bot signal dispatch
-            try:
-                from core.arena.dojo_mirror import mirror_trade_to_dojo, dispatch_house_bot_signal
-                if config.is_house_bot:
-                    asyncio.create_task(dispatch_house_bot_signal(
-                        config.config_id, decision_result
-                    ))
-                else:
-                    asyncio.create_task(mirror_trade_to_dojo(
-                        config.config_id, decision_result, trading_result
-                    ))
-            except Exception:
-                pass
-
-            if await self._should_publish_signal(config, decision_result):
-                await self._trigger_signal_publishing(
-                    config, signal_data, decision_result
-                )
-
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-
-            result = OrchestrationResult(
-                status="success",
-                config_id=str(config_id),
-                extraction_result=extraction_result,
-                decision_result=decision_result,
-                trading_result=trading_result,
-                execution_time_ms=execution_time_ms,
-                timestamp=end_time.isoformat()
-            )
-
-            await set_execution_phase(config_id, "completed", f"Signal validation completed in {execution_time_ms/1000:.1f}s")
-
-            self._log.info(f"Signal validation completed in {execution_time_ms}ms")
-            return result
-
-        except Exception as e:
-            end_time = datetime.now(timezone.utc)
-            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
-
-            self._log.error(f"Signal validation failed: {e}")
             return OrchestrationResult(
                 status="error",
                 config_id=str(config_id),
@@ -516,162 +352,6 @@ class GGBotOrchestrator:
 
         self._log.debug(f"Using timeframes: {timeframes}")
         return timeframes
-
-    async def _fetch_latest_ggshot_signal(self):
-        """Fetch the latest real ggShot signal from Telegram for manual testing."""
-        from signals.listener_service import SignalData
-        from telethon import TelegramClient
-        import os
-        from dotenv import load_dotenv
-
-        try:
-            load_dotenv()
-
-            api_id = int(os.getenv('TG_API_ID'))
-            api_hash = os.getenv('TG_API_HASH')
-            channel_name = os.getenv('GGSHOT_CHANNEL', 'GGShot_Bot')
-
-            if not api_id or not api_hash:
-                raise ValueError("Missing TG_API_ID or TG_API_HASH environment variables")
-
-            session_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'sessions')
-            session_path = os.path.join(session_dir, 'manual_trigger_session')
-
-            client = TelegramClient(session_path, api_id, api_hash)
-            await client.start()
-
-            try:
-                channel = await client.get_entity(channel_name)
-                messages = await client.get_messages(channel, limit=10)
-
-                from signals.ggshot_parser import GGShotParser
-                parser = GGShotParser()
-
-                for message in messages:
-                    if message.message:
-                        signal_data = parser.parse_signal(message.message)
-                        if signal_data:
-                            self._log.info(f"Found latest ggShot signal: {signal_data['symbol']} {signal_data['direction']}")
-
-                            return SignalData(
-                                source='ggshot',
-                                symbol=signal_data['symbol'],
-                                direction=signal_data['direction'],
-                                timeframe=signal_data['timeframe'],
-                                confidence=signal_data.get('strategy_accuracy', 80) / 100.0,
-                                entry_zone=signal_data['entry_zone'],
-                                stop_loss=signal_data['stop_loss'],
-                                take_profit=signal_data['target_1'],
-                                reasoning=f"Latest ggShot signal with {signal_data.get('strategy_accuracy', 80)}% accuracy",
-                                raw_message=message.message,
-                                metadata={
-                                    'targets': signal_data['targets'],
-                                    'trend_line': signal_data.get('trend_line'),
-                                    'strategy_accuracy': signal_data.get('strategy_accuracy'),
-                                    'manual_fetch': True
-                                },
-                                timestamp=datetime.now(timezone.utc)
-                            )
-
-                raise ValueError("No valid ggShot signals found in recent messages")
-
-            finally:
-                await client.disconnect()
-
-        except Exception as e:
-            self._log.error(f"Failed to fetch latest ggShot signal: {e}")
-            raise
-
-    async def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
-        """Check if signal should be published to telegram."""
-        telegram_config = config.telegram_integration or {}
-        publisher_config = telegram_config.get('publisher', {})
-
-        if not publisher_config.get('enabled', False):
-            return False
-
-        action = decision_result.get('action', 'wait').lower()
-        if action not in ['long', 'short', 'enter', 'buy', 'sell']:
-            return False
-
-        try:
-            from core.common.db import db_fetch_one
-            result = await db_fetch_one("""
-                SELECT subscription_tier, subscription_status
-                FROM user_profiles
-                WHERE user_id = %s
-            """, (config.user_id,))
-
-            if not result:
-                self._log.warning(f"No user profile found for {config.user_id}")
-                return False
-
-            tier, status = result
-
-            paid_tiers = ('usage_based', 'prepaid', 'pro')
-            if tier not in paid_tiers or status != 'active':
-                self._log.info(f"User {config.user_id} requires paid subscription for signal publishing")
-                return False
-
-        except Exception as e:
-            self._log.error(f"Failed to check subscription for signal publishing: {e}")
-            return False
-
-        return True
-
-    async def _trigger_signal_publishing(
-        self,
-        config: BotConfigV2,
-        signal_data: Dict,
-        decision_result: Dict
-    ) -> None:
-        """Trigger signal publishing to user's Telegram group."""
-        try:
-            from signals.publishing_service import publish_signal_to_telegram
-
-            trading_mode = getattr(config, 'trading_mode', 'paper')
-            live_tag = 'Hyperliquid' if trading_mode == 'hyperliquid' else None
-            enriched_signal_data = {
-                **signal_data,
-                'bot_name': config.config_name,
-                'symbol': config.selected_pair,
-                'config_type': config.config_type,
-                'live_tag': live_tag
-            }
-
-            success = await publish_signal_to_telegram(
-                config_id=config.config_id,
-                user_id=config.user_id,
-                signal_data=enriched_signal_data,
-                decision_result=decision_result
-            )
-
-            if success:
-                self._log.info(f"Published signal to Telegram for {config.config_name}")
-            else:
-                self._log.warning(f"Failed to publish signal for config {config.config_id}")
-
-        except ImportError:
-            self._log.warning("Publishing service not available - signals not published")
-        except Exception as e:
-            self._log.error(f"Error publishing signal for config {config.config_id}: {e}")
-
-    def _signal_data_to_dict(self, signal_data) -> Dict:
-        """Convert SignalData object to dict for decision engine."""
-        return {
-            'source': signal_data.source,
-            'symbol': signal_data.symbol,
-            'direction': signal_data.direction,
-            'timeframe': signal_data.timeframe,
-            'confidence': signal_data.confidence,
-            'entry_zone': signal_data.entry_zone,
-            'stop_loss': signal_data.stop_loss,
-            'take_profit': signal_data.take_profit,
-            'reasoning': signal_data.reasoning,
-            'raw_message': signal_data.raw_message,
-            'metadata': signal_data.metadata,
-            'timestamp': signal_data.timestamp.isoformat() if hasattr(signal_data.timestamp, 'isoformat') else str(signal_data.timestamp)
-        }
 
     async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
         """Get or create V2 extraction engine for user with LRU eviction."""
@@ -779,50 +459,6 @@ class GGBotOrchestrator:
             if successful_extractions == 0:
                 overall_result["error"] = "All timeframe extractions failed"
 
-            # Query ggShot signals for additional market context
-            try:
-                from core.services.user_service import UserService
-
-                extraction_config = config.extraction or {}
-                selected_sources = extraction_config.get('selected_data_sources', {})
-                trading_signals_config = selected_sources.get('trading_signals', {})
-                ggshot_enabled = 'ggshot' in trading_signals_config.get('data_points', [])
-
-                if ggshot_enabled:
-                    user_svc = UserService()
-                    profile = await user_svc.get_profile(user_id)
-
-                    if profile and profile.paid_data_points and 'ggshot' in profile.paid_data_points:
-                        from market_intelligence.adapters.signals.ggshot_adapter import GGShotAdapter
-                        from market_intelligence.types import QueryParams
-
-                        ggshot_adapter = GGShotAdapter()
-                        params = QueryParams(params={'symbol': symbol, 'include_raw': False})
-                        ggshot_response = await ggshot_adapter.fetch(params)
-
-                        if ggshot_response.data and ggshot_response.data.get('signals'):
-                            overall_result["ggshot_signals"] = ggshot_response.data['signals']
-                            overall_result["ggshot_metadata"] = ggshot_response.data.get('metadata', {})
-                            overall_result["ggshot_confidence"] = ggshot_response.confidence
-
-                            timeframes_found = list(ggshot_response.data['signals'].keys())
-                            self._log.info(f"Fetched ggShot signals for {symbol}: {len(timeframes_found)} timeframes ({', '.join(timeframes_found)})")
-                        else:
-                            self._log.info(f"No ggShot signals found for {symbol}")
-                            overall_result["ggshot_signals"] = {}
-
-                        await ggshot_adapter.close()
-                    else:
-                        self._log.debug(f"User {user_id} does not have access to ggshot signals (paid_data_points: {profile.paid_data_points if profile else 'no profile'})")
-                        overall_result["ggshot_signals"] = {}
-                else:
-                    self._log.debug(f"ggShot signals not enabled in config for {config.config_id}")
-                    overall_result["ggshot_signals"] = {}
-
-            except Exception as e:
-                self._log.warning(f"Failed to fetch ggShot signals (non-critical): {e}")
-                overall_result["ggshot_signals"] = {}
-
             # Fetch market intelligence via orchestrator
             try:
                 from market_intelligence.orchestrator import fetch_market_intelligence
@@ -889,7 +525,6 @@ class GGBotOrchestrator:
         config_id: str,
         config: BotConfigV2,
         extraction_result: Dict[str, Any],
-        signal_data: Optional[Dict] = None,
         run_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run V2 decision engine with full context management."""
@@ -902,50 +537,18 @@ class GGBotOrchestrator:
                     "confidence": 0.0
                 }
 
-            if signal_data:
-                symbol = signal_data['symbol']
-            else:
-                symbol = config.selected_pair
+            symbol = config.selected_pair
 
             if not symbol:
                 raise ValueError("No symbol specified for decision")
 
-            ggshot_signals = extraction_result.get('ggshot_signals', {})
             market_intelligence = extraction_result.get('market_intelligence', {})
-
-            # Route to Rei decision engine if enabled
-            if getattr(config, 'rei_enabled', False):
-                from decision.rei_engine import ReiDecisionEngine
-                rei_engine = ReiDecisionEngine(config_id, config.user_id)
-
-                open_positions = []
-                account_balance = None
-                try:
-                    from trading.paper.supabase_service import SupabasePaperTradingService
-                    paper_service = SupabasePaperTradingService()
-                    open_positions = await paper_service.get_open_positions(config_id)
-                    account_summary = await paper_service.get_account_summary(config_id)
-                    account_balance = account_summary.get('current_balance', 10000.0)
-                except Exception as e:
-                    self._log.warning(f"Could not fetch positions/balance for Rei context: {e}")
-
-                decision_result = await rei_engine.make_decision(
-                    symbol=symbol,
-                    extraction_result=extraction_result,
-                    open_positions=open_positions,
-                    account_balance=account_balance,
-                    market_intelligence=market_intelligence,
-                )
-                self._log.info(f"Rei Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
-                return decision_result
 
             # Standard OpenRouter LLM decision engine
             decision_engine = await self._get_decision_engine(config_id, config.user_id)
 
             decision_result = await decision_engine.make_decision(
                 symbol=symbol,
-                signal_data=signal_data,
-                ggshot_signals=ggshot_signals,
                 market_intelligence=market_intelligence,
                 run_id=run_id
             )
@@ -961,313 +564,6 @@ class GGBotOrchestrator:
                 "action": "wait",
                 "confidence": 0.0
             }
-
-    # =========================================================================
-    # Arena Mirror — DGClaw parallel execution layer
-    # =========================================================================
-
-    def _is_arena_enabled(self, config: BotConfigV2) -> bool:
-        """Check if this config should mirror trades to DGClaw arena."""
-        arena_configs = os.environ.get('ARENA_ENABLED_CONFIGS', '')
-        if not arena_configs:
-            return False
-        return config.config_id in [c.strip() for c in arena_configs.split(',') if c.strip()]
-
-    async def _enqueue_arena_trade(
-        self, config: BotConfigV2, decision_result: Dict[str, Any], run_id: Optional[str] = None
-    ):
-        """
-        Enqueue a trade intent to the arena Redis queue for sebastian_virtuals to process.
-        Fire-and-forget — does not block the bot cycle.
-        """
-        try:
-            action = decision_result.get('action', 'wait')
-            if action in ['wait', 'no_action', 'hold']:
-                return  # Nothing to mirror
-
-            import redis as sync_redis
-            r = sync_redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
-
-            trading_config = config.trading or {}
-            arena_intent = {
-                'config_id': config.config_id,
-                'config_name': config.config_name,
-                'user_id': config.user_id,
-                'symbol': decision_result.get('symbol') or config.selected_pair,
-                'action': action,
-                'confidence': decision_result.get('confidence', 0),
-                'stop_loss_price': decision_result.get('stop_loss_price'),
-                'take_profit_price': decision_result.get('take_profit_price'),
-                'leverage': trading_config.get('leverage', 3),
-                'max_margin_percent': trading_config.get('position_sizing', {}).get('max_margin_percent', 20),
-                'run_id': run_id,
-                'enqueued_at': datetime.now(timezone.utc).isoformat(),
-            }
-
-            r.lpush('arena:trade_queue', json.dumps(arena_intent))
-            r.close()
-            self._log.info(f"Arena trade enqueued: {action} {arena_intent['symbol']}")
-
-        except Exception as e:
-            # Non-fatal — arena mirror failing should never affect the primary trade
-            self._log.error(f"Failed to enqueue arena trade: {e}")
-
-    # =========================================================================
-    # Arena Phase 2 — Claw API direct routing (user agents)
-    # =========================================================================
-
-    async def _get_user_arena_agent(self, config: BotConfigV2) -> Optional[Dict[str, Any]]:
-        """
-        Check if this config has an arena agent assigned (1-bot-1-agent model).
-
-        Returns dict with claw_api_key and wallet_address, or None.
-        """
-        from core.common.db import db_fetch_one
-
-        result = await db_fetch_one("""
-            SELECT aa.wallet_address, aa.claw_api_key_vault_id, aa.agent_name
-            FROM arena_agents aa
-            WHERE aa.assigned_config_id = %s AND aa.status = 'assigned'
-        """, (config.config_id,))
-
-        if not result or not result[1]:
-            return None
-
-        wallet_address, claw_vault_id, agent_name = result
-
-        # Decrypt claw API key from vault
-        claw_key_row = await db_fetch_one("""
-            SELECT decrypted_secret
-            FROM vault.decrypted_secrets
-            WHERE id = %s
-        """, (claw_vault_id,))
-
-        if not claw_key_row:
-            self._log.error(f"Vault secret missing for arena agent {agent_name}")
-            return None
-
-        return {
-            'wallet_address': wallet_address,
-            'claw_api_key': claw_key_row[0],
-            'agent_name': agent_name,
-        }
-
-    async def _execute_claw_arena_trade(
-        self,
-        arena_agent: Dict[str, Any],
-        config: BotConfigV2,
-        decision_result: Dict[str, Any],
-        run_id: Optional[str] = None,
-    ):
-        """
-        Execute arena trade via claw REST API. Fire-and-forget.
-
-        Same position sizing logic as Phase 1 dgclaw_service but async.
-        """
-        try:
-            action = decision_result.get('action', 'wait')
-            if action in ['wait', 'no_action', 'hold']:
-                return
-
-            from trading.virtuals.claw_api import ClawAPIClient
-
-            client = ClawAPIClient(arena_agent['claw_api_key'])
-            wallet = arena_agent['wallet_address']
-
-            # Reconcile: close stale arena positions that primary no longer holds
-            await self._reconcile_arena_position(client, arena_agent, config)
-
-            # Determine side
-            if action in ('long', 'enter_long', 'enter'):
-                side = 'long'
-            elif action in ('short', 'enter_short'):
-                side = 'short'
-            elif action in ('exit', 'close'):
-                # Close position — need to determine pair
-                symbol = decision_result.get('symbol') or config.selected_pair
-                pair = self._arena_to_pair(symbol)
-                if pair:
-                    result = await client.close_trade(pair)
-                    status = result.get('status', 'unknown')
-                    self._log.info(f"Arena close {pair}: {status}")
-                    try:
-                        from core.common.activity_logger import log_activity_safe
-                        log_activity_safe(
-                            config_id=config.config_id,
-                            user_id=config.user_id,
-                            activity_type='arena_exit',
-                            activity_source='claw_arena',
-                            summary=f"Arena: Closed {pair} (decision)",
-                            details={
-                                'pair': pair,
-                                'agent': arena_agent['agent_name'],
-                                'job_id': result.get('job_id'),
-                                'status': status,
-                            },
-                            importance=6,
-                        )
-                    except Exception:
-                        pass
-                return
-            else:
-                return
-
-            # Get DGClaw balance for position sizing
-            account = await client.get_dgclaw_account(wallet)
-            if not account:
-                self._log.warning("Arena: DGClaw account query failed, skipping")
-                return
-
-            balance = account.get('balance', 0)
-            if balance <= 0:
-                self._log.warning("Arena: DGClaw balance is $0, skipping")
-                return
-
-            # Position sizing: confidence x max_margin% x balance x leverage
-            trading_config = config.trading or {}
-            confidence = decision_result.get('confidence', 0.5)
-            leverage = trading_config.get('leverage', 3)
-            max_margin_pct = trading_config.get('position_sizing', {}).get('max_margin_percent', 20)
-
-            margin = confidence * (max_margin_pct / 100.0) * balance
-            size_usd = margin * leverage
-
-            # Safety cap: 90% of balance as margin
-            max_margin = balance * 0.90
-            if margin > max_margin:
-                margin = max_margin
-                size_usd = margin * leverage
-
-            if size_usd < 10:
-                self._log.debug(f"Arena size ${size_usd:.2f} below $10 minimum, skipping")
-                return
-
-            # Convert symbol to HL pair name
-            symbol = decision_result.get('symbol') or config.selected_pair
-            pair = self._arena_to_pair(symbol)
-            if not pair:
-                self._log.warning(f"Arena: cannot convert symbol {symbol}")
-                return
-
-            self._log.info(
-                f"Arena trade: {side.upper()} {pair} ${size_usd:.0f} @ {leverage}x "
-                f"(agent={arena_agent['agent_name']})"
-            )
-
-            # SL/TP
-            sl = decision_result.get('stop_loss_price')
-            tp = decision_result.get('take_profit_price')
-
-            result = await client.create_trade(
-                pair=pair,
-                side=side,
-                size=size_usd,
-                leverage=leverage,
-                stop_loss=sl,
-                take_profit=tp,
-            )
-
-            status = result.get('status', 'unknown')
-            self._log.info(f"Arena trade result: {status} (job={result.get('job_id', 'N/A')})")
-
-            # Log activity
-            try:
-                from core.common.activity_logger import log_activity_safe
-                log_activity_safe(
-                    config_id=config.config_id,
-                    user_id=config.user_id,
-                    activity_type=f"arena_{side}",
-                    activity_source="claw_arena",
-                    summary=f"Arena: {side.upper()} {pair} ${size_usd:.0f} @ {leverage}x",
-                    details={
-                        "pair": pair,
-                        "side": side,
-                        "size_usd": round(size_usd, 2),
-                        "leverage": leverage,
-                        "agent": arena_agent['agent_name'],
-                        "job_id": result.get('job_id'),
-                        "status": status,
-                    },
-                    importance=5,
-                )
-            except Exception:
-                pass
-
-        except Exception as e:
-            self._log.error(f"Claw arena trade failed: {e}")
-
-    @staticmethod
-    def _arena_to_pair(symbol: str) -> Optional[str]:
-        """Convert any symbol format to HL bare name (e.g., 'ETH')."""
-        if not symbol:
-            return None
-        # Strip common suffixes: BTC/USDT -> BTC, BTC-USDT -> BTC, BTCUSDT -> BTC
-        for sep in ['/', '-']:
-            if sep in symbol:
-                symbol = symbol.split(sep)[0]
-        # Handle BTCUSDT-style (no separator)
-        for suffix in ['USDT', 'USD', 'USDC', 'PERP']:
-            if symbol.upper().endswith(suffix) and len(symbol) > len(suffix):
-                symbol = symbol[:-len(suffix)]
-        return symbol.upper() if symbol.isalpha() and len(symbol) <= 10 else None
-
-    async def _reconcile_arena_position(self, client, arena_agent: Dict[str, Any], config: BotConfigV2):
-        """Close arena positions that the primary bot no longer holds."""
-        try:
-            from core.common.db import db_fetch_all
-
-            positions = await client.get_dgclaw_positions(arena_agent['wallet_address'])
-            if not positions:
-                return
-
-            # Check what the primary bot currently holds
-            primary_pairs = set()
-
-            paper_rows = await db_fetch_all(
-                "SELECT symbol FROM paper_trades WHERE config_id = %s AND status = 'open'",
-                (config.config_id,)
-            )
-            for r in paper_rows:
-                pair = self._arena_to_pair(r[0])
-                if pair:
-                    primary_pairs.add(pair)
-
-            live_rows = await db_fetch_all(
-                "SELECT symbol FROM live_trades WHERE config_id = %s AND closed_at IS NULL",
-                (config.config_id,)
-            )
-            for r in live_rows:
-                pair = self._arena_to_pair(r[0])
-                if pair:
-                    primary_pairs.add(pair)
-
-            # Close any arena position not in primary
-            for pos in positions:
-                pair = pos.get('pair', '')
-                if pair and pair not in primary_pairs:
-                    self._log.info(f"Reconciler: closing stale {pair} on {arena_agent['agent_name']}")
-                    result = await client.close_trade(pair)
-                    try:
-                        from core.common.activity_logger import log_activity_safe
-                        log_activity_safe(
-                            config_id=config.config_id,
-                            user_id=config.user_id,
-                            activity_type='arena_exit',
-                            activity_source='arena_reconciler',
-                            summary=f"Arena: Reconciled stale {pair}",
-                            details={
-                                'pair': pair,
-                                'agent': arena_agent['agent_name'],
-                                'job_id': result.get('job_id'),
-                                'status': result.get('status'),
-                            },
-                            importance=5,
-                        )
-                    except Exception:
-                        pass
-
-        except Exception as e:
-            self._log.warning(f"Arena reconcile failed: {e}")
 
     async def _run_trading_v2(
         self,
@@ -1286,22 +582,6 @@ class GGBotOrchestrator:
 
             action = decision_result.get("action", "wait")
             confidence = decision_result.get("confidence", 0.0)
-
-            # For signal_validation configs: gate trades with confidence threshold
-            if config.config_type == "signal_validation":
-                if config.telegram_integration and config.telegram_integration.get("publisher"):
-                    publisher_config = config.telegram_integration.get("publisher", {})
-                    threshold = publisher_config.get("confidence_threshold", 0.7)
-                    if confidence < threshold:
-                        self._log.info(
-                            f"Signal rejected: confidence {confidence:.2f} below threshold {threshold:.2f}"
-                        )
-                        return {
-                            "status": "skipped",
-                            "reason": f"Signal confidence {confidence:.2f} below threshold {threshold:.2f}",
-                            "action": action,
-                            "confidence": confidence
-                        }
 
             if action in ["wait", "no_action", "hold"]:
                 return {
@@ -1349,27 +629,19 @@ class GGBotOrchestrator:
 
             # Determine trading mode
             trading_mode = getattr(config, 'trading_mode', 'paper')
-            is_live = trading_mode == 'symphony'
-            is_aster = trading_mode == 'aster'
             is_hyperliquid = trading_mode == 'hyperliquid'
-            is_virtuals = trading_mode == 'virtuals'
-            # Both hyperliquid-mode and virtuals-mode bots trade on HL and
-            # land in live_trades with provider='hyperliquid'. CredentialResolver
-            # inside hyperliquid_service picks the right API wallet.
-            is_hl_path = is_hyperliquid or is_virtuals
 
             if trading_action == "close":
                 try:
                     from core.common.db import db_fetch_one
                     open_positions = []
 
-                    if is_live or is_aster or is_hl_path:
-                        provider = 'hyperliquid' if is_hl_path else ('aster' if is_aster else 'symphony')
+                    if is_hyperliquid:
                         result = await db_fetch_one("""
                             SELECT batch_id FROM live_trades
                             WHERE config_id = %s AND provider = %s AND closed_at IS NULL
                             ORDER BY created_at DESC LIMIT 1
-                        """, (config.config_id, provider))
+                        """, (config.config_id, 'hyperliquid'))
                         if result:
                             open_positions.append({'batch_id': result[0]})
                     else:
@@ -1394,22 +666,12 @@ class GGBotOrchestrator:
 
                     position = open_positions[0]
 
-                    if is_hl_path:
+                    if is_hyperliquid:
                         trade_result = await self.hyperliquid_trading.close_position(
                             position['batch_id'],
                             user_id,
                             close_reason='position_management',
                             trading_mode=trading_mode,
-                        )
-                    elif is_aster:
-                        trade_result = await self.aster_trading.close_position(
-                            position['batch_id'],
-                            user_id
-                        )
-                    elif is_live:
-                        trade_result = await self.symphony_trading.close_position(
-                            position['batch_id'],
-                            reason="position_management"
                         )
                     else:
                         trade_result = await self.paper_trading.close_position(
@@ -1418,19 +680,6 @@ class GGBotOrchestrator:
                         )
 
                     self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol} (mode={trading_mode})")
-
-                    # Forum-post exit hook for virtuals bots — mirror the entry-side
-                    # hook below. AI Council reads both sides of the trade.
-                    if is_virtuals and trade_result.get('status') in ('success', 'closed', 'executed'):
-                        try:
-                            asyncio.create_task(self._post_virtuals_forum_entry(
-                                config=config,
-                                user_id=user_id,
-                                trade_result={**trade_result, "action": "close", "symbol": symbol},
-                                decision_result=decision_result,
-                            ))
-                        except Exception as e:
-                            self._log.warning(f"Forum post exit hook failed (non-fatal): {e}")
 
                     return trade_result
 
@@ -1441,33 +690,15 @@ class GGBotOrchestrator:
                         "error": f"Failed to close position: {str(e)}"
                     }
             else:
-                if is_hl_path:
+                if is_hyperliquid:
                     # Tag the intent with trading_mode so the service knows
-                    # whether to resolve user or virtuals-agent credentials.
+                    # which API wallet credentials to resolve.
                     trading_intent = {**trading_intent, "trading_mode": trading_mode}
                     trade_result = await self.hyperliquid_trading.execute_trade_intent(trading_intent)
                     self._log.info(
                         f"V2 Hyperliquid live trade completed: {trade_result.get('status')} "
                         f"for {symbol} (mode={trading_mode})"
                     )
-                    # Forum post hook for virtuals bots — AI Council reads these
-                    # for Monday top-10 picks. Fire-and-forget so trade path stays fast.
-                    if is_virtuals and trade_result.get('status') in ('executed', 'success'):
-                        try:
-                            asyncio.create_task(self._post_virtuals_forum_entry(
-                                config=config,
-                                user_id=user_id,
-                                trade_result=trade_result,
-                                decision_result=decision_result,
-                            ))
-                        except Exception as e:
-                            self._log.warning(f"Forum post hook failed (non-fatal): {e}")
-                elif is_aster:
-                    trade_result = await self.aster_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 AsterDEX live trade completed: {trade_result.get('status')} for {symbol}")
-                elif is_live:
-                    trade_result = await self.symphony_trading.execute_trade_intent(trading_intent)
-                    self._log.info(f"V2 Symphony live trade completed: {trade_result.get('status')} for {symbol}")
                 else:
                     trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
                     self._log.info(f"V2 Paper trade completed: {trade_result.get('status')} for {symbol}")
@@ -1480,99 +711,3 @@ class GGBotOrchestrator:
                 "status": "error",
                 "error": str(e)
             }
-
-    async def _post_virtuals_forum_entry(
-        self,
-        config: BotConfigV2,
-        user_id: str,
-        trade_result: Dict[str, Any],
-        decision_result: Dict[str, Any],
-    ) -> None:
-        """
-        Post the LLM rationale for a virtuals-mode trade to the agent's
-        DegenClaw forum thread so the AI Council can read it alongside
-        on-chain fills when picking the Monday top-10 allocation.
-
-        Fire-and-forget: if the forum rejects the post or the sidecar is
-        unreachable, we log and move on — missing a forum post never blocks
-        a trade.
-        """
-        try:
-            from core.auth.vault_utils import get_arena_v2_credential
-            from core.services.acp_node_client import acp_node_post
-
-            creds = await get_arena_v2_credential(config.config_id)
-            if not creds:
-                self._log.warning(
-                    f"forum-post skipped: no arena_v2 row for config {config.config_id}"
-                )
-                return
-
-            thread_id = creds.get('dgclaw_forum_thread_id')
-            if not thread_id:
-                # Thread discovery is not yet wired — skip until we've seeded
-                # a thread_id on the arena_agents_v2 row. The trade itself
-                # already succeeded; this is supplemental AI Council visibility.
-                self._log.debug(
-                    f"forum-post skipped: no dgclaw_forum_thread_id on {config.config_id}"
-                )
-                return
-
-            symbol = trade_result.get('symbol') or decision_result.get('symbol', '?')
-            side = str(trade_result.get('side') or decision_result.get('action', '?'))
-            reasoning = decision_result.get('reasoning') or trade_result.get('reason', '')
-            entry_price = trade_result.get('entry_price')
-            exit_price = trade_result.get('exit_price') or trade_result.get('close_price')
-            confidence = decision_result.get('confidence')
-
-            # Detect exit vs entry — orchestrator sets action='close' on the close path.
-            is_exit = (
-                side.lower() in ('close', 'exit', 'sell')
-                or trade_result.get('action') == 'close'
-                or decision_result.get('action') in ('close', 'exit')
-            )
-
-            if is_exit:
-                pnl = trade_result.get('realized_pnl') or trade_result.get('pnl')
-                pnl_pct = trade_result.get('pnl_percentage') or trade_result.get('realized_pnl_pct')
-                header = f"**EXIT {symbol}**"
-                lines = [
-                    header,
-                    f"exit: ${exit_price:.4f}" if exit_price else "",
-                    f"pnl: {'+' if pnl and pnl >= 0 else ''}${pnl:.2f}" if pnl is not None else "",
-                    f"pnl%: {pnl_pct:+.2f}%" if pnl_pct is not None else "",
-                    "",
-                    reasoning[:2000] if reasoning else "",
-                ]
-            else:
-                lines = [
-                    f"**{side.upper()} {symbol}**",
-                    f"entry: ${entry_price:.4f}" if entry_price else "",
-                    f"confidence: {confidence:.2f}" if confidence else "",
-                    "",
-                    reasoning[:2000] if reasoning else "",
-                ]
-            body = "\n".join(l for l in lines if l)
-
-            result = await acp_node_post(
-                "/forum-post",
-                {
-                    "agentWalletAddress": creds['agent_wallet_address'],
-                    "agentWalletId": creds['wallet_id'],
-                    "signerPrivateKey": creds['signer_private_key'],
-                    "agentId": creds['virtuals_agent_id'],
-                    "threadId": thread_id,
-                    "body": body,
-                },
-                timeout_seconds=30,
-            )
-            if result.get('_httpStatus') == 200 and result.get('success'):
-                self._log.info(
-                    f"forum-post ok: agent={creds['virtuals_agent_id']} symbol={symbol}"
-                )
-            else:
-                self._log.warning(
-                    f"forum-post failed for {creds['virtuals_agent_id']}: {result}"
-                )
-        except Exception as e:
-            self._log.warning(f"forum-post hook exception (non-fatal): {e}")

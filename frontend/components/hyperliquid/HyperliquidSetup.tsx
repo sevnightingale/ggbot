@@ -719,7 +719,6 @@ function HyperliquidContent() {
  * Hyperliquid setup page with Web3 wallet connection.
  *
  * Wraps content in its own WagmiProvider (Arbitrum chain) + RainbowKit.
- * Isolated from Arena's Scroll-chain config.
  */
 export default function HyperliquidSetup() {
   return (

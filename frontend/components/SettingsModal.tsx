@@ -12,7 +12,6 @@ import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { LiveTradingSetupModal } from '@/components/LiveTradingSetupModal'
-import { VirtualsConnectButton } from '@/components/VirtualsConnectButton'
 import { apiClient } from '@/lib/api'
 
 interface SettingsModalProps {
@@ -48,11 +47,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   } | null>(null)
   const [hlLoading, setHlLoading] = useState(true)
 
-  // Virtuals (ACP v2) connection state — session-level, popup 1 one-time
-  const [virtualsConnected, setVirtualsConnected] = useState<boolean>(false)
-  const [virtualsTtl, setVirtualsTtl] = useState<number | null>(null)
-  const [virtualsLoading, setVirtualsLoading] = useState(true)
-
   // Upgrade modal state
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   // Add Credits modal state
@@ -73,32 +67,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     if (open) {
       fetchHlStatus()
       fetchUsageSummary()
-      fetchVirtualsStatus()
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchVirtualsStatus = async () => {
-    try {
-      setVirtualsLoading(true)
-      const s = await apiClient.arenaV2ConnectionStatus()
-      setVirtualsConnected(s.connected)
-      setVirtualsTtl(s.ttl_seconds ?? null)
-    } catch {
-      setVirtualsConnected(false)
-    } finally {
-      setVirtualsLoading(false)
-    }
-  }
-
-  const disconnectVirtuals = async () => {
-    try {
-      await apiClient.arenaV2Disconnect()
-      setVirtualsConnected(false)
-      setVirtualsTtl(null)
-    } catch {
-      // non-critical
-    }
-  }
 
   const fetchHlStatus = async () => {
     try {
@@ -272,67 +242,16 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               )}
             </section>
 
-            {/* ── Virtuals Protocol (ACP v2) Connection ── */}
-            <section>
-              <div className="flex items-center gap-2 mb-1">
-                <Zap className="h-4 w-4 text-[var(--accent)]" />
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Connect Virtuals</h3>
-                <span className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border)]">Deploy Live Version</span>
-              </div>
-              <p className="text-xs text-[var(--text-muted)] mb-3">
-                One-time Virtuals login. Each Deploy Live Version action spins up
-                a dedicated agent wallet under your Virtuals account — you keep
-                control and can revoke the agent from the Virtuals dashboard.
-              </p>
-
-              {virtualsLoading ? (
-                <div className="flex items-center justify-center p-6 border border-dashed border-[var(--border)] rounded-lg">
-                  <Loader2 className="h-5 w-5 animate-spin text-[var(--text-secondary)]" />
-                </div>
-              ) : virtualsConnected ? (
-                <div className="border border-[var(--signal)]/30 rounded-lg p-4 bg-[var(--signal)]/5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[var(--signal)]" />
-                    <span className="text-sm font-medium text-[var(--text-primary)]">Connected</span>
-                    {virtualsTtl ? (
-                      <span className="text-xs text-[var(--text-muted)]">
-                        session expires in {Math.max(0, Math.round(virtualsTtl / 60))}m
-                      </span>
-                    ) : null}
-                  </div>
-                  <button
-                    onClick={disconnectVirtuals}
-                    className="px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <div className="border border-dashed border-[var(--border)] rounded-lg p-6 flex items-center justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <Zap className="h-5 w-5 text-[var(--text-secondary)] mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)] mb-1">Not Connected</p>
-                      <p className="text-sm text-[var(--text-secondary)]">
-                        Connect once to enable Deploy Live Version on any paper bot.
-                      </p>
-                    </div>
-                  </div>
-                  <VirtualsConnectButton onConnected={() => fetchVirtualsStatus()} />
-                </div>
-              )}
-            </section>
-
             {/* ── Live Trading Section ── */}
             <section>
               <div className="flex items-center gap-2 mb-1">
                 <Zap className="h-4 w-4 text-[var(--accent)]" />
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Hyperliquid ggbot (self-custody)</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Hyperliquid live trading (self-custody)</h3>
                 <span className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border)]">Optional</span>
               </div>
               <p className="text-xs text-[var(--text-muted)] mb-3">
                 Your own Hyperliquid wallet — one live bot per user, fully
-                non-custodial. Alternative to Virtuals agents above.
+                non-custodial.
               </p>
 
               {hlLoading ? (

@@ -103,14 +103,6 @@ class TestCatalogMapping:
         assert mapping['data_type'] == 'funding_rate'
         assert mapping['params_template']['symbol'] == 'BTC/USDT'
 
-    def test_get_mapping_for_ggshot(self):
-        """Test getting mapping for ggShot signals."""
-        mapping = _get_catalog_mapping('trading_signals', 'ggshot')
-
-        assert mapping is not None
-        assert mapping['data_type'] == 'ggshot_signals'
-        assert mapping['params_template']['symbol'] == '{symbol}'
-
     def test_get_mapping_not_found(self):
         """Test that unmapped data points return None."""
         mapping = _get_catalog_mapping('unknown_source', 'unknown_point')

@@ -25,7 +25,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4 text-[var(--text-primary)]">3. The Services</h2>
             <h3 className="text-xl font-semibold mb-3 text-[var(--text-primary)]">3.1 Platform Overview</h3>
-            <p>ggbots provides a platform for creating, configuring, and deploying AI-powered autonomous trading agents. The platform integrates with third-party trading APIs (including but not limited to Symphony.io and AsterDEX) to execute trades based on AI-generated decisions.</p>
+            <p>ggbots provides a platform for creating, configuring, and deploying AI-powered autonomous trading agents. The platform integrates with third-party trading APIs (including but not limited to Hyperliquid) to execute trades based on AI-generated decisions.</p>
             <p>You understand that ggbots does not execute trades directly, but rather facilitates communication between your configured trading agents and third-party execution venues. Your relationship with third-party trading platforms is governed by their respective terms of service.</p>
 
             <h3 className="text-xl font-semibold mb-3 mt-4 text-[var(--text-primary)]">3.2 Third Party Services</h3>
