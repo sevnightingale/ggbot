@@ -20,7 +20,7 @@ Root cause: Supabase free-tier 402 `exceed_db_size_quota` (DB 1,850MB vs 500MB c
 
 **Cutover**: live HL bot held inactive; all 5 services clean boot 0 restarts; E2E cycle verified: extraction → market_data local upsert → MI (6 points) → grok decision (enter 0.58) → paper trade long BTC @ $60,895.89, 41s, 0 errors. JWT auth verified via minted HS256 token. HL credentials verified read-only (`user_state` $108.11). Supabase truncated FK-closed set → 69MB → 402 lifts. error-alerts pipeline proven live (Telegram delivery).
 
-**Ops**: nightly encrypted backups (gpg AES256, key separate from .env, `pg_restore -l` integrity check, 7d+4w retention) cron 04:30 UTC; disk >85% alert cron; rclone installed for weekly R2 offsite (`r2:ggbot-db-backups`, pending credentials). Rollback = reverse-restore from archive dump (acknowledged one-way).
+**Ops**: nightly encrypted backups (gpg AES256, key separate from .env, `pg_restore -l` integrity check, 7d+4w retention) cron 04:30 UTC; disk >85% alert cron; R2 offsite LIVE (`r2:ggbot-db-backups`, scoped IP-locked token, archive + nightly uploaded same day, Sunday auto-sync); Supabase auth canary cron Mon/Thu (pause keepalive + signing-key-rotation detector, verified against live 402); hourly soak monitor until GATE C (2026-06-09 21:10 UTC) → Phase 7. Rollback = reverse-restore from archive dump (acknowledged one-way).
 
 ---
 
