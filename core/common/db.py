@@ -24,28 +24,27 @@ class DecimalEncoder(json.JSONEncoder):
         return super(DecimalEncoder, self).default(obj)
 
 def get_database_url():
-    """Get database connection URL, preferring Supabase over legacy config."""
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+    """Build the application database DSN (local PostgreSQL).
 
-    if supabase_url and supabase_key:
-        # Parse Supabase URL to get database connection details
-        # Supabase URL format: https://project-ref.supabase.co
-        # Database URL format: postgresql://postgres:[password]@db.project-ref.supabase.co:5432/postgres
-        parsed = urlparse(supabase_url)
-        project_ref = parsed.netloc.split('.')[0]
+    Precedence:
+      1. DATABASE_URL — full DSN (canonical pointer to the local Postgres)
+      2. DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS parts
 
-        # Get database password from service key (you'll need to set this in .env)
-        db_password = os.getenv("SUPABASE_DB_PASSWORD")
-        if not db_password:
-            raise ValueError("SUPABASE_DB_PASSWORD environment variable required for database connection")
+    Fails loud if neither is configured — no silent fallback (per migration off
+    Supabase: the app DB is now local Postgres; auth + vault are app-managed).
+    """
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
 
-        # Use transaction pooler for IPv4 compatibility (direct db only has IPv6)
-        return f"postgresql://postgres.{project_ref}:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
-    else:
-        # Fallback to legacy config
-        from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+    from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+    if DB_HOST and DB_NAME and DB_USER and DB_PASS:
         return f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+    raise ValueError(
+        "No database configuration found: set DATABASE_URL (preferred) or the "
+        "DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS set in .env"
+    )
 
 def _get_connection_pool():
     """Get or create the global connection pool."""
@@ -53,17 +52,21 @@ def _get_connection_pool():
 
     if _connection_pool is None:
         database_url = get_database_url()
-        # Connection pool: min 5 idle, max 50 concurrent
-        # maxconn=50 provides headroom for 16+ concurrent bot cycles at hourly boundaries
-        # connect_timeout=5 prevents permanent deadlock if pool exhausted in async context
+        # Log resolved host (not credentials) so a misconfigured DSN is obvious at startup.
+        try:
+            _host = urlparse(database_url).hostname
+        except Exception:
+            _host = "?"
+        print(f"[db] connection pool -> host={_host}")
+        # Connection pool: min 5 idle, max 30 concurrent per process.
+        # 3 pool-owning processes (api, scheduler, account-monitor) x 30 = 90 < max_connections=100.
+        # connect_timeout=5 prevents permanent deadlock if pool exhausted in async context.
         _connection_pool = pool.ThreadedConnectionPool(
             minconn=5,
-            maxconn=50,
+            maxconn=30,
             dsn=database_url,
             connect_timeout=5,
-            # TCP keepalive prevents Supabase PgBouncer from closing idle connections.
-            # Without this, threads grabbing stale pooled connections get
-            # "SSL connection has been closed unexpectedly" errors.
+            # TCP keepalives: harmless on local PG; survive any idle-close on the wire.
             keepalives=1,
             keepalives_idle=30,     # seconds before first probe
             keepalives_interval=10, # seconds between probes
@@ -71,6 +74,18 @@ def _get_connection_pool():
         )
 
     return _connection_pool
+
+
+def _reset_connection_pool():
+    """Discard the global pool so the next call rebuilds fresh connections.
+    Called when a pooled connection is found broken (e.g. local Postgres restarted)."""
+    global _connection_pool
+    if _connection_pool is not None:
+        try:
+            _connection_pool.closeall()
+        except Exception:
+            pass
+        _connection_pool = None
 
 @contextmanager
 def get_db_connection():
@@ -86,12 +101,23 @@ def get_db_connection():
             cur.execute("SELECT * FROM some_table")
             results = cur.fetchall()
     """
-    pool = _get_connection_pool()
-    conn = pool.getconn()  # Get connection from pool (reuses existing SSL connection)
+    pool_ = _get_connection_pool()
+    conn = pool_.getconn()  # Get connection from pool (reuses existing connection)
     try:
         yield conn
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        # Connection broke mid-use (e.g. local Postgres restarted / OOM-killed).
+        # Discard this connection and reset the pool so the next caller rebuilds.
+        try:
+            pool_.putconn(conn, close=True)
+        except Exception:
+            pass
+        conn = None
+        _reset_connection_pool()
+        raise
     finally:
-        pool.putconn(conn)  # Return connection to pool (keeps SSL connection alive)
+        if conn is not None:
+            pool_.putconn(conn)  # Return healthy connection to pool
 
 # ---------------------------------------------------------------------------
 # Async-safe DB helpers — run sync psycopg2 queries in a thread pool so they

@@ -11,6 +11,11 @@ import os
 from typing import Optional
 from core.common.logger import logger
 from core.common.db import get_db_connection
+from core.auth.local_vault import (
+    vault_create_secret,
+    vault_decrypt_secret,
+    vault_delete_secret,
+)
 
 
 class LLMKeyService:
@@ -83,20 +88,13 @@ class LLMKeyService:
 
                     vault_secret_id, credential_name = result
 
-                    # Decrypt from Supabase Vault using SQL function
-                    # Note: This uses Supabase's vault.decrypt_secret function
-                    cur.execute("""
-                        SELECT vault.decrypt_secret(%s) as decrypted_key
-                    """, (vault_secret_id,))
-
-                    vault_result = cur.fetchone()
-                    if not vault_result or not vault_result[0]:
+                    # Decrypt from the application-managed vault
+                    decrypted_key = vault_decrypt_secret(cur, vault_secret_id)
+                    if not decrypted_key:
                         logger.bind(user_id=user_id, provider=provider).warning(
                             f"Failed to decrypt user API key '{credential_name}' from vault"
                         )
                         return None
-
-                    decrypted_key = vault_result[0]
                     logger.bind(user_id=user_id, provider=provider).info(
                         f"Successfully retrieved user API key '{credential_name}' from vault"
                     )
@@ -160,16 +158,10 @@ class LLMKeyService:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # First encrypt the API key in Supabase Vault
-                    cur.execute("""
-                        SELECT vault.create_secret(%s) as vault_secret_id
-                    """, (api_key,))
-
-                    vault_result = cur.fetchone()
-                    if not vault_result or not vault_result[0]:
+                    # Encrypt the API key in the application-managed vault (nameless secret)
+                    vault_secret_id = vault_create_secret(cur, api_key)
+                    if not vault_secret_id:
                         raise ValueError("Failed to encrypt API key in vault")
-
-                    vault_secret_id = vault_result[0]
 
                     # Store the credential reference
                     cur.execute("""
@@ -277,11 +269,9 @@ class LLMKeyService:
                     if cur.rowcount == 0:
                         return False
 
-                    # Delete the secret from vault (optional, vault handles cleanup)
+                    # Delete the secret from the application-managed vault
                     try:
-                        cur.execute("""
-                            SELECT vault.delete_secret(%s)
-                        """, (vault_secret_id,))
+                        vault_delete_secret(cur, vault_secret_id)
                     except Exception as vault_error:
                         logger.bind(user_id=user_id).warning(
                             f"Failed to delete vault secret {vault_secret_id}: {vault_error}"

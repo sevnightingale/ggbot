@@ -1,17 +1,25 @@
 # core/auth/vault_utils.py
 """
-Supabase Vault utilities for encrypted API key storage and retrieval.
-Provides secure storage of user LLM credentials using Supabase Vault extension.
+Encrypted API-key storage and retrieval via the application-managed vault.
+
+Secrets are Fernet-encrypted under GGBOT_VAULT_KEY in the local `vault_secrets`
+table (see core/auth/local_vault.py). Public signatures and return shapes are
+unchanged from the previous Supabase-Vault implementation.
 """
 
 import uuid
 from typing import Optional, Dict, Any
 from core.common.db import get_db_connection
 from core.common.logger import logger
+from core.auth.local_vault import (
+    vault_create_secret,
+    vault_decrypt_secret,
+    vault_delete_secret,
+)
 
 
 class VaultManager:
-    """Manager for Supabase Vault operations with user LLM credentials."""
+    """Manager for vault operations with user LLM + Hyperliquid credentials."""
     
     @staticmethod
     async def store_user_credential(
@@ -37,13 +45,9 @@ class VaultManager:
                 with conn.cursor() as cur:
                     # Create unique vault secret name for this credential
                     vault_secret_name = f"user_{user_id}_{provider}_{credential_name}".replace(" ", "_").lower()
-                    
-                    # Store in Vault (returns vault secret ID)
-                    cur.execute(
-                        "SELECT vault.create_secret(%s, %s) as secret_id;",
-                        (vault_secret_name, api_key)
-                    )
-                    vault_secret_id = cur.fetchone()[0]
+
+                    # Store in vault (returns vault secret UUID)
+                    vault_secret_id = vault_create_secret(cur, api_key, vault_secret_name)
                     
                     # Store credential metadata in user_llm_credentials table
                     cur.execute("""
@@ -100,22 +104,15 @@ class VaultManager:
                         return None
                     
                     provider, vault_secret_id = result
-                    
-                    # Retrieve decrypted API key from Vault
-                    cur.execute("""
-                        SELECT decrypted_secret 
-                        FROM vault.decrypted_secrets 
-                        WHERE id = %s;
-                    """, (vault_secret_id,))
-                    
-                    vault_result = cur.fetchone()
-                    if not vault_result:
+
+                    # Retrieve decrypted API key from vault
+                    api_key = vault_decrypt_secret(cur, vault_secret_id)
+                    if api_key is None:
                         logger.bind(user_id=user_id).error(
                             f"Vault secret not found for credential '{credential_name}'"
                         )
                         return None
-                    
-                    api_key = vault_result[0]
+
                     return {
                         'provider': provider,
                         'api_key': api_key
@@ -192,15 +189,16 @@ class VaultManager:
                         return False
                     
                     vault_secret_id = result[0]
-                    
+
                     # Delete from user_llm_credentials table
                     cur.execute("""
                         DELETE FROM user_llm_credentials
                         WHERE user_id = %s AND credential_name = %s;
                     """, (user_id, credential_name))
-                    
-                    # Delete from Vault (note: vault secrets may not support direct deletion)
-                    # For now, just mark as deleted in our table
+
+                    # Delete the encrypted secret itself (now possible with the local vault)
+                    if vault_secret_id:
+                        vault_delete_secret(cur, vault_secret_id)
                     conn.commit()
                     
                     logger.bind(user_id=user_id).info(
@@ -237,12 +235,8 @@ class VaultManager:
                 with conn.cursor() as cur:
                     vault_secret_name = f"hyperliquid_{user_id}".replace("-", "_")
 
-                    # Store API wallet key in Vault (secret first, then name)
-                    cur.execute(
-                        "SELECT vault.create_secret(%s, %s) as secret_id;",
-                        (api_wallet_private_key, vault_secret_name)
-                    )
-                    vault_secret_id = cur.fetchone()[0]
+                    # Store API wallet key in vault
+                    vault_secret_id = vault_create_secret(cur, api_wallet_private_key, vault_secret_name)
 
                     # Update user_profiles with vault reference and wallet address
                     cur.execute("""
@@ -294,21 +288,14 @@ class VaultManager:
 
                     vault_secret_id, wallet_address = result
 
-                    # Retrieve decrypted API wallet key from Vault
-                    cur.execute("""
-                        SELECT decrypted_secret
-                        FROM vault.decrypted_secrets
-                        WHERE id = %s;
-                    """, (vault_secret_id,))
-
-                    vault_result = cur.fetchone()
-                    if not vault_result:
+                    # Retrieve decrypted API wallet key from vault
+                    api_wallet_key = vault_decrypt_secret(cur, vault_secret_id)
+                    if api_wallet_key is None:
                         logger.bind(user_id=user_id).error(
                             "Vault secret not found for Hyperliquid credential"
                         )
                         return None
 
-                    api_wallet_key = vault_result[0]
                     return {
                         'api_wallet_key': api_wallet_key,
                         'wallet_address': wallet_address
@@ -348,10 +335,7 @@ class VaultManager:
                     # Delete the vault secret if it exists
                     if vault_secret_id:
                         try:
-                            cur.execute("""
-                                DELETE FROM vault.secrets
-                                WHERE id = %s
-                            """, (vault_secret_id,))
+                            vault_delete_secret(cur, vault_secret_id)
                         except Exception as vault_error:
                             logger.bind(user_id=user_id).warning(
                                 f"Could not delete vault secret: {vault_error}"
@@ -429,33 +413,24 @@ async def delete_hyperliquid_credential(user_id: str) -> bool:
 # =========================================================================
 
 async def create_vault_secret(name: str, value: str) -> Optional[str]:
-    """Create an opaque Vault secret. Returns the UUID (as str), or None."""
+    """Create an opaque vault secret. Returns the UUID (as str), or None."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT vault.create_secret(%s, %s) as id;",
-                    (value, name),
-                )
-                row = cur.fetchone()
+                vault_id = vault_create_secret(cur, value, name)
                 conn.commit()
-                return str(row[0]) if row else None
+                return vault_id
     except Exception as e:
         logger.error(f"create_vault_secret failed for '{name}': {e}")
         return None
 
 
 async def get_vault_secret(vault_id: str) -> Optional[str]:
-    """Read back a Vault secret by its UUID. Returns plaintext or None."""
+    """Read back a vault secret by its UUID. Returns plaintext or None."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT decrypted_secret FROM vault.decrypted_secrets WHERE id = %s",
-                    (vault_id,),
-                )
-                row = cur.fetchone()
-                return row[0] if row else None
+                return vault_decrypt_secret(cur, vault_id)
     except Exception as e:
         logger.error(f"get_vault_secret failed for {vault_id}: {e}")
         return None
