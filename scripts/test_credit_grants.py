@@ -23,8 +23,7 @@ def get_user_stripe_id(email: str) -> tuple[str, str]:
             cur.execute("""
                 SELECT up.user_id, up.stripe_customer_id
                 FROM user_profiles up
-                JOIN auth.users au ON up.user_id = au.id
-                WHERE au.email = %s
+                WHERE up.email = %s
             """, (email,))
             result = cur.fetchone()
             if not result:

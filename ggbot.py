@@ -64,7 +64,10 @@ async def get_service_user(request: Request):
     service_calls[service_header].append(now)
 
     token = auth_header.split(' ')[1]
-    service_key = os.getenv('SUPABASE_SERVICE_KEY')
+    # Internal service-to-service secret. Historically overloaded onto SUPABASE_SERVICE_KEY;
+    # now its own var (SERVICE_AUTH_TOKEN) so the Supabase key can be pruned post-migration.
+    # Fallback keeps existing senders working until they switch to the new var name.
+    service_key = os.getenv('SERVICE_AUTH_TOKEN') or os.getenv('SUPABASE_SERVICE_KEY')
 
     if not service_key or token != service_key:
         raise HTTPException(status_code=401, detail="Invalid service token")
@@ -3007,9 +3010,9 @@ async def handle_payment_failed(invoice):
                 """, (user_id,))
                 paused_bots = cur.fetchall()
 
-                # Get user email for notification
+                # Get user email for notification (auth.users decoupled -> user_profiles.email)
                 cur.execute(
-                    "SELECT email FROM auth.users WHERE id = %s",
+                    "SELECT email FROM user_profiles WHERE user_id = %s",
                     (user_id,)
                 )
                 email_result = cur.fetchone()
@@ -3390,9 +3393,8 @@ async def nowpayments_webhook(request: Request):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT au.email
+                SELECT up.email
                 FROM user_profiles up
-                JOIN auth.users au ON up.user_id = au.id
                 WHERE up.user_id = %s
             """, (user_id,))
             result = cur.fetchone()

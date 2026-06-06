@@ -30,8 +30,7 @@ def get_user_info(email: str) -> tuple[str, str, str]:
             cur.execute("""
                 SELECT up.user_id, up.stripe_customer_id, up.subscription_tier
                 FROM user_profiles up
-                JOIN auth.users au ON up.user_id = au.id
-                WHERE au.email = %s
+                WHERE up.email = %s
             """, (email,))
             result = cur.fetchone()
             if not result:

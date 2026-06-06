@@ -338,12 +338,13 @@ class ResendService:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Get all active users
+                    # Get all users with an email (auth.users decoupled -> user_profiles).
+                    # Note: soft-delete (deleted_at) lived only in auth.users; profiles are
+                    # backfilled from non-deleted auth users, so this list excludes deleted users.
                     cur.execute("""
-                        SELECT id, email
-                        FROM auth.users
-                        WHERE deleted_at IS NULL
-                        AND email IS NOT NULL
+                        SELECT user_id, email
+                        FROM user_profiles
+                        WHERE email IS NOT NULL
                     """)
 
                     users = cur.fetchall()

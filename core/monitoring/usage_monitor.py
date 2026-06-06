@@ -326,12 +326,12 @@ class UsageMonitor:
             return None
 
     def _get_user_email(self, user_id: str) -> Optional[str]:
-        """Get user's email address from auth.users table."""
+        """Get user's email address from user_profiles (auth.users decoupled)."""
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT email FROM auth.users WHERE id = %s",
+                        "SELECT email FROM user_profiles WHERE user_id = %s",
                         (user_id,)
                     )
                     result = cur.fetchone()

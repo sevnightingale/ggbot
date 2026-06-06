@@ -704,42 +704,40 @@ async def list_users(
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Build query - join with auth.users for email
+            # Email now lives on user_profiles (auth.users decoupled); last_sign_in_at no longer tracked.
             if search:
                 cur.execute("""
                     SELECT
                         up.user_id,
-                        au.email,
+                        up.email,
                         up.subscription_tier,
                         up.subscription_status,
-                        au.created_at as joined_at,
-                        au.last_sign_in_at,
+                        up.created_at as joined_at,
+                        NULL::timestamptz as last_sign_in_at,
                         (SELECT COUNT(*) FROM configurations WHERE user_id = up.user_id) as bot_count,
                         (SELECT COALESCE(SUM(total_trades), 0) FROM paper_accounts pa
                          JOIN configurations c ON c.config_id = pa.config_id
                          WHERE c.user_id = up.user_id) as total_trades
                     FROM user_profiles up
-                    JOIN auth.users au ON au.id = up.user_id
-                    WHERE au.email ILIKE %s
-                    ORDER BY au.last_sign_in_at DESC NULLS LAST
+                    WHERE up.email ILIKE %s
+                    ORDER BY up.created_at DESC NULLS LAST
                     LIMIT %s OFFSET %s
                 """, (f"%{search}%", limit, offset))
             else:
                 cur.execute("""
                     SELECT
                         up.user_id,
-                        au.email,
+                        up.email,
                         up.subscription_tier,
                         up.subscription_status,
-                        au.created_at as joined_at,
-                        au.last_sign_in_at,
+                        up.created_at as joined_at,
+                        NULL::timestamptz as last_sign_in_at,
                         (SELECT COUNT(*) FROM configurations WHERE user_id = up.user_id) as bot_count,
                         (SELECT COALESCE(SUM(total_trades), 0) FROM paper_accounts pa
                          JOIN configurations c ON c.config_id = pa.config_id
                          WHERE c.user_id = up.user_id) as total_trades
                     FROM user_profiles up
-                    JOIN auth.users au ON au.id = up.user_id
-                    ORDER BY au.last_sign_in_at DESC NULLS LAST
+                    ORDER BY up.created_at DESC NULLS LAST
                     LIMIT %s OFFSET %s
                 """, (limit, offset))
 
@@ -759,8 +757,7 @@ async def list_users(
             if search:
                 cur.execute("""
                     SELECT COUNT(*) FROM user_profiles up
-                    JOIN auth.users au ON au.id = up.user_id
-                    WHERE au.email ILIKE %s
+                    WHERE up.email ILIKE %s
                 """, (f"%{search}%",))
             else:
                 cur.execute("SELECT COUNT(*) FROM user_profiles")
@@ -789,7 +786,7 @@ async def get_user_detail(
             cur.execute("""
                 SELECT
                     up.user_id,
-                    au.email,
+                    up.email,
                     up.subscription_tier,
                     up.subscription_status,
                     up.subscription_expires_at,
@@ -798,12 +795,11 @@ async def get_user_detail(
                     up.paid_data_points,
                     up.telegram_user_id,
                     up.telegram_username,
-                    au.created_at as joined_at,
-                    au.last_sign_in_at,
+                    up.created_at as joined_at,
+                    NULL::timestamptz as last_sign_in_at,
                     up.created_at as profile_created,
                     up.updated_at as profile_updated
                 FROM user_profiles up
-                JOIN auth.users au ON au.id = up.user_id
                 WHERE up.user_id = %s
             """, (user_id,))
 

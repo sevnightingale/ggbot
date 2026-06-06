@@ -17,8 +17,9 @@ module.exports = {
         PYTHONPATH: '/home/sev/ggbot',
         DEVELOPMENT_MODE: 'false',
         DATABASE_URL: process.env.DATABASE_URL,
-        SUPABASE_URL: process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        GGBOT_VAULT_KEY: process.env.GGBOT_VAULT_KEY,
+        SERVICE_AUTH_TOKEN: process.env.SERVICE_AUTH_TOKEN,
+        SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
         REDIS_URL: process.env.REDIS_URL
@@ -102,8 +103,7 @@ module.exports = {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
         DATABASE_URL: process.env.DATABASE_URL,
-        SUPABASE_URL: process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        GGBOT_VAULT_KEY: process.env.GGBOT_VAULT_KEY,
         REDIS_URL: process.env.REDIS_URL
       },
       error_file: 'logs/account-monitor-error.log',
@@ -131,8 +131,8 @@ module.exports = {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
         DATABASE_URL: process.env.DATABASE_URL,
-        SUPABASE_URL: process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        GGBOT_VAULT_KEY: process.env.GGBOT_VAULT_KEY,
+        SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
         REDIS_URL: process.env.REDIS_URL

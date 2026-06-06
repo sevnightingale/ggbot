@@ -11,18 +11,7 @@ from typing import Optional, Dict, Any
 from functools import wraps
 from fastapi import HTTPException, Request, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import create_client, Client
 from core.common.logger import logger
-
-def create_supabase_client() -> Client:
-    """Create and return a Supabase client for backend operations."""
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_KEY")
-    
-    if not url or not key:
-        raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required")
-    
-    return create_client(url, key)
 
 def verify_jwt_token(token: str) -> Optional[Dict[str, Any]]:
     """
@@ -108,39 +97,6 @@ def require_auth(f):
         return await f(*args, **kwargs)
     
     return decorated_function
-
-def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Get full user information from a JWT token using Supabase client.
-    
-    Args:
-        token: The JWT token
-        
-    Returns:
-        User information if valid, None if invalid
-    """
-    payload = verify_jwt_token(token)
-    if not payload:
-        return None
-    
-    try:
-        supabase = create_supabase_client()
-        user_id = payload.get("sub")
-        
-        # Get user information from Supabase Auth
-        user_response = supabase.auth.get_user(token)
-        if user_response.user:
-            return {
-                "id": user_response.user.id,
-                "email": user_response.user.email,
-                "created_at": user_response.user.created_at,
-                "last_sign_in_at": user_response.user.last_sign_in_at,
-                "user_metadata": user_response.user.user_metadata
-            }
-    except Exception as e:
-        print(f"Error getting user from token: {e}")
-    
-    return None
 
 # V2 FastAPI Security Scheme
 security = HTTPBearer()

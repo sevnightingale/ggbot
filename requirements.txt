@@ -140,7 +140,6 @@ platformdirs==4.3.6
 playwright==1.51.0
 pluggy==1.5.0
 portalocker==2.10.1
-postgrest==1.1.1
 posthog==3.23.0
 propcache==0.3.1
 proto-plus==1.26.1
@@ -179,7 +178,6 @@ pytz==2024.2
 pyunormalize==16.0.0
 PyYAML==6.0.2
 qdrant-client==1.13.3
-realtime==2.7.0
 redis==5.2.1
 referencing==0.36.2
 regex==2024.11.6
@@ -205,12 +203,8 @@ soupsieve==2.6
 SQLAlchemy==2.0.40
 sse-starlette==2.3.3
 starlette==0.49.1
-storage3==0.12.1
 StrEnum==0.4.15
 stripe==11.1.0
-supabase==2.18.1
-supabase_auth==2.12.3
-supabase_functions==0.10.1
 tenacity==9.0.0
 tiktoken==0.9.0
 tomli==2.4.0

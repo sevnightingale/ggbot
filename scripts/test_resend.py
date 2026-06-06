@@ -95,10 +95,9 @@ def test_user_sync():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, email
-                FROM auth.users
-                WHERE deleted_at IS NULL
-                AND email IS NOT NULL
+                SELECT user_id, email
+                FROM user_profiles
+                WHERE email IS NOT NULL
                 LIMIT 1
             """)
             result = cur.fetchone()

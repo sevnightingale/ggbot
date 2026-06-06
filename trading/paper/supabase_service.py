@@ -1,11 +1,11 @@
 """
-Supabase Paper Trading Service
+Paper Trading Service
 
-Core execution engine for paper trading using WebSocket live prices and Supabase for persistence.
-Handles trade execution, position tracking, and portfolio management via Supabase REST API.
+Core execution engine for paper trading using WebSocket live prices and local
+PostgreSQL for persistence. Handles trade execution, position tracking, and
+portfolio management via direct psycopg2 SQL (core.common.db helpers).
 """
 
-import os
 import uuid
 import asyncio
 import time
@@ -13,13 +13,12 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union
 from decimal import Decimal
 from dotenv import load_dotenv
-from supabase import create_client, Client
-from psycopg2.extras import execute_values
+from psycopg2.extras import execute_values, RealDictCursor
 
 import redis
 
 from core.common.logger import logger
-from core.common.db import get_db_connection
+from core.common.db import get_db_connection, db_fetch_one, db_fetch_all, db_execute_returning
 from core.symbols.standardizer import UniversalSymbolStandardizer
 from core.config import config_repo, BotConfig
 from core.domain.models.account import Account
@@ -112,13 +111,6 @@ class SupabasePaperTradingService:
     """
     
     def __init__(self):
-        self.supabase_url = os.getenv("SUPABASE_URL")
-        self.supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
-
-        if not self.supabase_url or not self.supabase_key:
-            raise ValueError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables")
-
-        self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
         self.price_service = LivePriceService()
         self.symbol_standardizer = UniversalSymbolStandardizer()
         self.account_repo = supabase_account_repo
@@ -412,47 +404,52 @@ class SupabasePaperTradingService:
             trade_id = str(uuid.uuid4())
             
             try:
-                # Insert trade record into Supabase
-                trade_data = {
-                    'trade_id': trade_id,
-                    'account_id': str(account.account_id),
-                    'config_id': config_id,
-                    'user_id': user_id,
-                    'decision_id': decision_id,
-                    'symbol': symbol,
-                    'side': action,
-                    'entry_price': entry_price,
-                    'current_price': entry_price,
-                    'size_usd': position_size_usd,
-                    # Note: size_contracts not in schema - using size_usd/entry_price calculation
-                    'leverage': leverage,
-                    'margin_used': margin_with_fees,  # Store actual reserved amount for later release
-                    'unrealized_pnl': 0.0,
-                    'status': 'open',
-                    'stop_loss': stop_loss,
-                    'take_profit': take_profit,
-                    'liquidation_price': liquidation_price,
-                    'confidence_score': confidence
-                    # Note: reasoning field not in schema, will track separately if needed
-                }
-                
-                response = self.supabase.table('paper_trades').insert(trade_data).execute()
-                if not response.data:
+                # Insert trade record into paper_trades
+                # Note: size_contracts not in schema - using size_usd/entry_price calculation
+                # margin_used stores actual reserved amount for later release
+                # Note: reasoning field not in schema, will track separately if needed
+                inserted_trade = await db_execute_returning(
+                    """
+                    INSERT INTO paper_trades (
+                        trade_id, account_id, config_id, user_id, decision_id,
+                        symbol, side, entry_price, current_price, size_usd,
+                        leverage, margin_used, unrealized_pnl, status,
+                        stop_loss, take_profit, liquidation_price, confidence_score
+                    ) VALUES (
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s
+                    )
+                    RETURNING trade_id
+                    """,
+                    (
+                        trade_id, str(account.account_id), config_id, user_id, decision_id,
+                        symbol, action, entry_price, entry_price, position_size_usd,
+                        leverage, margin_with_fees, 0.0, 'open',
+                        stop_loss, take_profit, liquidation_price, confidence
+                    )
+                )
+                if not inserted_trade:
                     raise Exception("Failed to insert trade record")
-                
+
                 # Create entry order record
-                order_data = {
-                    'trade_id': trade_id,
-                    'user_id': user_id,
-                    'order_type': 'market',
-                    'side': 'buy' if action == 'long' else 'sell',
-                    'filled_price': entry_price,
-                    'size': size_contracts,  # This should match schema
-                    'fees': fees
-                }
-                
-                response = self.supabase.table('paper_orders').insert(order_data).execute()
-                if not response.data:
+                inserted_order = await db_execute_returning(
+                    """
+                    INSERT INTO paper_orders (
+                        trade_id, user_id, order_type, side, filled_price, size, fees
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s
+                    )
+                    RETURNING order_id
+                    """,
+                    (
+                        trade_id, user_id, 'market',
+                        'buy' if action == 'long' else 'sell',
+                        entry_price, size_contracts, fees
+                    )
+                )
+                if not inserted_order:
                     logger.warning(f"Failed to create order record for trade {trade_id}")
 
                 # Log trade entry activity
@@ -538,16 +535,25 @@ class SupabasePaperTradingService:
         """
         try:
             # Idempotency check: Get trade details and verify it's open
-            response = self.supabase.table('paper_trades').select("*").eq('trade_id', trade_id).execute()
+            def _fetch_trade():
+                with get_db_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute(
+                            "SELECT * FROM paper_trades WHERE trade_id = %s",
+                            (trade_id,)
+                        )
+                        return cur.fetchone()
 
-            if not response.data:
+            trade = await asyncio.to_thread(_fetch_trade)
+
+            if not trade:
                 logger.warning(f"Trade {trade_id} not found, cannot close")
                 return {
                     "status": "failed",
                     "reason": "Trade not found"
                 }
 
-            trade = response.data[0]
+            trade = dict(trade)
 
             # Check if already closed (prevents multiple systems from closing same trade)
             if trade['status'] != 'open':
@@ -582,8 +588,11 @@ class SupabasePaperTradingService:
             close_fees = self._calculate_fees(close_size_usd)
             
             # Get existing fees from paper_orders (entry fees)
-            orders_response = self.supabase.table('paper_orders').select("fees").eq('trade_id', trade_id).execute()
-            entry_fees = sum(float(order.get('fees', 0)) for order in orders_response.data)
+            orders_rows = await db_fetch_all(
+                "SELECT fees FROM paper_orders WHERE trade_id = %s",
+                (trade_id,)
+            )
+            entry_fees = sum(float(row[0]) if row[0] is not None else 0.0 for row in orders_rows)
             
             total_fees = entry_fees + close_fees
             
@@ -591,31 +600,50 @@ class SupabasePaperTradingService:
             net_pnl = pnl - close_fees
             
             # Update trade record
-            update_data = {
-                'status': 'closed',
-                'current_price': close_price,
-                'realized_pnl': net_pnl,
-                'closed_at': datetime.now(timezone.utc).isoformat(),
-                'close_reason': reason
-            }
-            
-            response = self.supabase.table('paper_trades').update(update_data).eq('trade_id', trade_id).execute()
-            if not response.data:
+            updated_trade = await db_execute_returning(
+                """
+                UPDATE paper_trades SET
+                    status = %s,
+                    current_price = %s,
+                    realized_pnl = %s,
+                    closed_at = %s,
+                    close_reason = %s
+                WHERE trade_id = %s
+                RETURNING trade_id
+                """,
+                (
+                    'closed',
+                    close_price,
+                    net_pnl,
+                    datetime.now(timezone.utc).isoformat(),
+                    reason,
+                    trade_id
+                )
+            )
+            if not updated_trade:
                 raise Exception("Failed to update trade record")
-            
+
             # Create close order record
-            order_data = {
-                'trade_id': trade_id,
-                'user_id': trade['user_id'],
-                'order_type': reason if reason in ["stop_loss", "take_profit"] else "market",
-                'side': 'sell' if side == 'long' else 'buy',
-                'filled_price': close_price,
-                'size': size_contracts,
-                'fees': close_fees
-            }
-            
-            response = self.supabase.table('paper_orders').insert(order_data).execute()
-            if not response.data:
+            inserted_close_order = await db_execute_returning(
+                """
+                INSERT INTO paper_orders (
+                    trade_id, user_id, order_type, side, filled_price, size, fees
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s
+                )
+                RETURNING order_id
+                """,
+                (
+                    trade_id,
+                    trade['user_id'],
+                    reason if reason in ["stop_loss", "take_profit"] else "market",
+                    'sell' if side == 'long' else 'buy',
+                    close_price,
+                    size_contracts,
+                    close_fees
+                )
+            )
+            if not inserted_close_order:
                 logger.warning(f"Failed to create close order record for trade {trade_id}")
 
             # Update account using domain model FIRST (before logging activity)
@@ -820,8 +848,20 @@ class SupabasePaperTradingService:
     async def get_open_positions(self, config_id: str) -> List[Dict[str, Any]]:
         """Get all open positions for a config_id"""
         try:
-            response = self.supabase.table('paper_trades').select("*").eq('config_id', config_id).eq('status', 'open').order('opened_at', desc=True).execute()
-            return response.data
+            def _fetch():
+                with get_db_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute(
+                            """
+                            SELECT * FROM paper_trades
+                            WHERE config_id = %s AND status = 'open'
+                            ORDER BY opened_at DESC
+                            """,
+                            (config_id,)
+                        )
+                        return [dict(row) for row in cur.fetchall()]
+
+            return await asyncio.to_thread(_fetch)
         except Exception as e:
             logger.error(f"Failed to get open positions: {str(e)}")
             return []
@@ -829,10 +869,19 @@ class SupabasePaperTradingService:
     async def get_account_summary(self, config_id: str) -> Dict[str, Any]:
         """Get paper account summary with performance stats"""
         try:
-            response = self.supabase.table('paper_accounts').select("*").eq('config_id', config_id).execute()
-            
-            if response.data:
-                account_data = response.data[0]
+            def _fetch():
+                with get_db_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute(
+                            "SELECT * FROM paper_accounts WHERE config_id = %s",
+                            (config_id,)
+                        )
+                        return [dict(row) for row in cur.fetchall()]
+
+            data = await asyncio.to_thread(_fetch)
+
+            if data:
+                account_data = data[0]
                 
                 # Add computed fields
                 win_rate = 0
@@ -894,7 +943,7 @@ class SupabasePaperTradingService:
 
     async def _fallback_individual_updates(self, updates: List[Dict[str, Any]]) -> int:
         """
-        Fallback to individual Supabase updates if batch fails.
+        Fallback to individual position updates if batch fails.
 
         Args:
             updates: List of dicts with trade_id, current_price, unrealized_pnl
@@ -902,20 +951,31 @@ class SupabasePaperTradingService:
         Returns:
             Number of positions successfully updated
         """
-        successful_updates = 0
+        def _run():
+            successful = 0
+            for update in updates:
+                try:
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                """
+                                UPDATE paper_trades SET
+                                    current_price = %s,
+                                    unrealized_pnl = %s
+                                WHERE trade_id = %s
+                                """,
+                                (update['current_price'], update['unrealized_pnl'], update['trade_id'])
+                            )
+                            conn.commit()
+                    successful += 1
+                except Exception as e:
+                    # Rate limit individual failures to prevent log spam
+                    error_key = f"individual_update_{update['trade_id']}"
+                    if self.error_limiter.should_log(error_key):
+                        logger.warning(f"Individual update failed for {update['trade_id']}: {e}")
+            return successful
 
-        for update in updates:
-            try:
-                self.supabase.table('paper_trades').update({
-                    'current_price': update['current_price'],
-                    'unrealized_pnl': update['unrealized_pnl']
-                }).eq('trade_id', update['trade_id']).execute()
-                successful_updates += 1
-            except Exception as e:
-                # Rate limit individual failures to prevent log spam
-                error_key = f"individual_update_{update['trade_id']}"
-                if self.error_limiter.should_log(error_key):
-                    logger.warning(f"Individual update failed for {update['trade_id']}: {e}")
+        successful_updates = await asyncio.to_thread(_run)
 
         logger.info(f"🔄 Fallback: {successful_updates}/{len(updates)} positions updated individually")
         return successful_updates
@@ -936,12 +996,38 @@ class SupabasePaperTradingService:
         try:
             # Get ALL open positions (batch optimization)
             # Include config_id for per-config PnL aggregation
-            if config_id:
-                response = self.supabase.table('paper_trades').select("trade_id, config_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('config_id', config_id).eq('status', 'open').execute()
-            else:
-                response = self.supabase.table('paper_trades').select("trade_id, config_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('status', 'open').execute()
+            def _fetch_open():
+                with get_db_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        if config_id:
+                            cur.execute(
+                                """
+                                SELECT trade_id, config_id, symbol, side, entry_price,
+                                       size_usd, stop_loss, take_profit, liquidation_price
+                                FROM paper_trades
+                                WHERE config_id = %s AND status = 'open'
+                                """,
+                                (config_id,)
+                            )
+                        else:
+                            cur.execute(
+                                """
+                                SELECT trade_id, config_id, symbol, side, entry_price,
+                                       size_usd, stop_loss, take_profit, liquidation_price
+                                FROM paper_trades
+                                WHERE status = 'open'
+                                """
+                            )
+                        rows = []
+                        for row in cur.fetchall():
+                            d = dict(row)
+                            # Match PostgREST string output for ids (used as Redis keys / dict keys)
+                            d['trade_id'] = str(d['trade_id'])
+                            d['config_id'] = str(d['config_id'])
+                            rows.append(d)
+                        return rows
 
-            positions = response.data
+            positions = await asyncio.to_thread(_fetch_open)
             if not positions:
                 return 0
 
@@ -1044,8 +1130,21 @@ class SupabasePaperTradingService:
     async def get_trade_history(self, config_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Get trade history for config_id"""
         try:
-            response = self.supabase.table('paper_trades').select("*").eq('config_id', config_id).order('opened_at', desc=True).limit(limit).execute()
-            return response.data
+            def _fetch():
+                with get_db_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute(
+                            """
+                            SELECT * FROM paper_trades
+                            WHERE config_id = %s
+                            ORDER BY opened_at DESC
+                            LIMIT %s
+                            """,
+                            (config_id, limit)
+                        )
+                        return [dict(row) for row in cur.fetchall()]
+
+            return await asyncio.to_thread(_fetch)
         except Exception as e:
             logger.error(f"Failed to get trade history: {str(e)}")
             return []
@@ -1067,9 +1166,9 @@ class SupabasePaperTradingService:
             if md_health["errors"]:
                 health["errors"].extend(md_health["errors"])
             
-            # Check Supabase database
-            response = self.supabase.table('paper_accounts').select("count", count="exact").execute()
-            account_count = response.count or 0
+            # Check database connectivity + account count
+            count_row = await db_fetch_one("SELECT COUNT(*) FROM paper_accounts")
+            account_count = (count_row[0] if count_row else 0) or 0
             health["database"] = "healthy"
             health["stats"] = {
                 "total_accounts": account_count
