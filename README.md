@@ -63,7 +63,7 @@ Market Data → Extraction → Decision → Trading → Exchange
 │                   Core Infrastructure                           │
 │  ┌─────────────┬─────────────┬─────────────┬─────────────┐      │
 │  │ WebSocket   │ Monitoring  │ Config Mgmt │ Database    │      │
-│  │ Prices      │ & Alerts    │             │ (Supabase)  │      │
+│  │ Prices      │ & Alerts    │             │ (Postgres)  │      │
 └──┴─────────────┴─────────────┴─────────────┴─────────────┴──────┘
 ```
 
@@ -108,7 +108,8 @@ Market Data → Extraction → Decision → Trading → Exchange
 | **Python 3.10 / FastAPI** | REST API + SSE streaming |
 | **APScheduler** | Autonomous bot scheduling with candle alignment |
 | **pandas-ta** | Technical indicators (21 preprocessors) |
-| **PostgreSQL (Supabase)** | Main application database + auth |
+| **PostgreSQL 17 (self-hosted)** | Main application database |
+| **Supabase Auth** | SSO / JWT authentication |
 | **Redis** | Price cache, idempotency, queues, hot-path P&L |
 | **Loguru** | Structured logging with bound correlation context |
 
@@ -141,7 +142,8 @@ Market Data → Extraction → Decision → Trading → Exchange
 | Service | Purpose |
 |---------|---------|
 | **PM2** | 5 production processes: API, scheduler, market-data WebSocket, account monitor, error alerts |
-| **Supabase** | Managed Postgres, auth, encrypted secrets vault |
+| **PostgreSQL 17** | Self-hosted application database + Fernet-encrypted secrets vault |
+| **Supabase** | Auth (Google SSO, JWT) + avatar storage |
 | **Vercel** | Frontend hosting |
 
 ---

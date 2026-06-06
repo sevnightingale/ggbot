@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Comprehensive platform status check script for ggbots.
-Queries Supabase database for metrics to update ACTIVE.md.
+Queries the local PostgreSQL database for metrics to update ACTIVE.md.
 
 Usage:
     python scripts/status_check.py              # Display status only
@@ -1397,7 +1397,8 @@ def update_active_md(stats, biz_metrics=None):
             "### Infrastructure Services",
             "",
             f"- **Redis**: {redis_emoji} {redis_status['status']} (Memory: {redis_status['memory']})",
-            f"- **Supabase PostgreSQL**: 🟢 connected (Remote managed service)",
+            f"- **PostgreSQL 17 (local)**: 🟢 connected (127.0.0.1:5432/ggbot)",
+            f"- **Supabase (auth + storage only)**: free tier",
             ""
         ])
 

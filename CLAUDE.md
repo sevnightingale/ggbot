@@ -133,7 +133,7 @@ self._log_bind(symbol=symbol).error("Market data fetch failed")
 
 ### Database Access
 
-**V2 uses Supabase for all database operations**. Use direct PostgreSQL connections via `core.common.db` for V2 orchestrator.
+**App data lives in local PostgreSQL 17** (`127.0.0.1:5432/ggbot`, role `ggbot_app` — migrated off Supabase 2026-06-06). Supabase remains for **auth (GoTrue/JWT) and Storage (bot-avatars) only**. Secrets are Fernet-encrypted in the local `vault_secrets` table (`core/auth/local_vault.py`, key `GGBOT_VAULT_KEY` in .env). Use `core.common.db` for all database operations.
 
 ```python
 # ASYNC context (scheduler bot cycles) — ALWAYS use async helpers
@@ -249,13 +249,10 @@ if (!userProfile.can_activate_bots) return <UpgradePrompt />
 - If you catch yourself about to present analysis based on failed queries, STOP IMMEDIATELY.
 
 ### Database Query Requirements
-**ABSOLUTE RULE**: FOR SUPABASE DATABASE QUERIES, ALWAYS USE THE SUPABASE SKILL.
-- NEVER use psql commands directly (they don't work with Supabase remote connections)
-- NEVER use mcp__postgres__query (it doesn't work with Supabase)
-- ALWAYS use `Skill(command="supabase-db-query")` to activate the Supabase skill
-- After activating the skill, use heredoc syntax with `core.common.db.get_db_connection()`
-- The skill provides the correct method and examples
-- If you catch yourself about to use psql or postgres MCP, STOP and use the Supabase skill instead
+**RULE**: FOR DATABASE QUERIES, USE THE `supabase-db-query` SKILL PATTERN (name is historical — it targets the local PostgreSQL via the same helper).
+- ALWAYS use heredoc syntax with `core.common.db.get_db_connection()` (the skill shows the method and examples)
+- NEVER use mcp__postgres__query
+- Local `psql` exists (PG17 on this VM) and is acceptable for one-off ADMIN inspection, but app-data queries should go through `get_db_connection()` so they use the same pool/DSN as production code
 
 ### Development Approach
 - You need to be methodical. Slow. Think hard. Ask questions. Don't make assumptions.

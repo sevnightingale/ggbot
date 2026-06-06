@@ -1,5 +1,12 @@
 # Database Architecture & Design Context
 
+> **⚠️ 2026-06-06 — platform migrated to self-hosted PostgreSQL 17.** References below to
+> Supabase-hosted Postgres, per-table FKs to `auth.users`, RLS policies, the Supabase SQL
+> editor workflow, and Supabase Vault are **historical**. Current reality: app data in local
+> PG17 (`127.0.0.1:5432/ggbot`); Supabase = auth + storage only; email on `user_profiles.email`;
+> secrets in local `vault_secrets` (Fernet, `core/auth/local_vault.py`). Design *rationale*
+> below still applies.
+
 This document explains the **why** behind our database schema design decisions.
 
 **For the current schema**, see auto-generated section in [README.md](../README.md#-database-schema).

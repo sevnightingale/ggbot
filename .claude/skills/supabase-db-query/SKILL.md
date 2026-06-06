@@ -1,10 +1,14 @@
 ---
 name: Supabase Database Query
-description: Query the ggbots Supabase PostgreSQL database for bot configurations, trading performance, positions, and analytics. Use when analyzing bot performance, debugging issues, checking user data, or generating reports. Works with tables like configurations, paper_accounts, paper_trades, and decisions.
+description: Query the ggbots PostgreSQL database (local PG17 since 2026-06-06; skill name is historical) for bot configurations, trading performance, positions, and analytics. Use when analyzing bot performance, debugging issues, checking user data, or generating reports. Works with tables like configurations, paper_accounts, paper_trades, and decisions.
 allowed-tools: Bash
 ---
 
-# Supabase Database Query
+# Database Query (local PostgreSQL — name historical)
+
+> **2026-06-06**: App data migrated from Supabase to local PostgreSQL 17 (`127.0.0.1:5432/ggbot`).
+> `core.common.db.get_db_connection()` now targets the local DB — every pattern below works unchanged.
+> Supabase remains for auth + storage only; `auth.users` is NOT available (email lives on `user_profiles.email`).
 
 Query the production ggbots Supabase database using the existing connection infrastructure. This Skill provides safe, read-heavy database access for analytics, debugging, and monitoring.
 

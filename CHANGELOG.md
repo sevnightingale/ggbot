@@ -6,6 +6,24 @@ Complete history of features, fixes, and improvements. For upcoming work see ROA
 
 ---
 
+## 2026-06-06 - Database Migration: Supabase → Self-Hosted PostgreSQL 17 + App-Managed Vault
+
+Root cause: Supabase free-tier 402 `exceed_db_size_quota` (DB 1,850MB vs 500MB cap) blocked REST API + Auth since Jun 4 22:19 UTC. Resolution: full app-data migration to local PG17; Supabase retained for auth + bot-avatars storage only ($0/mo end state).
+
+**Infra**: PGDG postgresql-17 on VM (lean config: 128MB shared_buffers, UTC, scram, localhost-only), role `ggbot_app`, REVOKE PUBLIC, systemd ordering PG-before-PM2, swap 2→4GB, Redis maxmemory 256MB volatile-lru. `uuid-ossp` + `pgcrypto` installed into `extensions` schema (Supabase dump qualifies defaults as `extensions.uuid_generate_v4()` — fresh PG17 lacks schema → 5 hottest tables failed first restore; reset + re-restore clean, 0 errors).
+
+**Data**: archive dump 236MB via session pooler (PG14 client can't dump PG17 server — PGDG client required). 19 tables restored: row counts exact, content checksums identical (incl 194K activities + 161K decisions via order-independent sum-of-row-hashes — `md5(string_agg)` hit Supabase statement_timeout), enum labels+order verified, sequences ahead. 10 auth.users FKs dropped, 17 intra-public FKs kept. Profile backfill: email column + 36 missing profiles → 397/397 with email.
+
+**Vault**: Supabase Vault (non-portable pgsodium crypto) → local `vault_secrets` table, Fernet/MultiFernet (`GGBOT_VAULT_KEY`, key_version column for rotation). Only ggbot's 5 `hyperliquid_*` secrets migrated (60 `arena_*` DGClaw secrets untouched, $81 recovery dependency); UUIDs preserved → pointer columns unchanged. GATE A: all 5 local-decrypts byte-identical to source.
+
+**Code** (`core/auth/local_vault.py` new): `get_database_url()` → DATABASE_URL/DB_*, fail-loud, pool 50→30 + reset-on-broken-connection; 21 PostgREST sites → raw SQL (supabase_service 13, account_repository 5, supabase_storage 3) with exact return-shape parity; `auth.users` → `user_profiles.email` at 9 sites (admin last_sign_in_at dropped); SERVICE_AUTH_TOKEN split from SUPABASE_SERVICE_KEY; supabase-py + 5 sibling packages removed; app imports verified with supabase packages hard-blocked.
+
+**Cutover**: live HL bot held inactive; all 5 services clean boot 0 restarts; E2E cycle verified: extraction → market_data local upsert → MI (6 points) → grok decision (enter 0.58) → paper trade long BTC @ $60,895.89, 41s, 0 errors. JWT auth verified via minted HS256 token. HL credentials verified read-only (`user_state` $108.11). Supabase truncated FK-closed set → 69MB → 402 lifts. error-alerts pipeline proven live (Telegram delivery).
+
+**Ops**: nightly encrypted backups (gpg AES256, key separate from .env, `pg_restore -l` integrity check, 7d+4w retention) cron 04:30 UTC; disk >85% alert cron; rclone installed for weekly R2 offsite (`r2:ggbot-db-backups`, pending credentials). Rollback = reverse-restore from archive dump (acknowledged one-way).
+
+---
+
 ## 2026-06-04 - PM2 Namespace `gg` for Project-Scoped Service Operations
 
 All 5 services assigned `namespace: 'gg'` in `ecosystem.config.js` — enables `pm2 stop/start/restart gg` scoped to ggbot only. VM's PM2 daemon shared with unrelated projects → `pm2 restart all` unsafe. Namespace fixed at registration: stale stopped entries deleted from daemon, re-registered via eco-file cold start (`pm2 start ecosystem.config.js && pm2 save`). Namespace start/stop/delete verified on PM2 6.0.14. CLAUDE.md documents scoped ops + `pm2 save` snapshot discipline. Services resumed post OpenRouter top-up: all 5 online 0 restarts, `/health` 200, scheduler re-registered 6 bots at correct cadences, 0 errors. First post-resume cycle (17:00 UTC) verified end-to-end: 3 decisions on grok-4.3, paper long BTC/USDT @ $63,538 executed — first completed decision→trade chain since ~May 17 outage.
